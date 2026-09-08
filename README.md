@@ -44,7 +44,7 @@ practicum_emr_system/
 Clone the repository and enter the project:
 
 ```bash
-git clone <REPOSITORY_URL>
+git clone https://github.com/Gerardos0/Practicum_EMR_System.git
 cd practicum_emr_system
 ```
 
