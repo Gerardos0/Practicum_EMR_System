@@ -69,7 +69,7 @@ export default function ReviewQueuePage() {
                     <TableCell sx={{ fontWeight: 600 }}>{note.authorName}</TableCell>
                     <TableCell>
                       {patient.lastName}, {patient.firstName}
-                      <Typography variant="caption" display="block" color="text.secondary">MRN {patient.mrn}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>MRN {patient.mrn}</Typography>
                     </TableCell>
                     <TableCell>{TEMPLATES[note.templateId].name}</TableCell>
                     <TableCell>{note.signedAt ? formatDateTime(note.signedAt) : "—"}</TableCell>

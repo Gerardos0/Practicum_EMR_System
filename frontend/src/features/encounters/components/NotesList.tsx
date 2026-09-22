@@ -42,7 +42,7 @@ export default function NotesList({ notes, patientId, reviewer, emptyAction }: P
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{TEMPLATES[n.templateId].name}</Typography>
                 <Typography variant="caption" color="text.secondary">{n.diagnoses.map((d) => d.code).join(", ") || "No diagnosis yet"}</Typography>
               </TableCell>
-              <TableCell>{n.authorName}<Typography variant="caption" display="block" color="text.secondary">{disciplineLabel[n.authorDiscipline]}</Typography></TableCell>
+              <TableCell>{n.authorName}<Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{disciplineLabel[n.authorDiscipline]}</Typography></TableCell>
               <TableCell>{formatDateTime(n.updatedAt)}</TableCell>
               <TableCell><NoteStatusChip status={n.status} /></TableCell>
               <TableCell align="right">

@@ -83,9 +83,9 @@ function Field({
         getOptionLabel={(o) => `${o.code} ${o.label}`}
         isOptionEqualToValue={(a, b) => a.code === b.code}
         onChange={(_, v) => onDiagnoses?.(v)}
-        renderTags={(v, getTagProps) =>
+        renderValue={(v, getItemProps) =>
           v.map((o, i) => {
-            const { key, ...rest } = getTagProps({ index: i });
+            const { key, ...rest } = getItemProps({ index: i });
             return <Chip key={key} {...rest} size="small" label={`${o.code} ${o.label}`} />;
           })
         }
@@ -109,13 +109,13 @@ function Field({
       multiline={f.kind === "textarea"} minRows={f.kind === "textarea" ? f.rows ?? 3 : undefined}
       value={value} error={error} helperText={error ? "Required before you sign." : undefined}
       onChange={(e) => onField?.(f.id, e.target.value)}
-      InputProps={f.kind === "textarea" ? {
+      slotProps={f.kind === "textarea" ? { input: {
         endAdornment: (
           <InputAdornment position="end" sx={{ alignSelf: "flex-start", mt: 1 }}>
             <DictationButton label={f.label} onText={(t) => onField?.(f.id, (prev) => (prev ? `${prev} ${t}` : t))} />
           </InputAdornment>
         ),
-      } : undefined}
+      } } : undefined}
     />
   );
 }

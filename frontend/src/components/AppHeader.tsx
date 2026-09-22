@@ -113,6 +113,7 @@ export default function AppHeader() {
         <Chip label="Training" size="small" sx={{ bgcolor: utep.navy, color: "#fff", display: { xs: "none", md: "flex" } }} />
         <Button color="inherit" onClick={() => { signOut(); navigate("/"); }}>Sign out</Button>
       </Toolbar>
+      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
     </AppBar>
   );
 }

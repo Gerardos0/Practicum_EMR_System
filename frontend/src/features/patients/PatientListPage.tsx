@@ -62,8 +62,10 @@ export default function PatientListPage() {
         <TextField
           size="small" placeholder={isStudent ? "Search name or MRN" : "Search patient, MRN, or student"}
           value={query} onChange={(e) => setQuery(e.target.value)} sx={{ width: { xs: "100%", sm: 320 } }}
-          inputProps={{ "aria-label": "Search patients" }}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment> }}
+          slotProps={{
+            htmlInput: { "aria-label": "Search patients" },
+            input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment> },
+          }}
         />
       </Box>
 
@@ -127,7 +129,7 @@ export default function PatientListPage() {
                       <TableCell>
                         <NoteStatusChip status={r.latestNote?.status} />
                         {r.latestNote && (
-                          <Typography variant="caption" display="block" color="text.secondary">{formatDateTime(r.latestNote.updatedAt)}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{formatDateTime(r.latestNote.updatedAt)}</Typography>
                         )}
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>

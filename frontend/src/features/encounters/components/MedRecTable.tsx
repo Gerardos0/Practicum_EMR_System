@@ -54,7 +54,7 @@ export default function MedRecTable({ medications, value, readOnly, onChange }: 
                     <TextField
                       select size="small" fullWidth value={row.action ?? ""}
                       onChange={(e) => set(m.id, { action: e.target.value as MedRecAction })}
-                      inputProps={{ "aria-label": `Decision for ${label}` }}
+                      slotProps={{ htmlInput: { "aria-label": `Decision for ${label}` } }}
                     >
                       {ACTIONS.map((a) => <MenuItem key={a} value={a}>{a}</MenuItem>)}
                     </TextField>
@@ -67,7 +67,7 @@ export default function MedRecTable({ medications, value, readOnly, onChange }: 
                     <TextField
                       size="small" fullWidth value={row.comment ?? ""} placeholder="e.g. increase to 1000 mg BID"
                       onChange={(e) => set(m.id, { comment: e.target.value })}
-                      inputProps={{ "aria-label": `Comment for ${label}` }}
+                      slotProps={{ htmlInput: { "aria-label": `Comment for ${label}` } }}
                     />
                   )}
                 </TableCell>
