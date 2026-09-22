@@ -1,6 +1,7 @@
-import { ThemeProvider, CssBaseline } from "@mui/material";
+// import { ThemeProvider, CssBaseline } from "@mui/material";
+// import { theme } from "./theme";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { theme } from "./theme";
+
 import Login from "./pages/Login";
 import PatientList from "./pages/PatientList";
 import PatientChart from "./pages/PatientChart";
@@ -9,8 +10,7 @@ import InstructorQueue from "./pages/InstructorQueue";
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
@@ -20,7 +20,7 @@ function App() {
           <Route path="/review" element={<InstructorQueue />} />
         </Routes>
       </BrowserRouter>
-    </ThemeProvider>
+    
   );
 }
 

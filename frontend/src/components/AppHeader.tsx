@@ -1,15 +1,24 @@
 import { AppBar, Toolbar, Typography, Chip, Box, Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { currentUser } from "../data/mockData";
+import { fontFamily } from "../../utepGlass";
 
 export default function AppHeader() {
   const navigate = useNavigate();
 
   return (
-    <AppBar position="static" elevation={4}>
+    <AppBar
+    sx={{
+        background: "linear-gradient(90deg, #EE8B3C, #F2A15B)",
+          color: "#0E2250",
+          fontFamily,
+          fontWeight: 800,
+          fontSize: 18,
+      }}
+     position="static" elevation={4}>
       <Toolbar>
         <Typography variant="h6" component="div">
-          UTEP Educational EMR
+          UTEP EMR
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         <Typography variant="body2" sx={{ mr: 2 }}>
@@ -19,7 +28,7 @@ export default function AppHeader() {
           label={currentUser.discipline}
           size="small"
           variant="outlined"
-          sx={{ color: "inherit", borderColor: "rgba(255,255,255,0.7)", mr: 2 }}
+          sx={{ backgroundColor: "#0E2250", borderColor: "#FFFFF", color: "#FFFFFF", fontWeight: 600, mr: 2 }}
         />
         <Button color="inherit" onClick={() => navigate("/")}>
           Sign out
