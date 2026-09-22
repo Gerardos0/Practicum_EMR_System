@@ -31,20 +31,19 @@ export default function NoteForm() {
   const navigate = useNavigate();
   const patient = patients.find((p) => p.id === patientId) ?? patients[0];
 
-  const [icd10, setIcd10] = useState(ICD_OPTIONS[0]);
-  const [subjective, setSubjective] = useState(
-    "57 y/o male with T2DM diagnosed 10 years ago, here for follow-up. Reports polydipsia and fatigue x 2 months. Takes metformin 500 mg daily but admits to missing doses when traveling. No hypoglycemic episodes. Allergy: penicillin (rash)."
-  );
-  const [objective, setObjective] = useState(
-    "BP 138/84, HR 78, wt 91.2 kg. A1C 10.5% (goal <7%). SCr 0.9, K 4.1. Current regimen: metformin 500 mg PO daily, multivitamin."
-  );
-  const [assessment, setAssessment] = useState(
-    "Uncontrolled T2DM. A1C 10.5% on submaximal metformin monotherapy with documented non-adherence. Drug therapy problem: dose too low plus adherence barrier."
-  );
-  const [plan, setPlan] = useState(
-    "1. Titrate metformin to 1000 mg PO BID with meals as tolerated.\n2. Add second agent given A1C >9%; discuss GLP-1 vs SGLT2 with supervising provider.\n3. Adherence counseling, pill organizer, review of missed-dose strategy.\n4. Repeat A1C in 3 months; BMP at that visit."
-  );
+  const [icd10, setIcd10] = useState("");
+  const [subjective, setSubjective] = useState("");
+  const [objective, setObjective] = useState("");
+  const [assessment, setAssessment] = useState("");
+  const [plan, setPlan] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  const canSubmit =
+    icd10.trim() !== "" &&
+    subjective.trim() !== "" &&
+    objective.trim() !== "" &&
+    assessment.trim() !== "" &&
+    plan.trim() !== "";
 
   const handleSubmit = () => {
     const note: ClinicalNote = {
@@ -98,6 +97,7 @@ export default function NoteForm() {
 
           <TextField
             label="Subjective"
+            placeholder="Chief complaint, HPI, relevant history as reported by the patient..."
             multiline
             minRows={4}
             fullWidth
@@ -107,6 +107,7 @@ export default function NoteForm() {
           />
           <TextField
             label="Objective"
+            placeholder="Vitals, exam findings, labs relevant to this visit..."
             multiline
             minRows={3}
             fullWidth
@@ -119,6 +120,7 @@ export default function NoteForm() {
             <TextField
               select
               label="ICD-10 code"
+              placeholder="Select a code"
               sx={{ width: 300, flexShrink: 0 }}
               value={icd10}
               onChange={(e) => setIcd10(e.target.value)}
@@ -132,6 +134,7 @@ export default function NoteForm() {
             </TextField>
             <TextField
               label="Assessment — clinical rationale"
+              placeholder="Why this diagnosis, what the data supports..."
               multiline
               minRows={2}
               fullWidth
@@ -143,6 +146,7 @@ export default function NoteForm() {
 
           <TextField
             label="Plan"
+            placeholder="Numbered next steps: medications, education, follow-up, referrals..."
             multiline
             minRows={4}
             fullWidth
@@ -166,7 +170,7 @@ export default function NoteForm() {
             </Button>
             <Button
               variant="contained"
-              disabled={submitted}
+              disabled={submitted || !canSubmit}
               onClick={handleSubmit}
             >
               Submit for signature
