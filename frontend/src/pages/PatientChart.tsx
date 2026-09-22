@@ -83,7 +83,7 @@ export default function PatientChart() {
             {patient.labs.map((l) => (
               <Box key={l.name} sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Typography variant="body2">{l.name}</Typography>
-                <Typography variant="body2" color={l.flag ? "error" : "text.primary"} fontWeight={l.flag ? 600 : 400}>
+                <Typography variant="body2" color={l.flag ? "error" : "text.primary"} sx={{ fontWeight: l.flag ? 600 : 400 }}>
                   {l.value}{l.flag ? `  ${l.flag}` : ""}
                 </Typography>
               </Box>
@@ -130,7 +130,7 @@ export default function PatientChart() {
               notesForPatient.map((n) => (
                 <Box key={n.id} sx={{ mb: 1.5 }}>
                   <Divider sx={{ mb: 1.5 }} />
-                  <Typography variant="body2" fontWeight={600}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {n.authorName} &middot; {n.status.replace("_", " ")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
