@@ -1,17 +1,3 @@
-# from fastapi import FastAPI
-
-# app = FastAPI(
-#     title="API",
-#     version="1.0.0",
-# )
-
-# @app.get("/")
-# def root():
-#     return {"message": "API is running"}
-
-# @app.get("/health")
-# def health():
-#     return {"status": "healthy"}
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,7 +20,9 @@ app.add_middleware(
 # Routers get included here as you build them, e.g.:
 # from app.api.routes import auth
 # app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+from app.api.routes import auth  # noqa: E402
 
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():
