@@ -8,7 +8,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/AuthContext";
 import { listCoursesForUser } from "../api/courses";
 import { useDisplayPrefs } from "../theme/DisplayPrefsProvider";
-import { trainingStripe, utep } from "../theme/tokens";
+import { utep } from "../theme/tokens";
 import { disciplineLabel, roleLabel } from "../utils/labels";
 import { homePathFor } from "../utils/permissions";
 import { useAsync } from "../utils/useAsync";
