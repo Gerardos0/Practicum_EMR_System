@@ -36,19 +36,18 @@ export default function Login() {
         <TextField
           label="Email"
           type="email"
-          defaultValue="dreyes38362@miners.utep.edu"
+          placeholder="you@miners.utep.edu"
           fullWidth
           sx={{ mb: 3 }}
         />
         <TextField
           label="Password"
           type="password"
-          defaultValue="............"
           fullWidth
           sx={{ mb: 1.5 }}
         />
         <FormControlLabel
-          control={<Checkbox defaultChecked />}
+          control={<Checkbox />}
           label="Keep me signed in on this device"
           sx={{ mb: 2 }}
         />
