@@ -1,27 +1,63 @@
-// import { ThemeProvider, CssBaseline } from "@mui/material";
-// import { theme } from "./theme";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { DisplayPrefsProvider } from "./theme/DisplayPrefsProvider";
+import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import RequireAuth from "./features/auth/RequireAuth";
+import LoginPage from "./features/auth/LoginPage";
+import SelectCoursePage from "./features/auth/SelectCoursePage";
+import AppShell from "./components/AppShell";
+import PatientListPage from "./features/patients/PatientListPage";
+import PatientChartPage from "./features/patients/PatientChartPage";
+import NoteEditorPage from "./features/encounters/NoteEditorPage";
+import ReviewQueuePage from "./features/encounters/ReviewQueuePage";
+import NoteReviewPage from "./features/encounters/NoteReviewPage";
+import RosterImportPage from "./features/admin/RosterImportPage";
+import AuditLogPage from "./features/admin/AuditLogPage";
+import NotFoundPage from "./pages/NotFoundPage";
+import { homePathFor } from "./utils/permissions";
 
-import Login from "./pages/Login";
-import PatientList from "./pages/PatientList";
-import PatientChart from "./pages/PatientChart";
-import NoteForm from "./pages/NoteForm";
-import InstructorQueue from "./pages/InstructorQueue";
-
-function App() {
-  return (
-    
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/patients" element={<PatientList />} />
-          <Route path="/patients/:patientId" element={<PatientChart />} />
-          <Route path="/patients/:patientId/note" element={<NoteForm />} />
-          <Route path="/review" element={<InstructorQueue />} />
-        </Routes>
-      </BrowserRouter>
-    
-  );
+function LoginRoute() {
+  const { session } = useAuth();
+  if (session?.courseId) return <Navigate to={homePathFor(session.activeRole)} replace />;
+  return <LoginPage />;
 }
 
-export default App;
+export default function App() {
+  return (
+    <DisplayPrefsProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LoginRoute />} />
+
+            <Route element={<RequireAuth needsCourse={false} />}>
+              <Route path="/select-course" element={<SelectCoursePage />} />
+            </Route>
+
+            <Route element={<RequireAuth />}>
+              <Route element={<AppShell />}>
+                <Route path="/patients" element={<PatientListPage />} />
+                <Route path="/patients/:patientId" element={<PatientChartPage />} />
+
+                <Route element={<RequireAuth roles={["student"]} />}>
+                  <Route path="/patients/:patientId/notes/:noteId" element={<NoteEditorPage />} />
+                </Route>
+
+                <Route element={<RequireAuth roles={["instructor"]} />}>
+                  <Route path="/review" element={<ReviewQueuePage />} />
+                  <Route path="/review/:noteId" element={<NoteReviewPage />} />
+                </Route>
+
+                <Route element={<RequireAuth roles={["instructor", "admin"]} />}>
+                  <Route path="/admin/roster" element={<RosterImportPage />} />
+                  <Route path="/audit" element={<AuditLogPage />} />
+                </Route>
+
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </DisplayPrefsProvider>
+  );
+}
