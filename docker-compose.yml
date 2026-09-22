@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: emr_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: emr
+      POSTGRES_PASSWORD: emr
+      POSTGRES_DB: emr
+    ports:
+      - "5432:5432"
+    volumes:
+      - emr_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emr -d emr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  emr_pgdata:
