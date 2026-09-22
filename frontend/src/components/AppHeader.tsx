@@ -1,14 +1,12 @@
-import { useState } from "react";
+// import { useState } from "react";
 import {
-  AppBar, Box, Button, Chip, Divider, FormControlLabel, IconButton, Menu, MenuItem, Select,
-  Switch, ToggleButton, ToggleButtonGroup, Toolbar, Tooltip, Typography,
+  AppBar, Box, Button, Chip, MenuItem, Select, Toolbar, Typography,
 } from "@mui/material";
-import TextIncreaseOutlined from "@mui/icons-material/TextIncreaseOutlined";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/AuthContext";
 import { listCoursesForUser } from "../api/courses";
-import { useDisplayPrefs } from "../theme/DisplayPrefsProvider";
-import { trainingStripe, utep } from "../theme/tokens";
+// import { useDisplayPrefs } from "../theme/DisplayPrefsProvider";
+import { utep } from "../theme/tokens";
 import { disciplineLabel, roleLabel } from "../utils/labels";
 import { homePathFor } from "../utils/permissions";
 import { useAsync } from "../utils/useAsync";
@@ -34,8 +32,8 @@ const NAV: Record<Role, { to: string; label: string }[]> = {
 export default function AppHeader() {
   const navigate = useNavigate();
   const { user, activeRole, discipline, courseId, switchRole, selectCourse, signOut } = useSession();
-  const { prefs, setPrefs } = useDisplayPrefs();
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  // const { prefs, setPrefs } = useDisplayPrefs();
+  // const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const { data: courses = [] } = useAsync(() => listCoursesForUser(user), [user.id]);
 
   const roleCourses = courses.filter((c) => user.roles.find((r) => r.role === activeRole)?.courseIds.includes(c.id));
@@ -82,12 +80,12 @@ export default function AppHeader() {
           </Select>
         )}
 
-        <Tooltip title="Text size and contrast">
+        {/* <Tooltip title="Text size and contrast">
           <IconButton aria-label="Display settings" color="inherit" onClick={(e) => setAnchor(e.currentTarget)}>
             <TextIncreaseOutlined />
           </IconButton>
-        </Tooltip>
-        <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+        </Tooltip> */}
+        {/* <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
           <Box sx={{ px: 2, py: 1.5, width: 260 }}>
             <Typography variant="subtitle2" id="text-size" sx={{ mb: 1 }}>Text size</Typography>
             <ToggleButtonGroup
@@ -104,7 +102,7 @@ export default function AppHeader() {
               label="High contrast"
             />
           </Box>
-        </Menu>
+        </Menu> */}
 
         <Box sx={{ textAlign: "right", display: { xs: "none", sm: "block" }, lineHeight: 1.2 }}>
           <Typography variant="body2" sx={{ fontWeight: 700 }}>{user.fullName}</Typography>
@@ -113,7 +111,6 @@ export default function AppHeader() {
         <Chip label="Training" size="small" sx={{ bgcolor: utep.navy, color: "#fff", display: { xs: "none", md: "flex" } }} />
         <Button color="inherit" onClick={() => { signOut(); navigate("/"); }}>Sign out</Button>
       </Toolbar>
-      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
     </AppBar>
   );
 }

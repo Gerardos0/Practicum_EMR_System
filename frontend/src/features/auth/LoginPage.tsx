@@ -9,7 +9,7 @@ import MailOutlineRounded from "@mui/icons-material/MailOutlineRounded";
 import { useNavigate } from "react-router-dom";
 import { DEV_CODE, sendCode, startSignIn, verifyCode, type CodeChannel } from "../../api/auth";
 import { homePathFor } from "../../utils/permissions";
-import { trainingStripe, utep } from "../../theme/tokens";
+import { utep } from "../../theme/tokens";
 import { useAuth } from "./AuthContext";
 
 type Step = "credentials" | "channel" | "code";
@@ -75,7 +75,6 @@ export default function LoginPage() {
       <Box component="header" sx={{ bgcolor: utep.orange, color: utep.navy, px: { xs: 2, sm: 3.5 }, height: 60, display: "flex", alignItems: "center" }}>
         <Typography component="span" sx={{ fontWeight: 800, fontSize: 18 }}>UTEP EMR</Typography>
       </Box>
-      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
 
       <Box component="main" sx={{ flex: 1, display: "grid", placeItems: "center", px: 2, py: 5 }}>
         <Paper component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>

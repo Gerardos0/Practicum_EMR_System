@@ -6,29 +6,24 @@ import type {
 
 const users: User[] = [
   {
-    id: "u_ana", fullName: "Ana Reyes", email: "ana.reyes@miners.utep.edu",
+    id: "u_daniel", fullName: "Daniel Reyes", email: "daniel.reyes@miners.utep.edu",
     universityId: "800123456", phoneLast4: "4412",
     roles: [{ role: "student", discipline: "pharmacy", courseIds: ["c_phar"] }],
   },
   {
-    id: "u_sam", fullName: "Sam Torres", email: "sam.torres@miners.utep.edu",
+    id: "u_clarissa", fullName: "Clarissa Dominguez", email: "clarissa.dominguez@miners.utep.edu",
     universityId: "800654321", phoneLast4: "9087",
     roles: [{ role: "student", discipline: "pharmacy", courseIds: ["c_phar"] }],
   },
   {
-    id: "u_luis", fullName: "Luis Ortega", email: "luis.ortega@miners.utep.edu",
-    universityId: "800777001", phoneLast4: "1130",
-    roles: [{ role: "student", discipline: "physical_therapy", courseIds: ["c_pt"] }],
-  },
-  {
-    id: "u_mejia", fullName: "Daniel Mejía", email: "dmejia@utep.edu", phoneLast4: "2260",
+    id: "u_gerardo", fullName: "Gerardo Sillas", email: "gerardo.sillas@utep.edu", phoneLast4: "2260",
     roles: [
       { role: "instructor", courseIds: ["c_phar", "c_pt"] },
       { role: "admin", courseIds: ["c_phar", "c_pt"] },
     ],
   },
   {
-    id: "u_chavez", fullName: "Sofía Chávez", email: "schavez@utep.edu", phoneLast4: "5521",
+    id: "u_chavez", fullName: "Joe Mota", email: "joe.mota@utep.edu", phoneLast4: "5521",
     roles: [{ role: "instructor", courseIds: ["c_phar"] }],
   },
 ];
