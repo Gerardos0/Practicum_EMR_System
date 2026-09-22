@@ -8,7 +8,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/AuthContext";
 import { listCoursesForUser } from "../api/courses";
 import { useDisplayPrefs } from "../theme/DisplayPrefsProvider";
-import { utep } from "../theme/tokens";
+import { trainingStripe, utep } from "../theme/tokens";
 import { disciplineLabel, roleLabel } from "../utils/labels";
 import { homePathFor } from "../utils/permissions";
 import { useAsync } from "../utils/useAsync";
@@ -113,6 +113,7 @@ export default function AppHeader() {
         <Chip label="Training" size="small" sx={{ bgcolor: utep.navy, color: "#fff", display: { xs: "none", md: "flex" } }} />
         <Button color="inherit" onClick={() => { signOut(); navigate("/"); }}>Sign out</Button>
       </Toolbar>
+      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
     </AppBar>
   );
 }

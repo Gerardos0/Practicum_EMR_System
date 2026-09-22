@@ -100,7 +100,7 @@ export default function LoginPage() {
                 <TextField
                   label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password"
                   fullWidth value={password} onChange={(e) => setPassword(e.target.value)}
-                  InputProps={{
+                  slotProps={{ input: {
                     endAdornment: (
                       <InputAdornment position="end">
                         <IconButton
@@ -111,7 +111,7 @@ export default function LoginPage() {
                         </IconButton>
                       </InputAdornment>
                     ),
-                  }}
+                  } }}
                 />
                 <Button type="submit" variant="contained" size="large" disabled={busy}>
                   {busy ? "Checking…" : "Continue"}
@@ -144,7 +144,7 @@ export default function LoginPage() {
                 <TextField
                   label="6-digit code" autoFocus fullWidth value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  inputProps={{ inputMode: "numeric", autoComplete: "one-time-code", maxLength: 6, style: { letterSpacing: "0.4em", fontSize: 20 } }}
+                  slotProps={{ htmlInput: { inputMode: "numeric", autoComplete: "one-time-code", maxLength: 6, style: { letterSpacing: "0.4em", fontSize: 20 } } }}
                   helperText={import.meta.env.DEV ? `Mock backend: use ${DEV_CODE}` : undefined}
                 />
                 <Button type="submit" variant="contained" size="large" disabled={busy || code.length !== 6}>

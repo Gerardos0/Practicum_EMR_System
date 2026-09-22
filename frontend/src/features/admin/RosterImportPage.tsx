@@ -70,7 +70,7 @@ export default function RosterImportPage() {
           account keep it; they're just added to this course. <Link href={templateHref} download="roster-template.csv">Download a template</Link>.
         </Typography>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
           <TextField select size="small" label="Students' discipline" value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} sx={{ minWidth: 240 }}>
             {(Object.keys(disciplineLabel) as Discipline[]).map((d) => <MenuItem key={d} value={d}>{disciplineLabel[d]}</MenuItem>)}
           </TextField>

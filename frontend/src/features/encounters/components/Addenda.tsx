@@ -26,7 +26,7 @@ export default function Addenda({ items, onAdd }: Props) {
         ))}
       </Stack>
       {onAdd && (
-        <Stack spacing={1} alignItems="flex-start">
+        <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
           <TextField
             label="New addendum" multiline minRows={2} fullWidth value={body} onChange={(e) => setBody(e.target.value)}
             helperText="Use an addendum to correct or add to a signed note. The original stays as signed."

@@ -24,7 +24,7 @@ export default function AuditLogPage() {
           <Typography component="h1" variant="h5">Activity log</Typography>
           <Typography variant="body2" color="text.secondary">Every chart view, note action, and denied attempt. Entries can't be edited or deleted.</Typography>
         </Box>
-        <TextField size="small" placeholder="Filter by person, action, or record" value={q} onChange={(e) => setQ(e.target.value)} inputProps={{ "aria-label": "Filter activity" }} sx={{ width: { xs: "100%", sm: 300 } }} />
+        <TextField size="small" placeholder="Filter by person, action, or record" value={q} onChange={(e) => setQ(e.target.value)} slotProps={{ htmlInput: { "aria-label": "Filter activity" } }} sx={{ width: { xs: "100%", sm: 300 } }} />
         <FormControlLabel control={<Switch checked={deniedOnly} onChange={(e) => setDeniedOnly(e.target.checked)} />} label="Denied only" />
       </Box>
       <Paper>
