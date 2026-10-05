@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import type { Discipline, RosterRow, User } from "../../types";
-import { importRoster, listRoster, removeFromCourse } from "../../api/roster";
+import { importRoster, listRoster, removeFromCourse, type TempPassword } from "../../api/roster";
 import { getCourse } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
 import { disciplineLabel } from "../../utils/labels";
@@ -14,12 +14,13 @@ import EmptyState from "../../components/EmptyState";
 import { parseRosterFile, ROSTER_TEMPLATE_CSV } from "./parseRoster";
 
 export default function RosterImportPage() {
-  const { user, courseId } = useSession();
+  const { courseId } = useSession();
   const fileInput = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<RosterRow[]>();
   const [fileName, setFileName] = useState("");
   const [discipline, setDiscipline] = useState<Discipline>("pharmacy");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string }>();
+  const [passwords, setPasswords] = useState<TempPassword[]>([]);
   const [removing, setRemoving] = useState<User>();
 
   const course = useAsync(() => getCourse(courseId), [courseId]);
@@ -44,7 +45,8 @@ export default function RosterImportPage() {
   const doImport = async () => {
     if (!rows) return;
     try {
-      const res = await importRoster(user, courseId, discipline, rows);
+      const res = await importRoster(courseId, discipline, rows);
+      setPasswords(res.temporaryPasswords);
       setMessage({ kind: "success", text: `Added ${res.added} students to ${course.data?.code}.${res.alreadyEnrolled ? ` ${res.alreadyEnrolled} were already enrolled.` : ""}` });
       setRows(undefined);
       setFileName("");
@@ -62,6 +64,16 @@ export default function RosterImportPage() {
       </Box>
 
       {message && <Alert severity={message.kind} onClose={() => setMessage(undefined)}>{message.text}</Alert>}
+      {passwords.length > 0 && (
+        <Alert severity="warning">
+          Share these temporary passwords with the new students. They have to change them at sign-in, and this is the only time they show up.
+          <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
+            {passwords.map((item) => (
+              <li key={item.email}><strong>{item.email}</strong>: {item.password}</li>
+            ))}
+          </Box>
+        </Alert>
+      )}
 
       <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6">Add students from a spreadsheet</Typography>
@@ -153,7 +165,7 @@ export default function RosterImportPage() {
         <DialogActions>
           <Button onClick={() => setRemoving(undefined)}>Cancel</Button>
           <Button color="error" variant="contained" onClick={async () => {
-            await removeFromCourse(user, courseId, removing!.id);
+            await removeFromCourse(courseId, removing!.id);
             setRemoving(undefined);
             roster.reload();
           }}>Remove student</Button>

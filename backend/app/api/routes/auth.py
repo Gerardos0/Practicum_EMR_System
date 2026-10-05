@@ -70,7 +70,6 @@ async def login(
 
 @router.post("/refresh", response_model=Token)
 async def refresh(user: UserAllowPwChange, db: DbSession):
-    """Sliding renewal. The caller already holds a valid access token."""
     return Token(
         access_token=create_access_token(str(user.id)),
         must_change_password=user.must_change_password,

@@ -1,12 +1,4 @@
-"""Seed roles, disciplines, and the synthetic demo chart.
-
-Run from backend/:  python -m app.scripts.seed
-Demo accounts use SEED_DEMO_PASSWORD, or "practicum-demo" outside production.
-Safe to re-run.
-
-The Batch Account Administrator role from the Sprint 1 answers is deferred.
-Roster import stays on instructor and admin.
-"""
+"""Demo courses, users, and charts. From backend/: python -m app.scripts.seed"""
 import argparse
 import asyncio
 import getpass
@@ -80,7 +72,7 @@ async def seed(admin_email: str | None, admin_password: str | None) -> None:
         permissions = await _upsert_permissions(db)
         disciplines = await _upsert_disciplines(db)
         roles = await _upsert_roles(db, permissions)
-        await _drop_obsolete(db, disciplines)
+        await _drop_obsolete(db)
         await _seed_courses_and_people(db, roles, disciplines, _demo_password())
         if admin_email and admin_password:
             await _ensure_admin(db, roles["admin"], admin_email, admin_password)
@@ -135,16 +127,13 @@ async def _upsert_roles(db, permissions: dict[str, Permission]) -> dict[str, Rol
     return existing
 
 
-async def _drop_obsolete(db, disciplines: dict[str, Discipline]) -> None:
+async def _drop_obsolete(db) -> None:
     for role in (await db.scalars(select(Role))).all():
         if role.code not in ROLE_PERMISSIONS:
             await db.delete(role)
     for perm in (await db.scalars(select(Permission))).all():
         if perm.code not in PERMISSIONS:
             await db.delete(perm)
-    keep = {row.id for code, row in disciplines.items() if code in DISCIPLINES}
-    stale = [row.id for row in disciplines.values() if row.id not in keep]
-    # disciplines dict includes ones we just created plus previously loaded. Reload.
     all_disciplines = (await db.scalars(select(Discipline))).all()
     stale = [row.id for row in all_disciplines if row.code not in DISCIPLINES]
     if stale:

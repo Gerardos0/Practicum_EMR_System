@@ -1,5 +1,3 @@
-"""Identity + RBAC (FR-01..FR-08). Roles, disciplines and permissions are
-data-driven rows, not hard-coded enums, per the Week 0 design note."""
 import uuid
 from datetime import datetime
 
@@ -57,10 +55,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     phone_last4: Mapped[str | None] = mapped_column(String(4))
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True)  # FR-08
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    # Course-scoped role and discipline live on course_memberships. This FK is unused by the API.
     discipline_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("disciplines.id"))
 
     discipline: Mapped[Discipline | None] = relationship()

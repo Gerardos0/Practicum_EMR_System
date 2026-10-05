@@ -10,10 +10,10 @@ import { useAsync } from "../../utils/useAsync";
 import ReferralDialog from "./ReferralDialog";
 
 export default function SchedulingTab({ patient }: { patient: Patient }) {
-  const { user, activeRole } = useSession();
+  const { activeRole } = useSession();
   const [open, setOpen] = useState(false);
-  const appts = useAsync(() => listAppointments(patient.id), [patient.id]);
-  const refs = useAsync(() => listReferrals(patient.id), [patient.id]);
+  const appts = useAsync(() => listAppointments(patient.id, activeRole), [patient.id, activeRole]);
+  const refs = useAsync(() => listReferrals(patient.id, activeRole), [patient.id, activeRole]);
 
   return (
     <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { md: "1fr 1fr" } }}>
@@ -54,7 +54,7 @@ export default function SchedulingTab({ patient }: { patient: Patient }) {
         open={open}
         onClose={() => setOpen(false)}
         onCreate={async (input) => {
-          await createReferral(user, { ...input, patientId: patient.id });
+          await createReferral(activeRole, { ...input, patientId: patient.id });
           refs.reload();
         }}
       />

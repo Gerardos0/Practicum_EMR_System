@@ -34,7 +34,7 @@ export default function AppHeader() {
   const { user, activeRole, discipline, courseId, switchRole, selectCourse, signOut } = useSession();
   // const { prefs, setPrefs } = useDisplayPrefs();
   // const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const { data: courses = [] } = useAsync(() => listCoursesForUser(user), [user.id]);
+  const { data: courses = [] } = useAsync(() => listCoursesForUser(), [user.id]);
 
   const roleCourses = courses.filter((c) => user.roles.find((r) => r.role === activeRole)?.courseIds.includes(c.id));
 

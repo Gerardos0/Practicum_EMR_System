@@ -1,5 +1,3 @@
-"""FR-05 / NFR-05: append-only audit trail. No updated_at, no soft delete --
-rows are only ever inserted. (Later: revoke UPDATE/DELETE at the DB role level.)"""
 import uuid
 from datetime import datetime
 from typing import Any

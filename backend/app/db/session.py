@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 
-# asyncpg takes ssl as a connect arg. libpq's ?sslmode= is stripped in config.
 connect_args: dict = {"ssl": True} if settings.database_ssl else {}
 
 engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
@@ -15,6 +14,5 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency: one async DB session per request."""
     async with AsyncSessionLocal() as session:
         yield session

@@ -1,9 +1,3 @@
-"""Clinical chart. Note templates live on clinical_notes.template_id.
-
-source_patient_id links a student's assessment copy back to the instructor chart
-it was cloned from. It is not a reusable patient-template catalog. case_key is
-the string the UI already calls caseTemplateId (for example "case_t2dm").
-"""
 import uuid
 from datetime import date, datetime
 from typing import Any

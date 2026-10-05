@@ -19,5 +19,4 @@ class TimestampMixin:
 
 
 class SoftDeleteMixin:
-    """NFR-02: clinical records are never hard-deleted."""
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

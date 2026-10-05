@@ -15,7 +15,7 @@ export default function SelectCoursePage() {
   const navigate = useNavigate();
   const { user, activeRole, switchRole, selectCourse, signOut } = useSession();
   const [picked, setPicked] = useState<string>();
-  const { data: courses = [] } = useAsync(() => listCoursesForUser(user), [user.id]);
+  const { data: courses = [] } = useAsync(() => listCoursesForUser(), [user.id]);
 
   const assignment = user.roles.find((r) => r.role === activeRole);
   const available = courses.filter((c) => assignment?.courseIds.includes(c.id));

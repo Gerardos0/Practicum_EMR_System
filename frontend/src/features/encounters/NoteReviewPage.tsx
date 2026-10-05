@@ -23,16 +23,16 @@ import { TEMPLATES } from "./noteTemplates";
 
 export default function NoteReviewPage() {
   const { noteId = "" } = useParams();
-  const { user, activeRole, courseId } = useSession();
+  const { activeRole, courseId } = useSession();
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useAsync(async () => {
-    const note = await getNote(user, activeRole, noteId);
-    const patient = await getPatient(user, activeRole, note.patientId);
+    const note = await getNote(activeRole, noteId);
+    const patient = await getPatient(activeRole, note.patientId);
     return { note, patient };
-  }, [noteId, user.id, activeRole]);
+  }, [noteId, activeRole]);
   const course = useAsync(() => getCourse(courseId), [courseId]);
 
   if (load.error) return <PageError error={load.error} />;
@@ -50,8 +50,8 @@ export default function NoteReviewPage() {
     setError("");
     try {
       const updated = kind === "cosign"
-        ? await cosignNote(user, activeRole, note.id, comment)
-        : await returnNote(user, activeRole, note.id, comment);
+        ? await cosignNote(activeRole, note.id, comment)
+        : await returnNote(activeRole, note.id, comment);
       load.setData({ note: updated, patient });
       setComment("");
     } catch (e) {

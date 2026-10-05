@@ -7,7 +7,6 @@ _UNSAFE_SECRETS = {"", "change-me", "change-me-to-a-long-random-string"}
 
 
 def _as_asyncpg(url: str) -> str:
-    """Accept Render's postgres:// and a plain postgresql:// URL."""
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
     if url.startswith("postgresql+psycopg2://"):
@@ -18,7 +17,6 @@ def _as_asyncpg(url: str) -> str:
 
 
 def _strip_ssl_query(url: str) -> tuple[str, bool]:
-    """asyncpg rejects libpq's sslmode. Keep the requirement as a flag instead."""
     parsed = urlparse(url)
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
     sslmode = query.pop("sslmode", None)
@@ -34,16 +32,15 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = "development"
 
-    # App runs async through asyncpg. Render hands out postgres://, which is normalized below.
     DATABASE_URL: str = "postgresql+asyncpg://emr:emr@localhost:5432/emr"
     database_ssl: bool = False
 
     JWT_SECRET_KEY: str = "change-me"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # short-lived tokens support FR-09 session timeout
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
 
-    CORS_ORIGINS: list[str] = ["http://localhost:5173"]  # Vite dev server
-    CORS_ORIGIN_REGEX: str | None = None  # e.g. https://.*\.vercel\.app
+    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    CORS_ORIGIN_REGEX: str | None = None
 
     @model_validator(mode="after")
     def normalize(self) -> "Settings":
@@ -56,7 +53,6 @@ class Settings(BaseSettings):
 
     @property
     def SYNC_DATABASE_URL(self) -> str:
-        """Same database, sync psycopg2 driver -- used by Alembic and one-off scripts."""
         url = self.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
         if self.database_ssl and "sslmode=" not in url:
             joiner = "&" if "?" in url else "?"

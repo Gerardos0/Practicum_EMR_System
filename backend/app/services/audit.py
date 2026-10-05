@@ -1,6 +1,3 @@
-"""FR-05: one place every module calls to record who did what, when.
-Does NOT commit -- the caller commits, so the audit row and the change it
-describes are saved together or not at all."""
 import uuid
 from typing import Any
 

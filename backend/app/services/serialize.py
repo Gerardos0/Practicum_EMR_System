@@ -1,4 +1,3 @@
-"""Build the camelCase payloads the frontend already expects."""
 from datetime import date
 
 from app.models.clinical import (
@@ -178,6 +177,7 @@ async def user_out(db, user: User) -> dict:
         {"role": role, "discipline": discipline, "course_ids": sorted(course_ids)}
         for (role, discipline), course_ids in sorted(grouped.items())
     ]
+    await db.refresh(user, attribute_names=["roles"])
     if any(item.code == "admin" for item in user.roles) and not any(item["role"] == "admin" for item in roles):
         from sqlalchemy import select
 

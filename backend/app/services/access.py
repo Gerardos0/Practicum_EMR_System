@@ -1,8 +1,3 @@
-"""Active-role checks. A user may hold several roles; the request says which one is in use.
-
-Permissions match frontend/src/utils/permissions.ts. The union of a user's roles is not enough:
-Gerardo is both instructor and admin, and the UI role switcher must change what the API allows.
-"""
 import uuid
 
 from fastapi import HTTPException, status

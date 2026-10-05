@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routes import audit, auth, courses, notes, patients, scheduling
 from app.core.config import settings
 from app.db.session import get_db
 
@@ -17,11 +18,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Routers get included here as you build them, e.g.:
-# from app.api.routes import auth
-# app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-from app.api.routes import audit, auth, courses, notes, patients, scheduling  # noqa: E402
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(courses.router, prefix=settings.API_V1_PREFIX)

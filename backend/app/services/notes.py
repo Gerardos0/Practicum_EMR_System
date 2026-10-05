@@ -1,6 +1,3 @@
-"""Note lifecycle. Practice notes are final when the author signs. Assessment notes
-go to the instructor and can only be corrected with an addendum after co-signature.
-"""
 import uuid
 
 from fastapi import HTTPException, status

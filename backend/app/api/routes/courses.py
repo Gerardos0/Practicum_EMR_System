@@ -29,7 +29,6 @@ async def _instructors(db, course_id: uuid.UUID) -> list[User]:
             select(CourseMembership).where(CourseMembership.course_id == course_id)
         )
     ).all()
-    # role is selectin-loaded only if the relationship is configured that way. Load explicitly.
     found: list[User] = []
     seen: set[uuid.UUID] = set()
     for row in rows:
@@ -197,7 +196,6 @@ async def remove_from_course(
 
 
 def _staff_role(user: User, rows, course_id: uuid.UUID) -> str:
-    """Instructor and admin can both manage a roster. Prefer the course membership."""
     if any(row.role.code == "instructor" and row.course_id == course_id for row in rows):
         require_course("instructor", course_id, user, rows)
         return "instructor"

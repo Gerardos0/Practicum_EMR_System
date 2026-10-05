@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type DependencyList } from "react";
 
-/** Tiny data-loading hook. Swap for TanStack Query once real endpoints exist. */
 export function useAsync<T>(fn: () => Promise<T>, deps: DependencyList) {
   const [data, setData] = useState<T | undefined>();
   const [error, setError] = useState<Error | undefined>();

@@ -1,4 +1,3 @@
-"""Authorization, chart, note, roster, and audit behavior against Postgres."""
 import pytest
 
 DEMO = "practicum-demo"
@@ -47,8 +46,8 @@ async def test_student_cannot_see_another_students_assessment(client):
     course = await course_id(client, headers, "PHAR 5320")
     listed = await client.get("/api/v1/patients", headers=headers, params={"course_id": course, "role": "student"})
     mrns = {row["patient"]["mrn"] for row in listed.json()}
-    assert "TR-20001" in mrns  # shared practice chart
-    assert "TR-10057-ST" not in mrns  # Sam's assessment copy
+    assert "TR-20001" in mrns
+    assert "TR-10057-ST" not in mrns
 
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     sam = await patient_by_mrn(client, instructor, course, "instructor", "TR-10057-ST")

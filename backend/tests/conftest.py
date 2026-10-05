@@ -1,4 +1,3 @@
-"""Point the test process at emr_test, migrate it, and seed the synthetic charts."""
 import asyncio
 import os
 from pathlib import Path

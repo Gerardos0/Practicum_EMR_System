@@ -1,4 +1,3 @@
-"""Patient visibility, status changes, and practice-chart reset."""
 import uuid
 from datetime import date, datetime, timezone
 
@@ -173,7 +172,6 @@ async def _replace_children(db: AsyncSession, patient: Patient, snap: dict) -> N
 
 
 def chart_snapshot(patient: Patient) -> dict:
-    """The state an instructor restores a practice chart to."""
     return {
         "chief_complaint": patient.chief_complaint,
         "hpi": patient.hpi,
