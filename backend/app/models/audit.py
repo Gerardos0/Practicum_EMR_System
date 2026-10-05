@@ -19,8 +19,10 @@ class AuditEvent(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
-    action: Mapped[str] = mapped_column(String(50))        # "patient.view", "note.sign", "auth.login"
+    action: Mapped[str] = mapped_column(String(80))        # "chart.view", "note.sign", "auth.login"
     entity_type: Mapped[str] = mapped_column(String(50))   # "patient", "note", ...
     entity_id: Mapped[str | None] = mapped_column(String(64))
+    result: Mapped[str] = mapped_column(String(10), default="ok", server_default="ok")
+    course_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("courses.id"), index=True)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     details: Mapped[dict[str, Any] | None] = mapped_column(JSONB)

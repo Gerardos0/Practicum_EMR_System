@@ -4,7 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+# asyncpg takes ssl as a connect arg. libpq's ?sslmode= is stripped in config.
+connect_args: dict = {"ssl": True} if settings.database_ssl else {}
+
+engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
 
 # expire_on_commit=False matters in async: otherwise touching an attribute after
 # commit triggers a lazy load, which raises MissingGreenlet.

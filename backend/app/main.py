@@ -12,6 +12,7 @@ app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,9 +21,14 @@ app.add_middleware(
 # Routers get included here as you build them, e.g.:
 # from app.api.routes import auth
 # app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
-from app.api.routes import auth  # noqa: E402
+from app.api.routes import audit, auth, courses, notes, patients, scheduling  # noqa: E402
 
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(courses.router, prefix=settings.API_V1_PREFIX)
+app.include_router(patients.router, prefix=settings.API_V1_PREFIX)
+app.include_router(notes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(scheduling.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():

@@ -53,13 +53,16 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
+    university_id: Mapped[str | None] = mapped_column(String(20))
+    phone_last4: Mapped[str | None] = mapped_column(String(4))
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True)  # FR-08
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    # Open client question #2 (multiple roles/disciplines?). Nullable single FK for now.
+    # Course-scoped role and discipline live on course_memberships. This FK is unused by the API.
     discipline_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("disciplines.id"))
 
     discipline: Mapped[Discipline | None] = relationship()
     roles: Mapped[list[Role]] = relationship(secondary=user_roles)
+    memberships: Mapped[list["CourseMembership"]] = relationship(back_populates="user")

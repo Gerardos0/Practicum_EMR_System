@@ -18,7 +18,13 @@ async def log_event(
     entity_id: str | None = None,
     ip_address: str | None = None,
     details: dict[str, Any] | None = None,
+    result: str = "ok",
+    course_id: uuid.UUID | None = None,
+    detail: str | None = None,
 ) -> None:
+    payload = dict(details or {})
+    if detail:
+        payload["detail"] = detail
     db.add(
         AuditEvent(
             action=action,
@@ -26,6 +32,8 @@ async def log_event(
             actor_user_id=actor_user_id,
             entity_id=entity_id,
             ip_address=ip_address,
-            details=details,
+            details=payload or None,
+            result=result,
+            course_id=course_id,
         )
     )
