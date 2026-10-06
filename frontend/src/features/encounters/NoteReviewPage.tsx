@@ -19,7 +19,7 @@ import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
-import { TEMPLATES } from "./noteTemplates";
+import { templateName } from "./noteTemplates";
 
 export default function NoteReviewPage() {
   const { noteId = "" } = useParams();
@@ -74,7 +74,7 @@ export default function NoteReviewPage() {
         <Paper component="article" aria-label="Student note" sx={{ p: { xs: 2, md: 3 } }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", mb: 2.5 }}>
             <Box sx={{ flex: 1 }}>
-              <Typography component="h2" variant="h5">{TEMPLATES[note.templateId].name}</Typography>
+              <Typography component="h2" variant="h5">{templateName(note.templateId)}</Typography>
               <Typography variant="body2" color="text.secondary">
                 {note.authorName}, {disciplineLabel[note.authorDiscipline]} student
                 {note.signedAt ? `. Signed ${formatDateTime(note.signedAt)}` : ""}

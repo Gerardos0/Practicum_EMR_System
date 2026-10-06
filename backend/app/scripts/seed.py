@@ -24,6 +24,8 @@ from app.models.clinical import (
     Encounter,
     LabResult,
     Medication,
+    NoteAddendum,
+    NoteComment,
     Patient,
     Problem,
     Referral,
@@ -171,7 +173,7 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
     await _member(db, gerardo, phar, roles["instructor"], None)
     await _member(db, gerardo, pt, roles["instructor"], None)
     await _member(db, joe, phar, roles["instructor"], None)
-    await _charts(db, phar, pt, ana, sam, luis, gerardo)
+    await _charts(db, phar, pt, ana, sam, luis, gerardo, daniel, clarissa)
     await _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy)
 
 
@@ -239,79 +241,75 @@ async def _ensure_admin(db, admin_role: Role, email: str, password: str) -> None
     )
 
 
-async def _charts(db, phar: Course, pt: Course, ana: User, sam: User, luis: User, gerardo: User) -> None:
-    if await db.scalar(select(Patient).where(Patient.mrn == "TR-20001")):
-        return
+async def _charts(
+    db, phar: Course, pt: Course, ana: User, sam: User, luis: User, gerardo: User, daniel: User, clarissa: User,
+) -> None:
     pharmacy = await db.scalar(select(Discipline).where(Discipline.code == "pharmacy"))
-    rosa = _patient(
-        mrn="TR-20001", first="Rosa", last="Villalobos", preferred="Rosie", dob="1958-07-02", sex="Female",
-        pronouns="she/her", course=phar, mode="practice", case_key="practice_a", label="Test Patient A",
-        cc="Blood pressure check and medication review.",
-        hpi="68-year-old female with hypertension here for a 3-month follow-up. Reports occasional ankle swelling in the evenings.",
-        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
-        family="Sister: stroke at 70.", surgical="Cholecystectomy (2004).", social="Widowed, lives alone. Former smoker, quit 2001.",
-        encounter_type="Office visit",
-    )
-    rosa.allergies.append(Allergy(substance="Sulfa drugs", reaction="Rash", severity="mild"))
-    rosa.medications.extend([
-        Medication(name="Lisinopril", dose="10 mg", route="PO", frequency="Once daily", indication="Hypertension"),
-        Medication(name="Amlodipine", dose="5 mg", route="PO", frequency="Once daily", indication="Hypertension"),
-    ])
-    rosa.problems.append(Problem(code="I10", description="Essential hypertension", since="2012"))
-    rosa.labs.extend([
-        LabResult(name="Potassium", value="4.6", unit="mmol/L", reference_range="3.5–5.1", collected_at=date(2026, 9, 10)),
-        LabResult(name="Serum creatinine", value="1.1", unit="mg/dL", reference_range="0.6–1.1", collected_at=date(2026, 9, 10)),
-    ])
-    rosa.vitals.extend([
-        Vital(label="BP", value="146/88 mmHg"), Vital(label="Pulse", value="72 bpm"),
-        Vital(label="SpO₂", value="97%"), Vital(label="Weight", value="71 kg"),
-    ])
-    marcus = _patient(
-        mrn="TR-20002", first="Marcus", last="Hill", preferred=None, dob="1992-01-19", sex="Male", pronouns=None,
-        course=pt, mode="practice", case_key="practice_b", label="Test Patient B",
-        cc="Right knee stiffness 6 weeks after ACL reconstruction.",
-        hpi="34-year-old male, 6 weeks post right ACL reconstruction. Pain 3/10 with stairs. Walking without crutches.",
-        lifecycle="Active", encounter_status="Scheduled", care="Outpatient", program="Plan of care active",
-        family="Noncontributory.", surgical="Right ACL reconstruction (Aug 2026).", social="Recreational soccer player. Office job.",
-        encounter_type="PT visit #4",
-    )
-    marcus.medications.append(Medication(name="Ibuprofen", dose="400 mg", route="PO", frequency="Every 8 hours as needed", indication="Knee pain"))
-    marcus.problems.append(Problem(description="Status post right ACL reconstruction", since="2026-08"))
-    marcus.vitals.extend([Vital(label="BP", value="122/78 mmHg"), Vital(label="Pulse", value="64 bpm")])
-    einstein_ana = _t2dm(phar, ana, "TR-10057-AR")
-    einstein_sam = _t2dm(phar, sam, "TR-10057-ST")
-    linh = _patient(
-        mrn="TR-10088-LO", first="Linh", last="Nguyen", preferred=None, dob="1981-05-30", sex="Female",
-        pronouns="she/her", course=pt, mode="assessment", case_key="case_lbp", owner=luis,
-        cc="Low back pain for 3 weeks after lifting boxes.",
-        hpi="45-year-old female with low back pain radiating to the right buttock, worse with sitting. No numbness or bowel/bladder changes.",
-        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
-        family="Noncontributory.", surgical="None.", social="Warehouse supervisor. Walks 3x/week.",
-        encounter_type="PT evaluation",
-    )
-    linh.allergies.append(Allergy(substance="Codeine", reaction="Nausea", severity="mild"))
-    linh.medications.append(Medication(name="Naproxen", dose="220 mg", route="PO", frequency="Twice daily", indication="Back pain"))
-    linh.problems.append(Problem(code="M54.50", description="Low back pain, unspecified"))
-    linh.vitals.extend([Vital(label="BP", value="118/74 mmHg"), Vital(label="Pulse", value="70 bpm")])
-    for chart in (rosa, marcus, einstein_ana, einstein_sam, linh):
-        db.add(chart)
+    therapy = await db.scalar(select(Discipline).where(Discipline.code == "physical_therapy"))
+    nursing = await db.scalar(select(Discipline).where(Discipline.code == "nursing"))
+
+    rosa = await _ensure_chart(db, "TR-20001", lambda: _rosa(phar))
+    elena = await _ensure_chart(db, "TR-20003", lambda: _elena(phar))
+    marcus = await _ensure_chart(db, "TR-20002", lambda: _marcus(pt))
+    hector = await _ensure_chart(db, "TR-20004", lambda: _hector(phar))
+    priya = await _ensure_chart(db, "TR-20005", lambda: _priya(phar))
+    omar = await _ensure_chart(db, "TR-20006", lambda: _omar(phar))
+    keisha = await _ensure_chart(db, "TR-20007", lambda: _keisha(phar))
+    tomas = await _ensure_chart(db, "TR-20008", lambda: _tomas(phar))
+    nadine = await _ensure_chart(db, "TR-20009", lambda: _nadine(phar))
+    sofia = await _ensure_chart(db, "TR-20021", lambda: _sofia(pt))
+    deshawn = await _ensure_chart(db, "TR-20022", lambda: _deshawn(pt))
+    einstein_ana = await _ensure_chart(db, "TR-10057-AR", lambda: _t2dm(phar, ana, "TR-10057-AR"))
+    einstein_sam = await _ensure_chart(db, "TR-10057-ST", lambda: _t2dm(phar, sam, "TR-10057-ST"))
+    einstein_daniel = await _ensure_chart(db, "TR-10057-DR", lambda: _t2dm(phar, daniel, "TR-10057-DR"))
+    einstein_clarissa = await _ensure_chart(db, "TR-10057-CD", lambda: _t2dm(phar, clarissa, "TR-10057-CD"))
+    carmen = await _ensure_chart(db, "TR-10112-CD", lambda: _carmen(phar, clarissa))
+    james = await _ensure_chart(db, "TR-10140-DR", lambda: _james(phar, daniel))
+    linh = await _ensure_chart(db, "TR-10088-LO", lambda: _linh(pt, luis))
+
+    _fill_rosa(rosa)
+    _fill_elena(elena)
+    _fill_marcus(marcus)
+    _fill_hector(hector)
+    _fill_priya(priya)
+    _fill_omar(omar)
+    _fill_keisha(keisha)
+    _fill_tomas(tomas)
+    _fill_nadine(nadine)
+    _fill_sofia(sofia)
+    _fill_deshawn(deshawn)
+    for copy in (einstein_ana, einstein_sam, einstein_daniel, einstein_clarissa):
+        _fill_t2dm(copy)
+    _fill_carmen(carmen)
+    _fill_james(james)
+    _fill_linh(linh)
     await db.flush()
-    for practice in (rosa, marcus):
-        await db.refresh(
-            practice,
-            attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"],
-        )
-        practice.snapshot = chart_snapshot(practice)
-    signed = datetime(2026, 9, 22, 15, 40, tzinfo=timezone.utc)
-    note = ClinicalNote(
-        patient_id=einstein_sam.id,
-        encounter_id=einstein_sam.encounter.id,
-        template_id="pharmacy_mtm",
-        author_id=sam.id,
-        discipline_id=pharmacy.id,
-        mode="assessment",
-        status="pending_review",
-        version=4,
+
+    for practice in (rosa, elena, marcus, hector, priya, omar, keisha, tomas, nadine, sofia, deshawn):
+        await db.refresh(practice, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+        if not practice.snapshot:
+            practice.snapshot = chart_snapshot(practice)
+
+    await _ensure_appointment(db, einstein_ana.id, datetime(2026, 12, 15, 9, 30, tzinfo=timezone.utc), "Diabetes follow-up", "Pharmacy clinic")
+    await _ensure_appointment(db, einstein_daniel.id, datetime(2026, 10, 20, 14, 0, tzinfo=timezone.utc), "A1C recheck", "Pharmacy clinic")
+    await _ensure_appointment(db, carmen.id, datetime(2026, 10, 8, 16, 0, tzinfo=timezone.utc), "INR follow-up", "Anticoagulation clinic")
+    await _ensure_appointment(db, marcus.id, datetime(2026, 9, 29, 14, 0, tzinfo=timezone.utc), "PT visit #5", "Physical Therapy")
+    await _ensure_appointment(db, linh.id, datetime(2026, 10, 2, 11, 0, tzinfo=timezone.utc), "PT visit #2", "Physical Therapy")
+    await _ensure_appointment(db, hector.id, datetime(2026, 10, 9, 10, 0, tzinfo=timezone.utc), "COPD inhaler review", "Pharmacy clinic")
+    await _ensure_appointment(db, priya.id, datetime(2026, 10, 14, 13, 30, tzinfo=timezone.utc), "Thyroid and lipids", "Pharmacy clinic")
+    await _ensure_appointment(db, omar.id, datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc), "CKD / diabetes labs", "Pharmacy clinic")
+    await _ensure_appointment(db, keisha.id, datetime(2026, 10, 7, 15, 0, tzinfo=timezone.utc), "Asthma follow-up", "Pharmacy clinic")
+    await _ensure_appointment(db, sofia.id, datetime(2026, 10, 3, 8, 30, tzinfo=timezone.utc), "PT visit #6", "Physical Therapy")
+    await _ensure_appointment(db, deshawn.id, datetime(2026, 10, 6, 11, 30, tzinfo=timezone.utc), "Gait training", "Physical Therapy")
+
+    if nursing:
+        await _ensure_referral(db, einstein_sam.id, nursing.id, gerardo.id, "Diabetes education and foot-care teaching.", "routine")
+        await _ensure_referral(db, james.id, nursing.id, daniel.id, "Heart-failure daily-weight teaching.", "urgent")
+
+    # Sam: still waiting on Gerardo (queue "Needs review")
+    sam_note = await _ensure_note(
+        db, einstein_sam, sam, pharmacy, gerardo,
+        status="pending_review", template_id="pharmacy_mtm",
         content={
             "reason": "Diabetes follow-up, elevated home glucose.",
             "med_experience": "Takes metformin in the morning, forgets ~2x/week. No cost issues.",
@@ -322,17 +320,803 @@ async def _charts(db, phar: Course, pt: Course, ana: User, sam: User, luis: User
             "followup": "Recheck A1C in 3 months.",
         },
         diagnoses=[{"code": "E11.65", "label": "Type 2 diabetes mellitus with hyperglycemia"}],
-        routed_to_id=gerardo.id,
+        created=datetime(2026, 9, 22, 15, 2, tzinfo=timezone.utc),
+        signed=datetime(2026, 9, 22, 15, 40, tzinfo=timezone.utc),
+    )
+    await _ensure_audit(db, sam.id, "chart.view", "patient", einstein_sam.id, phar.id, datetime(2026, 9, 22, 15, 2, 11, tzinfo=timezone.utc))
+    await _ensure_audit(db, sam.id, "note.sign_submit", "note", sam_note.id, phar.id, datetime(2026, 9, 22, 15, 40, 2, tzinfo=timezone.utc))
+
+    # Ana: co-signed (queue "Co-signed")
+    ana_note = await _ensure_note(
+        db, einstein_ana, ana, pharmacy, gerardo,
+        status="cosigned", template_id="pharmacy_mtm",
+        content={
+            "reason": "Type 2 diabetes follow-up.",
+            "med_experience": "Metformin 500 mg daily. Misses weekend doses when she works doubles.",
+            "objective": "A1C 10.5%, FBG 212, eGFR 92, BP 138/86, BMI 30.9.",
+            "dtp": "Indication: additional therapy needed. Adherence: weekend missed doses.",
+            "rationale": "Far from goal on low-dose metformin; kidneys allow titration and a second agent.",
+            "recommendations": "1. Titrate metformin to 1000 mg BID.\n2. Start empagliflozin 10 mg daily if coverage allows.",
+            "monitoring": "BMP in 2 weeks, A1C in 3 months, counsel on genital hygiene.",
+            "education": "Missed-dose plan and sick-day rules.",
+            "followup": "Pharmacy clinic in 4 weeks.",
+        },
+        diagnoses=[{"code": "E11.65", "label": "Type 2 diabetes mellitus with hyperglycemia"}],
+        created=datetime(2026, 9, 18, 13, 10, tzinfo=timezone.utc),
+        signed=datetime(2026, 9, 18, 14, 5, tzinfo=timezone.utc),
+        cosigned=datetime(2026, 9, 19, 9, 15, tzinfo=timezone.utc),
+        cosigned_by=gerardo,
+    )
+    await _ensure_comment(db, ana_note, gerardo, "cosigned", "Clear assessment. Follow the empagliflozin coverage check before the next visit.")
+    await _ensure_addendum(db, ana_note, ana, "Patient's insurance confirmed empagliflozin on formulary with a PA.")
+
+    # Daniel: returned diabetes note (queue "Returned" + student dashboard)
+    daniel_note = await _ensure_note(
+        db, einstein_daniel, daniel, pharmacy, gerardo,
+        status="returned", template_id="pharmacy_mtm",
+        content={
+            "reason": "High sugars.",
+            "med_experience": "Takes metformin.",
+            "objective": "A1C 10.5%.",
+            "dtp": "Not at goal.",
+            "rationale": "Needs a change.",
+            "recommendations": "Increase metformin.",
+            "followup": "Later.",
+        },
+        diagnoses=[{"code": "E11.65", "label": "Type 2 diabetes mellitus with hyperglycemia"}],
+        created=datetime(2026, 9, 24, 16, 0, tzinfo=timezone.utc),
+        signed=datetime(2026, 9, 24, 16, 20, tzinfo=timezone.utc),
+        updated=datetime(2026, 9, 25, 10, 5, tzinfo=timezone.utc),
+    )
+    await _ensure_comment(
+        db, daniel_note, gerardo, "returned",
+        "Revise before resubmitting: (1) quantify missed doses and timing, (2) include SCr/eGFR before titrating metformin, (3) name a monitoring plan and a second-line option with rationale.",
+    )
+    await _ensure_audit(db, gerardo.id, "note.return", "note", daniel_note.id, phar.id, datetime(2026, 9, 25, 10, 5, tzinfo=timezone.utc))
+
+    # Clarissa: draft on her Einstein copy
+    await _ensure_note(
+        db, einstein_clarissa, clarissa, pharmacy, gerardo,
+        status="draft", template_id="pharmacy_mtm",
+        content={
+            "reason": "Diabetes follow-up. Patient reports thirst and high home readings.",
+            "med_experience": "Metformin 500 mg with breakfast. Skips it 1–2 mornings a week when rushing to class.",
+        },
+        diagnoses=[],
+        created=datetime(2026, 9, 26, 11, 0, tzinfo=timezone.utc),
+        updated=datetime(2026, 9, 26, 11, 45, tzinfo=timezone.utc),
+    )
+
+    # Clarissa: returned anticoagulation note on Carmen
+    carmen_note = await _ensure_note(
+        db, carmen, clarissa, pharmacy, gerardo,
+        status="returned", template_id="pharmacy_mtm",
+        content={
+            "reason": "Warfarin follow-up, INR high.",
+            "med_experience": "Warfarin 5 mg daily. Occasional extra vitamin K foods. No missed doses this week.",
+            "objective": "INR 4.8 (goal 2–3). No bleeding. BP 128/76.",
+            "dtp": "Safety: supratherapeutic INR.",
+            "rationale": "INR above goal; hold and restart lower.",
+            "recommendations": "Hold warfarin today.",
+            "followup": "Recheck INR.",
+        },
+        diagnoses=[{"code": "Z79.01", "label": "Long term (current) use of anticoagulants"}],
+        created=datetime(2026, 9, 23, 9, 0, tzinfo=timezone.utc),
+        signed=datetime(2026, 9, 23, 9, 40, tzinfo=timezone.utc),
+        updated=datetime(2026, 9, 23, 15, 12, tzinfo=timezone.utc),
+    )
+    await _ensure_comment(
+        db, carmen_note, gerardo, "returned",
+        "Spell out hold vs dose reduction, when to restart, the exact next INR date, and bleeding precautions you gave the patient.",
+    )
+
+    # Daniel: in-progress draft on James (HF)
+    await _ensure_note(
+        db, james, daniel, pharmacy, gerardo,
+        status="draft", template_id="pharmacy_mtm",
+        content={
+            "reason": "Heart failure med review after a weight gain of 4 lb.",
+            "med_experience": "Furosemide 40 mg daily. Sometimes takes it later so he can leave the house.",
+            "objective": "BP 110/68, pulse 88, K 3.3 (L), SCr 1.4.",
+        },
+        diagnoses=[{"code": "I50.22", "label": "Chronic systolic (congestive) heart failure"}],
+        created=datetime(2026, 9, 27, 8, 30, tzinfo=timezone.utc),
+    )
+
+    # Daniel: signed practice note on Rosa
+    await _ensure_note(
+        db, rosa, daniel, pharmacy, None,
+        status="signed", template_id="pharmacy_mtm",
+        content={
+            "reason": "BP follow-up.",
+            "med_experience": "Lisinopril 10 mg and amlodipine 5 mg every morning. No missed doses. Ankle swelling in the evening.",
+            "objective": "BP 146/88, pulse 72, K 4.6, SCr 1.1.",
+            "dtp": "Effectiveness: BP above goal. Safety: amlodipine may be contributing to edema.",
+            "rationale": "On two agents; edema suggests amlodipine. Kidney function supports current lisinopril.",
+            "recommendations": "1. Keep lisinopril 10 mg daily.\n2. Discuss amlodipine vs. an ACE/ARB adjustment with the clinic.",
+            "followup": "Recheck BP in 2 weeks at the skills lab.",
+        },
+        diagnoses=[{"code": "I10", "label": "Essential (primary) hypertension"}],
+        created=datetime(2026, 9, 21, 10, 0, tzinfo=timezone.utc),
+        signed=datetime(2026, 9, 21, 10, 25, tzinfo=timezone.utc),
+        mode="practice",
+    )
+
+    # Luis: returned PT SOAP on Linh
+    if therapy:
+        linh_note = await _ensure_note(
+            db, linh, luis, therapy, gerardo,
+            status="returned", template_id="pt_daily_soap",
+            content={
+                "visit_number": "1",
+                "subjective": "Pain 6/10 in the right low back after lifting. Worse sitting.",
+                "measures": "Lumbar flexion limited, SLR negative.",
+                "interventions": "Education and gentle mobility.",
+                "progress": "First visit.",
+                "plan": "See twice a week.",
+            },
+            diagnoses=[{"code": "M54.50", "label": "Low back pain, unspecified"}],
+            created=datetime(2026, 9, 22, 8, 0, tzinfo=timezone.utc),
+            signed=datetime(2026, 9, 22, 8, 35, tzinfo=timezone.utc),
+            updated=datetime(2026, 9, 22, 17, 0, tzinfo=timezone.utc),
+        )
+        await _ensure_comment(
+            db, linh_note, gerardo, "returned",
+            "Add measurable goals (ROM, pain, sitting tolerance), red-flag screen, and parameters for the HEP.",
+        )
+
+
+async def _ensure_chart(db, mrn: str, factory) -> Patient:
+    found = await db.scalar(select(Patient).where(Patient.mrn == mrn))
+    if found:
+        return found
+    chart = factory()
+    db.add(chart)
+    await db.flush()
+    return chart
+
+
+async def _ensure_appointment(db, patient_id, when, kind, with_whom) -> None:
+    found = await db.scalar(
+        select(Appointment.id).where(Appointment.patient_id == patient_id, Appointment.kind == kind)
+    )
+    if found is None:
+        db.add(Appointment(patient_id=patient_id, when=when, kind=kind, with_whom=with_whom))
+
+
+async def _ensure_referral(db, patient_id, discipline_id, created_by_id, reason, urgency) -> None:
+    found = await db.scalar(
+        select(Referral.id).where(Referral.patient_id == patient_id, Referral.reason == reason)
+    )
+    if found is None:
+        db.add(Referral(
+            patient_id=patient_id, to_discipline_id=discipline_id, reason=reason,
+            urgency=urgency, created_by_id=created_by_id,
+        ))
+
+
+async def _ensure_note(
+    db, patient: Patient, author: User, discipline, reviewer: User | None, *,
+    status: str, template_id: str, content: dict, diagnoses: list, created: datetime,
+    signed: datetime | None = None, updated: datetime | None = None,
+    cosigned: datetime | None = None, cosigned_by: User | None = None, mode: str | None = None,
+) -> ClinicalNote:
+    found = await db.scalar(
+        select(ClinicalNote).where(
+            ClinicalNote.patient_id == patient.id,
+            ClinicalNote.author_id == author.id,
+            ClinicalNote.status == status,
+        )
+    )
+    if found:
+        return found
+    note = ClinicalNote(
+        patient_id=patient.id,
+        encounter_id=patient.encounter.id,
+        template_id=template_id,
+        author_id=author.id,
+        discipline_id=discipline.id,
+        mode=mode or patient.mode,
+        status=status,
+        version=3 if status != "draft" else 1,
+        content=content,
+        diagnoses=diagnoses,
+        routed_to_id=reviewer.id if reviewer else None,
         signed_at=signed,
-        created_at=datetime(2026, 9, 22, 15, 2, tzinfo=timezone.utc),
-        updated_at=signed,
+        cosigned_at=cosigned,
+        cosigned_by_id=cosigned_by.id if cosigned_by else None,
+        created_at=created,
+        updated_at=updated or signed or created,
     )
     db.add(note)
-    db.add(Appointment(patient_id=einstein_ana.id, when=datetime(2026, 12, 15, 9, 30, tzinfo=timezone.utc), kind="Diabetes follow-up", with_whom="Pharmacy clinic"))
-    db.add(Appointment(patient_id=marcus.id, when=datetime(2026, 9, 29, 14, 0, tzinfo=timezone.utc), kind="PT visit #5", with_whom="Physical Therapy"))
     await db.flush()
-    db.add(AuditEvent(occurred_at=datetime(2026, 9, 22, 15, 2, 11, tzinfo=timezone.utc), actor_user_id=sam.id, action="chart.view", entity_type="patient", entity_id=str(einstein_sam.id), result="ok", course_id=phar.id))
-    db.add(AuditEvent(occurred_at=datetime(2026, 9, 22, 15, 40, 2, tzinfo=timezone.utc), actor_user_id=sam.id, action="note.sign_submit", entity_type="note", entity_id=str(note.id), result="ok", course_id=phar.id))
+    return note
+
+
+async def _ensure_comment(db, note: ClinicalNote, author: User, kind: str, body: str) -> None:
+    found = await db.scalar(
+        select(NoteComment.id).where(NoteComment.note_id == note.id, NoteComment.kind == kind, NoteComment.body == body)
+    )
+    if found is None:
+        db.add(NoteComment(note_id=note.id, author_id=author.id, body=body, kind=kind, created_at=note.updated_at))
+
+
+async def _ensure_addendum(db, note: ClinicalNote, author: User, body: str) -> None:
+    found = await db.scalar(
+        select(NoteAddendum.id).where(NoteAddendum.note_id == note.id, NoteAddendum.body == body)
+    )
+    if found is None:
+        db.add(NoteAddendum(note_id=note.id, author_id=author.id, body=body, created_at=note.cosigned_at or note.updated_at))
+
+
+async def _ensure_audit(db, actor_id, action, entity_type, entity_id, course_id, when) -> None:
+    found = await db.scalar(
+        select(AuditEvent.id).where(
+            AuditEvent.actor_user_id == actor_id,
+            AuditEvent.action == action,
+            AuditEvent.entity_id == str(entity_id),
+        )
+    )
+    if found is None:
+        db.add(AuditEvent(
+            occurred_at=when, actor_user_id=actor_id, action=action, entity_type=entity_type,
+            entity_id=str(entity_id), result="ok", course_id=course_id,
+        ))
+
+
+def _maybe_allergy(chart: Patient, substance: str, reaction: str | None = None, severity: str | None = None) -> None:
+    if not any(row.substance == substance for row in chart.allergies):
+        chart.allergies.append(Allergy(substance=substance, reaction=reaction, severity=severity))
+
+
+def _maybe_med(chart: Patient, name: str, **kwargs) -> None:
+    if not any(row.name == name for row in chart.medications):
+        chart.medications.append(Medication(name=name, **kwargs))
+
+
+def _maybe_problem(chart: Patient, description: str, code: str | None = None, since: str | None = None) -> None:
+    if not any(row.description == description for row in chart.problems):
+        chart.problems.append(Problem(code=code, description=description, since=since))
+
+
+def _maybe_lab(chart: Patient, name: str, collected_at: date, **kwargs) -> None:
+    if not any(row.name == name and row.collected_at == collected_at for row in chart.labs):
+        chart.labs.append(LabResult(name=name, collected_at=collected_at, **kwargs))
+
+
+def _maybe_vital(chart: Patient, label: str, value: str) -> None:
+    if not any(row.label == label for row in chart.vitals):
+        chart.vitals.append(Vital(label=label, value=value))
+
+
+def _contacts(chart: Patient, *, payer=None, member=None, group=None, em_name=None, em_phone=None, em_rel=None) -> None:
+    if payer and not chart.insurance_payer:
+        chart.insurance_payer = payer
+    if member and not chart.insurance_member_id:
+        chart.insurance_member_id = member
+    if group and not chart.insurance_group_number:
+        chart.insurance_group_number = group
+    if em_name and not chart.emergency_contact_name:
+        chart.emergency_contact_name = em_name
+    if em_phone and not chart.emergency_contact_phone:
+        chart.emergency_contact_phone = em_phone
+    if em_rel and not chart.emergency_contact_relationship:
+        chart.emergency_contact_relationship = em_rel
+
+
+def _rosa(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20001", first="Rosa", last="Villalobos", preferred="Rosie", dob="1958-07-02", sex="Female",
+        pronouns="she/her", course=course, mode="practice", case_key="practice_a", label="Test Patient A",
+        cc="Blood pressure check and medication review.",
+        hpi="68-year-old female with hypertension here for a 3-month follow-up. Reports occasional ankle swelling in the evenings. Home readings 140s/80s. Takes both BP pills with breakfast.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
+        family="Sister: stroke at 70. Mother: hypertension.", surgical="Cholecystectomy (2004). Cataract OU (2019).",
+        social="Widowed, lives alone. Former smoker, quit 2001 (30 pack-years). No alcohol. Walks the dog daily.",
+        encounter_type="Office visit",
+        payer="Medicare", member="1EG4-TE8-MK72", group="MED-A",
+        em_name="Elena Villalobos", em_phone="915-555-0144", em_rel="Daughter",
+    )
+    _fill_rosa(chart)
+    return chart
+
+
+def _fill_rosa(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare", member="1EG4-TE8-MK72", group="MED-A",
+              em_name="Elena Villalobos", em_phone="915-555-0144", em_rel="Daughter")
+    _maybe_allergy(chart, "Sulfa drugs", "Rash", "mild")
+    _maybe_allergy(chart, "Shellfish", "Hives", "moderate")
+    _maybe_med(chart, "Lisinopril", dose="10 mg", route="PO", frequency="Once daily", indication="Hypertension", adherence="Takes every morning")
+    _maybe_med(chart, "Amlodipine", dose="5 mg", route="PO", frequency="Once daily", indication="Hypertension", adherence="Takes every morning")
+    _maybe_med(chart, "Hydrochlorothiazide", dose="12.5 mg", route="PO", frequency="Once daily", indication="Hypertension", adherence="Takes every morning")
+    _maybe_med(chart, "Atorvastatin", dose="20 mg", route="PO", frequency="Once daily at bedtime", indication="Hyperlipidemia")
+    _maybe_med(chart, "Aspirin", dose="81 mg", route="PO", frequency="Once daily", indication="Primary prevention")
+    _maybe_problem(chart, "Essential hypertension", code="I10", since="2012")
+    _maybe_problem(chart, "Hyperlipidemia", code="E78.5", since="2018")
+    _maybe_problem(chart, "Lower extremity edema", code="R60.0")
+    collected = date(2026, 9, 10)
+    _maybe_lab(chart, "Potassium", collected, value="4.6", unit="mmol/L", reference_range="3.5–5.1")
+    _maybe_lab(chart, "Serum creatinine", collected, value="1.1", unit="mg/dL", reference_range="0.6–1.1")
+    _maybe_lab(chart, "eGFR", collected, value="52", unit="mL/min/1.73m²", reference_range=">60", flag="L")
+    _maybe_lab(chart, "Sodium", collected, value="138", unit="mmol/L", reference_range="136–145")
+    _maybe_lab(chart, "LDL cholesterol", collected, value="118", unit="mg/dL", reference_range="<100", flag="H")
+    _maybe_vital(chart, "BP", "146/88 mmHg")
+    _maybe_vital(chart, "Pulse", "72 bpm")
+    _maybe_vital(chart, "Temp", "36.7 °C")
+    _maybe_vital(chart, "SpO₂", "97%")
+    _maybe_vital(chart, "Weight", "71 kg")
+    _maybe_vital(chart, "Height", "160 cm")
+    _maybe_vital(chart, "BMI", "27.7")
+
+
+def _elena(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20003", first="Elena", last="Salazar", preferred=None, dob="1949-11-08", sex="Female",
+        pronouns="she/her", course=course, mode="practice", case_key="practice_c", label="Test Patient C",
+        cc="Warfarin teaching after a new DVT.",
+        hpi="76-year-old female started on warfarin 5 days ago for a right-leg DVT. First clinic INR today. Using a pillbox. Diet includes spinach 3–4 nights a week.",
+        lifecycle="Active", encounter_status="In progress", care="Outpatient",
+        family="Brother: VTE at 62.", surgical="Right hip replacement (2021).",
+        social="Lives with daughter. Rare alcohol. Never smoker.",
+        encounter_type="Anticoagulation visit",
+        payer="Medicare Advantage", member="MA-88421", group="UHC-ELP",
+        em_name="Sofia Salazar", em_phone="915-555-0190", em_rel="Daughter",
+    )
+    _fill_elena(chart)
+    return chart
+
+
+def _fill_elena(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare Advantage", member="MA-88421", group="UHC-ELP",
+              em_name="Sofia Salazar", em_phone="915-555-0190", em_rel="Daughter")
+    _maybe_allergy(chart, "NSAIDs", "GI bleed", "severe")
+    _maybe_med(chart, "Warfarin", dose="5 mg", route="PO", frequency="Once daily in the evening", indication="DVT", adherence="No missed doses")
+    _maybe_med(chart, "Acetaminophen", dose="500 mg", route="PO", frequency="Every 8 hours as needed", indication="Hip pain")
+    _maybe_med(chart, "Pantoprazole", dose="40 mg", route="PO", frequency="Once daily", indication="GI protection")
+    _maybe_med(chart, "Calcium + vitamin D", dose="600 mg/400 IU", route="PO", frequency="Twice daily", indication="Bone health")
+    _maybe_problem(chart, "Acute embolism and thrombosis of unspecified deep veins of right lower extremity", code="I82.401", since="2026-09")
+    _maybe_problem(chart, "Long term (current) use of anticoagulants", code="Z79.01")
+    _maybe_problem(chart, "Presence of right artificial hip joint", code="Z96.641", since="2021")
+    _maybe_lab(chart, "INR", date(2026, 9, 26), value="1.4", unit="", reference_range="2.0–3.0", flag="L")
+    _maybe_lab(chart, "Hemoglobin", date(2026, 9, 26), value="12.1", unit="g/dL", reference_range="12.0–16.0")
+    _maybe_lab(chart, "Platelets", date(2026, 9, 26), value="248", unit="K/µL", reference_range="150–400")
+    _maybe_vital(chart, "BP", "132/78 mmHg")
+    _maybe_vital(chart, "Pulse", "76 bpm")
+    _maybe_vital(chart, "Weight", "64 kg")
+    _maybe_vital(chart, "SpO₂", "96%")
+
+
+def _marcus(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20002", first="Marcus", last="Hill", preferred=None, dob="1992-01-19", sex="Male", pronouns="he/him",
+        course=course, mode="practice", case_key="practice_b", label="Test Patient B",
+        cc="Right knee stiffness 6 weeks after ACL reconstruction.",
+        hpi="34-year-old male, 6 weeks post right ACL reconstruction. Pain 3/10 with stairs. Walking without crutches. Quad lag on straight-leg raise.",
+        lifecycle="Active", encounter_status="Scheduled", care="Outpatient", program="Plan of care active",
+        family="Father: OA of the knee.", surgical="Right ACL reconstruction (Aug 2026).",
+        social="Recreational soccer player. Office job. Never smoker.",
+        encounter_type="PT visit #4",
+        payer="Blue Cross Community", member="BC-44019", group="UTEP-STAFF",
+        em_name="Maya Hill", em_phone="915-555-0112", em_rel="Spouse",
+    )
+    _fill_marcus(chart)
+    return chart
+
+
+def _fill_marcus(chart: Patient) -> None:
+    _contacts(chart, payer="Blue Cross Community", member="BC-44019", group="UTEP-STAFF",
+              em_name="Maya Hill", em_phone="915-555-0112", em_rel="Spouse")
+    _maybe_allergy(chart, "Latex", "Contact rash", "mild")
+    _maybe_med(chart, "Ibuprofen", dose="400 mg", route="PO", frequency="Every 8 hours as needed", indication="Knee pain")
+    _maybe_med(chart, "Acetaminophen", dose="500 mg", route="PO", frequency="Every 6 hours as needed", indication="Pain")
+    _maybe_problem(chart, "Status post right ACL reconstruction", since="2026-08")
+    _maybe_problem(chart, "Muscle weakness of right lower limb", code="M62.81")
+    _maybe_vital(chart, "BP", "122/78 mmHg")
+    _maybe_vital(chart, "Pulse", "64 bpm")
+    _maybe_vital(chart, "Weight", "82 kg")
+    _maybe_vital(chart, "Height", "183 cm")
+    _maybe_vital(chart, "Pain", "3/10")
+
+
+def _hector(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20004", first="Hector", last="Morales", preferred=None, dob="1955-03-22", sex="Male",
+        pronouns="he/him", course=course, mode="practice", case_key="practice_copd", label="Test Patient D",
+        cc="Short of breath and inhaler technique check.",
+        hpi="71-year-old male with COPD. Using albuterol 4–5 times most days. Woke twice last week coughing. Continues to smoke ½ pack/day. No fever.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
+        family="Father: lung cancer.", surgical="None.",
+        social="Lives with wife. Current smoker 40 pack-years. Rare alcohol.",
+        encounter_type="COPD clinic",
+        payer="Medicare", member="1EG4-HM9-KX11", group="MED-B",
+        em_name="Rosa Morales", em_phone="915-555-0177", em_rel="Spouse",
+    )
+    _fill_hector(chart)
+    return chart
+
+
+def _fill_hector(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare", member="1EG4-HM9-KX11", group="MED-B",
+              em_name="Rosa Morales", em_phone="915-555-0177", em_rel="Spouse")
+    _maybe_allergy(chart, "Penicillin", "Anaphylaxis", "severe")
+    _maybe_med(chart, "Albuterol HFA", dose="90 mcg", route="Inh", frequency="2 puffs every 4–6 hours as needed", indication="Dyspnea", adherence="Uses 4–5 times/day")
+    _maybe_med(chart, "Tiotropium", dose="18 mcg", route="Inh", frequency="Once daily", indication="COPD", adherence="Misses weekend doses")
+    _maybe_med(chart, "Budesonide/formoterol", dose="160/4.5 mcg", route="Inh", frequency="2 puffs twice daily", indication="COPD")
+    _maybe_med(chart, "Prednisone", dose="5 mg", route="PO", frequency="Once daily", indication="Recent exacerbation")
+    _maybe_problem(chart, "COPD with (acute) exacerbation", code="J44.1", since="2014")
+    _maybe_problem(chart, "Nicotine dependence, cigarettes", code="F17.210")
+    _maybe_lab(chart, "Eosinophils", date(2026, 9, 12), value="180", unit="cells/µL", reference_range="<500")
+    _maybe_vital(chart, "BP", "136/84 mmHg")
+    _maybe_vital(chart, "Pulse", "92 bpm")
+    _maybe_vital(chart, "RR", "22 /min")
+    _maybe_vital(chart, "SpO₂", "91%")
+    _maybe_vital(chart, "Weight", "68 kg")
+
+
+def _priya(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20005", first="Priya", last="Nair", preferred=None, dob="1978-06-14", sex="Female",
+        pronouns="she/her", course=course, mode="practice", case_key="practice_thyroid", label="Test Patient E",
+        cc="Fatigue, weight gain, and lipid results.",
+        hpi="48-year-old female with hypothyroidism on levothyroxine 75 mcg. Tired, cold, and up 6 lb since June. Last TSH was high. Also here for a statin start discussion.",
+        lifecycle="Active", encounter_status="Waiting", care="Outpatient",
+        family="Mother: hypothyroidism. Father: MI at 58.", surgical="C-section (2012).",
+        social="Works nights in a call center. Vegetarian. No tobacco. Wine on weekends.",
+        encounter_type="Office visit",
+        payer="El Paso Health", member="EPH-22910", group="HOSP-RN",
+        em_name="Arjun Nair", em_phone="915-555-0166", em_rel="Spouse",
+    )
+    _fill_priya(chart)
+    return chart
+
+
+def _fill_priya(chart: Patient) -> None:
+    _contacts(chart, payer="El Paso Health", member="EPH-22910", group="HOSP-RN",
+              em_name="Arjun Nair", em_phone="915-555-0166", em_rel="Spouse")
+    _maybe_allergy(chart, "Iodine contrast", "Itching", "mild")
+    _maybe_med(chart, "Levothyroxine", dose="75 mcg", route="PO", frequency="Once daily on empty stomach", indication="Hypothyroidism", adherence="Takes most mornings")
+    _maybe_med(chart, "Omeprazole", dose="20 mg", route="PO", frequency="Once daily", indication="GERD")
+    _maybe_med(chart, "Ethinyl estradiol/norgestimate", dose="35 mcg/0.25 mg", route="PO", frequency="Once daily", indication="Contraception")
+    _maybe_problem(chart, "Hypothyroidism", code="E03.9", since="2019")
+    _maybe_problem(chart, "Pure hypercholesterolemia", code="E78.00")
+    _maybe_problem(chart, "GERD", code="K21.9")
+    collected = date(2026, 9, 18)
+    _maybe_lab(chart, "TSH", collected, value="8.4", unit="mIU/L", reference_range="0.4–4.0", flag="H")
+    _maybe_lab(chart, "Free T4", collected, value="0.7", unit="ng/dL", reference_range="0.8–1.8", flag="L")
+    _maybe_lab(chart, "LDL cholesterol", collected, value="162", unit="mg/dL", reference_range="<100", flag="H")
+    _maybe_lab(chart, "HDL cholesterol", collected, value="48", unit="mg/dL", reference_range=">50", flag="L")
+    _maybe_lab(chart, "Triglycerides", collected, value="178", unit="mg/dL", reference_range="<150", flag="H")
+    _maybe_vital(chart, "BP", "128/82 mmHg")
+    _maybe_vital(chart, "Pulse", "58 bpm")
+    _maybe_vital(chart, "Weight", "79 kg")
+    _maybe_vital(chart, "Height", "163 cm")
+    _maybe_vital(chart, "BMI", "29.7")
+
+
+def _omar(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20006", first="Omar", last="Haddad", preferred=None, dob="1964-11-02", sex="Male",
+        pronouns="he/him", course=course, mode="practice", case_key="practice_ckd", label="Test Patient F",
+        cc="Diabetes and kidney-function follow-up.",
+        hpi="61-year-old male with type 2 diabetes and CKD. Metformin 1000 mg BID. Occasional foamy urine. Home fasting glucose 140–180. No chest pain.",
+        lifecycle="Active", encounter_status="In progress", care="Outpatient",
+        family="Brother: ESRD. Mother: type 2 diabetes.", surgical="Left eye cataract (2024).",
+        social="Owns a small market. Former smoker, quit 2018. No alcohol.",
+        encounter_type="CKD / diabetes visit",
+        payer="Medicaid", member="TXM-77120", group="STAR",
+        em_name="Layla Haddad", em_phone="915-555-0133", em_rel="Spouse",
+    )
+    _fill_omar(chart)
+    return chart
+
+
+def _fill_omar(chart: Patient) -> None:
+    _contacts(chart, payer="Medicaid", member="TXM-77120", group="STAR",
+              em_name="Layla Haddad", em_phone="915-555-0133", em_rel="Spouse")
+    _maybe_allergy(chart, "ACE inhibitors", "Angioedema", "severe")
+    _maybe_med(chart, "Metformin", dose="1000 mg", route="PO", frequency="Twice daily", indication="Type 2 diabetes", adherence="Rare missed lunch dose")
+    _maybe_med(chart, "Losartan", dose="50 mg", route="PO", frequency="Once daily", indication="Hypertension / CKD")
+    _maybe_med(chart, "Empagliflozin", dose="10 mg", route="PO", frequency="Once daily", indication="CKD / diabetes")
+    _maybe_med(chart, "Atorvastatin", dose="40 mg", route="PO", frequency="Once daily at bedtime", indication="ASCVD prevention")
+    _maybe_med(chart, "Insulin glargine", dose="18 units", route="SQ", frequency="Once daily at bedtime", indication="Type 2 diabetes")
+    _maybe_problem(chart, "Type 2 diabetes mellitus with chronic kidney disease", code="E11.22", since="2012")
+    _maybe_problem(chart, "CKD stage 3", code="N18.30", since="2022")
+    _maybe_problem(chart, "Essential hypertension", code="I10")
+    collected = date(2026, 9, 20)
+    _maybe_lab(chart, "Hemoglobin A1C", collected, value="8.7", unit="%", reference_range="4.0–5.6", flag="H")
+    _maybe_lab(chart, "Serum creatinine", collected, value="1.8", unit="mg/dL", reference_range="0.7–1.3", flag="H")
+    _maybe_lab(chart, "eGFR", collected, value="41", unit="mL/min/1.73m²", reference_range=">60", flag="L")
+    _maybe_lab(chart, "Potassium", collected, value="5.2", unit="mmol/L", reference_range="3.5–5.1", flag="H")
+    _maybe_lab(chart, "UACR", collected, value="180", unit="mg/g", reference_range="<30", flag="H")
+    _maybe_vital(chart, "BP", "148/90 mmHg")
+    _maybe_vital(chart, "Pulse", "80 bpm")
+    _maybe_vital(chart, "Weight", "96 kg")
+    _maybe_vital(chart, "BMI", "31.4")
+
+
+def _keisha(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20007", first="Keisha", last="Brooks", preferred=None, dob="1995-08-09", sex="Female",
+        pronouns="she/her", course=course, mode="practice", case_key="practice_asthma", label="Test Patient G",
+        cc="Asthma flare after a dusty move, also wants to talk about anxiety meds.",
+        hpi="31-year-old female with asthma. Rescue inhaler 3 nights this week. Peak flow down from personal best. Started sertraline 4 weeks ago, nausea the first week.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
+        family="Mother: asthma. Sister: GAD.", surgical="None.",
+        social="Graduate student. Never smoker. Occasional vape with friends. Cat at home.",
+        encounter_type="Urgent follow-up",
+        payer="Student Health Plan", member="SHP-31088", group="UTEP-STU",
+        em_name="Denise Brooks", em_phone="915-555-0188", em_rel="Mother",
+    )
+    _fill_keisha(chart)
+    return chart
+
+
+def _fill_keisha(chart: Patient) -> None:
+    _contacts(chart, payer="Student Health Plan", member="SHP-31088", group="UTEP-STU",
+              em_name="Denise Brooks", em_phone="915-555-0188", em_rel="Mother")
+    _maybe_allergy(chart, "Aspirin", "Wheeze", "moderate")
+    _maybe_allergy(chart, "Cats", "Sneezing", "mild")
+    _maybe_med(chart, "Albuterol HFA", dose="90 mcg", route="Inh", frequency="2 puffs every 4 hours as needed", indication="Asthma", adherence="Used 8 puffs yesterday")
+    _maybe_med(chart, "Fluticasone", dose="110 mcg", route="Inh", frequency="2 puffs twice daily", indication="Asthma", adherence="Skips nights when she feels well")
+    _maybe_med(chart, "Montelukast", dose="10 mg", route="PO", frequency="Once daily at bedtime", indication="Asthma")
+    _maybe_med(chart, "Sertraline", dose="50 mg", route="PO", frequency="Once daily", indication="Generalized anxiety")
+    _maybe_med(chart, "Ethinyl estradiol/norethindrone", dose="20 mcg/1 mg", route="PO", frequency="Once daily", indication="Contraception")
+    _maybe_problem(chart, "Uncomplicated asthma", code="J45.909", since="childhood")
+    _maybe_problem(chart, "Generalized anxiety disorder", code="F41.1", since="2024")
+    _maybe_problem(chart, "Allergic rhinitis", code="J30.9")
+    _maybe_vital(chart, "BP", "118/74 mmHg")
+    _maybe_vital(chart, "Pulse", "96 bpm")
+    _maybe_vital(chart, "RR", "20 /min")
+    _maybe_vital(chart, "SpO₂", "96%")
+    _maybe_vital(chart, "Peak flow", "280 L/min")
+
+
+def _tomas(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20008", first="Tomas", last="Alvarez", preferred="Tommy", dob="1969-12-01", sex="Male",
+        pronouns="he/him", course=course, mode="practice", case_key="practice_gout", label="Test Patient H",
+        cc="Right great-toe pain overnight. Wants to know if he can take more ibuprofen.",
+        hpi="56-year-old male with recurrent gout. Red, hot first MTP, can't put a shoe on. Beer at a wedding Saturday. On HCTZ for BP.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
+        family="Father: gout.", surgical="None.",
+        social="Construction supervisor. Drinks beer on weekends. Never smoker.",
+        encounter_type="Acute visit",
+        payer="Cigna", member="CG-90144", group="CON-TX",
+        em_name="Maria Alvarez", em_phone="915-555-0129", em_rel="Spouse",
+    )
+    _fill_tomas(chart)
+    return chart
+
+
+def _fill_tomas(chart: Patient) -> None:
+    _contacts(chart, payer="Cigna", member="CG-90144", group="CON-TX",
+              em_name="Maria Alvarez", em_phone="915-555-0129", em_rel="Spouse")
+    _maybe_allergy(chart, "Allopurinol", "Rash", "moderate")
+    _maybe_med(chart, "Ibuprofen", dose="800 mg", route="PO", frequency="Three times daily", indication="Gout pain", adherence="Took 2 extra tablets last night")
+    _maybe_med(chart, "Hydrochlorothiazide", dose="25 mg", route="PO", frequency="Once daily", indication="Hypertension")
+    _maybe_med(chart, "Lisinopril", dose="20 mg", route="PO", frequency="Once daily", indication="Hypertension")
+    _maybe_med(chart, "Colchicine", dose="0.6 mg", route="PO", frequency="As directed for flares", indication="Gout", adherence="Ran out 2 weeks ago")
+    _maybe_problem(chart, "Gout, unspecified", code="M10.9", since="2017")
+    _maybe_problem(chart, "Essential hypertension", code="I10")
+    _maybe_problem(chart, "Obesity, class 1", code="E66.9")
+    collected = date(2026, 9, 28)
+    _maybe_lab(chart, "Uric acid", collected, value="9.1", unit="mg/dL", reference_range="3.5–7.2", flag="H")
+    _maybe_lab(chart, "Serum creatinine", collected, value="1.2", unit="mg/dL", reference_range="0.7–1.3")
+    _maybe_lab(chart, "eGFR", collected, value="72", unit="mL/min/1.73m²", reference_range=">60")
+    _maybe_vital(chart, "BP", "152/94 mmHg")
+    _maybe_vital(chart, "Pulse", "88 bpm")
+    _maybe_vital(chart, "Temp", "37.4 °C")
+    _maybe_vital(chart, "Weight", "104 kg")
+    _maybe_vital(chart, "BMI", "33.8")
+
+
+def _nadine(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20009", first="Nadine", last="Chen", preferred=None, dob="1941-01-17", sex="Female",
+        pronouns="she/her", course=course, mode="practice", case_key="practice_geriatric", label="Test Patient I",
+        cc="Confusion and burning with urination. Family brought a bag of bottles.",
+        hpi="85-year-old female from assisted living with 2 days of dysuria and new confusion. Fall last month, no fracture. Daughter is unsure which pills she actually takes.",
+        lifecycle="Active", encounter_status="Waiting", care="Outpatient",
+        family="Daughter is historian. No known CAD.", surgical="TKA right (2016). Pacemaker (2020).",
+        social="Assisted living. Widowed. No tobacco or alcohol.",
+        encounter_type="Geriatric visit",
+        payer="Medicare", member="1EG4-NC2-PQ55", group="MED-A",
+        em_name="Grace Chen", em_phone="915-555-0104", em_rel="Daughter",
+    )
+    _fill_nadine(chart)
+    return chart
+
+
+def _fill_nadine(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare", member="1EG4-NC2-PQ55", group="MED-A",
+              em_name="Grace Chen", em_phone="915-555-0104", em_rel="Daughter")
+    _maybe_allergy(chart, "Codeine", "Confusion", "moderate")
+    _maybe_med(chart, "Donepezil", dose="10 mg", route="PO", frequency="Once daily at bedtime", indication="Dementia")
+    _maybe_med(chart, "Metoprolol succinate", dose="50 mg", route="PO", frequency="Once daily", indication="AF / rate control")
+    _maybe_med(chart, "Apixaban", dose="2.5 mg", route="PO", frequency="Twice daily", indication="Atrial fibrillation")
+    _maybe_med(chart, "Oxybutynin", dose="5 mg", route="PO", frequency="Twice daily", indication="Overactive bladder")
+    _maybe_med(chart, "Diphenhydramine", dose="25 mg", route="PO", frequency="At bedtime as needed", indication="Sleep")
+    _maybe_med(chart, "Omeprazole", dose="20 mg", route="PO", frequency="Once daily", indication="GERD")
+    _maybe_med(chart, "Vitamin D3", dose="2000 IU", route="PO", frequency="Once daily", indication="Deficiency")
+    _maybe_problem(chart, "Urinary tract infection, site not specified", code="N39.0")
+    _maybe_problem(chart, "Unspecified dementia, unspecified severity, with behavioral disturbance", code="F03.918", since="2021")
+    _maybe_problem(chart, "Unspecified atrial fibrillation", code="I48.91")
+    _maybe_problem(chart, "History of falling", code="Z91.81")
+    collected = date(2026, 9, 29)
+    _maybe_lab(chart, "WBC", collected, value="13.2", unit="K/µL", reference_range="4.0–11.0", flag="H")
+    _maybe_lab(chart, "Sodium", collected, value="132", unit="mmol/L", reference_range="136–145", flag="L")
+    _maybe_lab(chart, "Serum creatinine", collected, value="1.3", unit="mg/dL", reference_range="0.6–1.1", flag="H")
+    _maybe_lab(chart, "UA nitrite", collected, value="Positive", unit="", reference_range="Negative", flag="H")
+    _maybe_vital(chart, "BP", "108/64 mmHg")
+    _maybe_vital(chart, "Pulse", "96 bpm")
+    _maybe_vital(chart, "Temp", "38.1 °C")
+    _maybe_vital(chart, "SpO₂", "95%")
+    _maybe_vital(chart, "Weight", "52 kg")
+
+
+def _sofia(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20021", first="Sofia", last="Ramirez", preferred=None, dob="1988-04-04", sex="Female",
+        pronouns="she/her", course=course, mode="practice", case_key="practice_shoulder", label="Test Patient J",
+        cc="Right shoulder pain reaching overhead at work.",
+        hpi="38-year-old female, 8 weeks of right lateral shoulder pain after stocking shelves. Pain 5/10, worse at night. Positive painful arc. No neck pain or numbness.",
+        lifecycle="Active", encounter_status="Scheduled", care="Outpatient", program="Plan of care active",
+        family="Noncontributory.", surgical="None.",
+        social="Grocery stocker, right-hand dominant. Yoga 1x/week.",
+        encounter_type="PT visit #3",
+        payer="UnitedHealthcare", member="UHC-55801", group="RETAIL-W",
+        em_name="Luis Ramirez", em_phone="915-555-0155", em_rel="Spouse",
+    )
+    _fill_sofia(chart)
+    return chart
+
+
+def _fill_sofia(chart: Patient) -> None:
+    _contacts(chart, payer="UnitedHealthcare", member="UHC-55801", group="RETAIL-W",
+              em_name="Luis Ramirez", em_phone="915-555-0155", em_rel="Spouse")
+    _maybe_med(chart, "Naproxen", dose="500 mg", route="PO", frequency="Twice daily", indication="Shoulder pain")
+    _maybe_med(chart, "Cyclobenzaprine", dose="5 mg", route="PO", frequency="At bedtime as needed", indication="Muscle spasm")
+    _maybe_problem(chart, "Unspecified rotator cuff tear or rupture of right shoulder, not specified as traumatic", code="M75.101")
+    _maybe_vital(chart, "BP", "120/76 mmHg")
+    _maybe_vital(chart, "Pulse", "72 bpm")
+    _maybe_vital(chart, "Pain", "5/10")
+
+
+def _deshawn(course: Course) -> Patient:
+    chart = _patient(
+        mrn="TR-20022", first="DeShawn", last="Carter", preferred=None, dob="1959-09-30", sex="Male",
+        pronouns="he/him", course=course, mode="practice", case_key="practice_cva", label="Test Patient K",
+        cc="Gait and balance after left MCA stroke 10 weeks ago.",
+        hpi="66-year-old male, 10 weeks post left MCA ischemic stroke. Uses a cane. Residual right hemiparesis. Goal is independent household ambulation. No new weakness.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient", program="Plan of care active",
+        family="Brother: stroke at 70.", surgical="PEG removed (2026).",
+        social="Retired bus driver. Lives with son. Former smoker.",
+        encounter_type="Neuro PT visit #8",
+        payer="Medicare", member="1EG4-DC8-WW02", group="MED-B",
+        em_name="Andre Carter", em_phone="915-555-0199", em_rel="Son",
+    )
+    _fill_deshawn(chart)
+    return chart
+
+
+def _fill_deshawn(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare", member="1EG4-DC8-WW02", group="MED-B",
+              em_name="Andre Carter", em_phone="915-555-0199", em_rel="Son")
+    _maybe_allergy(chart, "NKDA")
+    _maybe_med(chart, "Aspirin", dose="81 mg", route="PO", frequency="Once daily", indication="Stroke secondary prevention")
+    _maybe_med(chart, "Clopidogrel", dose="75 mg", route="PO", frequency="Once daily", indication="Stroke secondary prevention")
+    _maybe_med(chart, "Atorvastatin", dose="80 mg", route="PO", frequency="Once daily at bedtime", indication="ASCVD")
+    _maybe_med(chart, "Lisinopril", dose="10 mg", route="PO", frequency="Once daily", indication="Hypertension")
+    _maybe_med(chart, "Metformin", dose="500 mg", route="PO", frequency="Twice daily", indication="Type 2 diabetes")
+    _maybe_problem(chart, "Hemiplegia and hemiparesis following cerebral infarction affecting right dominant side", code="I69.351", since="2026-07")
+    _maybe_problem(chart, "Type 2 diabetes mellitus without complications", code="E11.9")
+    _maybe_problem(chart, "Essential hypertension", code="I10")
+    _maybe_vital(chart, "BP", "134/80 mmHg")
+    _maybe_vital(chart, "Pulse", "76 bpm")
+    _maybe_vital(chart, "SpO₂", "97%")
+    _maybe_vital(chart, "Weight", "88 kg")
+
+
+def _carmen(course: Course, owner: User) -> Patient:
+    chart = _patient(
+        mrn="TR-10112-CD", first="Carmen", last="Ortiz", preferred=None, dob="1944-04-12", sex="Female",
+        pronouns="she/her", course=course, mode="assessment", case_key="case_inr", owner=owner,
+        cc="Warfarin follow-up. Last INR was high.",
+        hpi="81-year-old female on warfarin for atrial fibrillation. Recent extra leafy greens at a family dinner. No bleeding, bruising on the forearm.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
+        family="Mother: AF.", surgical="Cataract surgery (2019).", social="Lives independently. Daughter fills the pillbox.",
+        encounter_type="Anticoagulation visit",
+        payer="Medicare", member="1EG4-CO1-AF81", group="MED-A",
+        em_name="Isabel Ortiz", em_phone="915-555-0148", em_rel="Daughter",
+    )
+    _fill_carmen(chart)
+    return chart
+
+
+def _fill_carmen(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare", member="1EG4-CO1-AF81", group="MED-A",
+              em_name="Isabel Ortiz", em_phone="915-555-0148", em_rel="Daughter")
+    _maybe_allergy(chart, "Aspirin", "Stomach upset", "mild")
+    _maybe_med(chart, "Warfarin", dose="5 mg", route="PO", frequency="Once daily", indication="Atrial fibrillation", adherence="No missed doses this week")
+    _maybe_med(chart, "Metoprolol tartrate", dose="25 mg", route="PO", frequency="Twice daily", indication="Rate control")
+    _maybe_med(chart, "Furosemide", dose="20 mg", route="PO", frequency="Once daily", indication="Edema")
+    _maybe_med(chart, "Levothyroxine", dose="50 mcg", route="PO", frequency="Once daily", indication="Hypothyroidism")
+    _maybe_problem(chart, "Unspecified atrial fibrillation", code="I48.91", since="2018")
+    _maybe_problem(chart, "Long term (current) use of anticoagulants", code="Z79.01")
+    _maybe_problem(chart, "Hypothyroidism", code="E03.9")
+    _maybe_lab(chart, "INR", date(2026, 9, 23), value="4.8", unit="", reference_range="2.0–3.0", flag="H")
+    _maybe_lab(chart, "Hemoglobin", date(2026, 9, 23), value="11.4", unit="g/dL", reference_range="12.0–16.0", flag="L")
+    _maybe_vital(chart, "BP", "128/76 mmHg")
+    _maybe_vital(chart, "Pulse", "82 bpm")
+    _maybe_vital(chart, "Weight", "58 kg")
+
+
+def _james(course: Course, owner: User) -> Patient:
+    chart = _patient(
+        mrn="TR-10140-DR", first="James", last="Whitaker", preferred="Jim", dob="1952-02-02", sex="Male",
+        pronouns="he/him", course=course, mode="assessment", case_key="case_hf", owner=owner,
+        cc="Heart-failure med review after a 4 lb weight gain.",
+        hpi="74-year-old male with HFrEF. Gained 4 lb in 5 days. More orthopnea. Taking furosemide later in the day so he can run errands.",
+        lifecycle="Active", encounter_status="In progress", care="Outpatient",
+        family="Father: MI at 68.", surgical="CABG (2015).", social="Retired mechanic. Wife cooks low-salt meals most days.",
+        encounter_type="Heart failure clinic",
+        payer="Medicare", member="1EG4-JW3-HF74", group="MED-B",
+        em_name="Helen Whitaker", em_phone="915-555-0121", em_rel="Spouse",
+    )
+    _fill_james(chart)
+    return chart
+
+
+def _fill_james(chart: Patient) -> None:
+    _contacts(chart, payer="Medicare", member="1EG4-JW3-HF74", group="MED-B",
+              em_name="Helen Whitaker", em_phone="915-555-0121", em_rel="Spouse")
+    _maybe_allergy(chart, "Lisinopril", "Cough", "moderate")
+    _maybe_med(chart, "Furosemide", dose="40 mg", route="PO", frequency="Once daily", indication="Volume overload", adherence="Takes late morning")
+    _maybe_med(chart, "Carvedilol", dose="12.5 mg", route="PO", frequency="Twice daily", indication="HFrEF")
+    _maybe_med(chart, "Spironolactone", dose="25 mg", route="PO", frequency="Once daily", indication="HFrEF")
+    _maybe_med(chart, "Sacubitril/valsartan", dose="49/51 mg", route="PO", frequency="Twice daily", indication="HFrEF")
+    _maybe_med(chart, "Dapagliflozin", dose="10 mg", route="PO", frequency="Once daily", indication="HFrEF")
+    _maybe_med(chart, "Atorvastatin", dose="40 mg", route="PO", frequency="Once daily at bedtime", indication="ASCVD")
+    _maybe_problem(chart, "Chronic systolic (congestive) heart failure", code="I50.22", since="2015")
+    _maybe_problem(chart, "Hyperlipidemia", code="E78.5")
+    collected = date(2026, 9, 27)
+    _maybe_lab(chart, "Potassium", collected, value="3.3", unit="mmol/L", reference_range="3.5–5.1", flag="L")
+    _maybe_lab(chart, "Serum creatinine", collected, value="1.4", unit="mg/dL", reference_range="0.7–1.3", flag="H")
+    _maybe_lab(chart, "BNP", collected, value="840", unit="pg/mL", reference_range="<100", flag="H")
+    _maybe_lab(chart, "Sodium", collected, value="133", unit="mmol/L", reference_range="136–145", flag="L")
+    _maybe_vital(chart, "BP", "110/68 mmHg")
+    _maybe_vital(chart, "Pulse", "88 bpm")
+    _maybe_vital(chart, "Weight", "92 kg")
+    _maybe_vital(chart, "SpO₂", "94%")
+
+
+def _linh(course: Course, owner: User) -> Patient:
+    chart = _patient(
+        mrn="TR-10088-LO", first="Linh", last="Nguyen", preferred=None, dob="1981-05-30", sex="Female",
+        pronouns="she/her", course=course, mode="assessment", case_key="case_lbp", owner=owner,
+        cc="Low back pain for 3 weeks after lifting boxes.",
+        hpi="45-year-old female with low back pain radiating to the right buttock, worse with sitting. No numbness or bowel/bladder changes.",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
+        family="Noncontributory.", surgical="None.", social="Warehouse supervisor. Walks 3x/week.",
+        encounter_type="PT evaluation",
+        payer="Aetna", member="AE-10088", group="WH-ELP",
+        em_name="Minh Nguyen", em_phone="915-555-0171", em_rel="Spouse",
+    )
+    _fill_linh(chart)
+    return chart
+
+
+def _fill_linh(chart: Patient) -> None:
+    _contacts(chart, payer="Aetna", member="AE-10088", group="WH-ELP",
+              em_name="Minh Nguyen", em_phone="915-555-0171", em_rel="Spouse")
+    _maybe_allergy(chart, "Codeine", "Nausea", "mild")
+    _maybe_med(chart, "Naproxen", dose="220 mg", route="PO", frequency="Twice daily", indication="Back pain")
+    _maybe_med(chart, "Methocarbamol", dose="500 mg", route="PO", frequency="Three times daily as needed", indication="Spasm")
+    _maybe_problem(chart, "Low back pain, unspecified", code="M54.50")
+    _maybe_vital(chart, "BP", "118/74 mmHg")
+    _maybe_vital(chart, "Pulse", "70 bpm")
+    _maybe_vital(chart, "Pain", "6/10")
+    _maybe_vital(chart, "Weight", "61 kg")
 
 
 async def _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy) -> None:
@@ -506,28 +1290,36 @@ def _t2dm(course: Course, owner: User, mrn: str) -> Patient:
         family="Mother: type 2 diabetes. Father: hypertension.", surgical="Appendectomy (1990).",
         social="Married. Never smoker. Alcohol 2 drinks/week. No drug use. Takes a daily multivitamin.",
         encounter_type="Office visit",
+        payer="Blue Cross", member="BC-10057", group="FAC-ELP",
+        em_name="Elsa Einstein", em_phone="915-555-0100", em_rel="Spouse",
     )
-    chart.allergies.append(Allergy(substance="Penicillin", reaction="Hives", severity="moderate"))
-    chart.medications.extend([
-        Medication(name="Metformin", dose="500 mg", route="PO", frequency="Once daily", indication="Type 2 diabetes", adherence="Misses ~2 doses/week"),
-        Medication(name="Multivitamin", dose="1 tablet", route="PO", frequency="Once daily", indication="Supplement"),
-    ])
-    chart.problems.append(Problem(code="E11.65", description="Type 2 diabetes mellitus with hyperglycemia", since="2016"))
-    collected = date(2026, 9, 15)
-    chart.labs.extend([
-        LabResult(name="Hemoglobin A1C", value="10.5", unit="%", reference_range="4.0–5.6", flag="H", collected_at=collected),
-        LabResult(name="Fasting glucose", value="212", unit="mg/dL", reference_range="70–99", flag="H", collected_at=collected),
-        LabResult(name="Serum creatinine", value="0.9", unit="mg/dL", reference_range="0.7–1.3", collected_at=collected),
-        LabResult(name="eGFR", value="92", unit="mL/min/1.73m²", reference_range=">60", collected_at=collected),
-        LabResult(name="Potassium", value="4.2", unit="mmol/L", reference_range="3.5–5.1", collected_at=collected),
-        LabResult(name="LDL cholesterol", value="96", unit="mg/dL", reference_range="<100", collected_at=collected),
-    ])
-    chart.vitals.extend([
-        Vital(label="BP", value="138/86 mmHg"), Vital(label="Pulse", value="78 bpm"),
-        Vital(label="SpO₂", value="98%"), Vital(label="Weight", value="98 kg"),
-        Vital(label="Height", value="178 cm"), Vital(label="BMI", value="30.9"),
-    ])
+    _fill_t2dm(chart)
     return chart
+
+
+def _fill_t2dm(chart: Patient) -> None:
+    _contacts(chart, payer="Blue Cross", member="BC-10057", group="FAC-ELP",
+              em_name="Elsa Einstein", em_phone="915-555-0100", em_rel="Spouse")
+    _maybe_allergy(chart, "Penicillin", "Hives", "moderate")
+    _maybe_med(chart, "Metformin", dose="500 mg", route="PO", frequency="Once daily", indication="Type 2 diabetes", adherence="Misses ~2 doses/week")
+    _maybe_med(chart, "Multivitamin", dose="1 tablet", route="PO", frequency="Once daily", indication="Supplement")
+    for med in list(chart.medications):
+        if med.name in {"Lisinopril", "Atorvastatin"}:
+            chart.medications.remove(med)
+    _maybe_problem(chart, "Type 2 diabetes mellitus with hyperglycemia", code="E11.65", since="2016")
+    collected = date(2026, 9, 15)
+    _maybe_lab(chart, "Hemoglobin A1C", collected, value="10.5", unit="%", reference_range="4.0–5.6", flag="H")
+    _maybe_lab(chart, "Fasting glucose", collected, value="212", unit="mg/dL", reference_range="70–99", flag="H")
+    _maybe_lab(chart, "Serum creatinine", collected, value="0.9", unit="mg/dL", reference_range="0.7–1.3")
+    _maybe_lab(chart, "eGFR", collected, value="92", unit="mL/min/1.73m²", reference_range=">60")
+    _maybe_lab(chart, "Potassium", collected, value="4.2", unit="mmol/L", reference_range="3.5–5.1")
+    _maybe_lab(chart, "LDL cholesterol", collected, value="96", unit="mg/dL", reference_range="<100")
+    _maybe_vital(chart, "BP", "138/86 mmHg")
+    _maybe_vital(chart, "Pulse", "78 bpm")
+    _maybe_vital(chart, "SpO₂", "98%")
+    _maybe_vital(chart, "Weight", "98 kg")
+    _maybe_vital(chart, "Height", "178 cm")
+    _maybe_vital(chart, "BMI", "30.9")
 
 
 def _patient(**kwargs) -> Patient:
@@ -553,6 +1345,12 @@ def _patient(**kwargs) -> Patient:
         family_history=kwargs["family"],
         surgical_history=kwargs["surgical"],
         social_history=kwargs["social"],
+        insurance_payer=kwargs.get("payer"),
+        insurance_member_id=kwargs.get("member"),
+        insurance_group_number=kwargs.get("group"),
+        emergency_contact_name=kwargs.get("em_name"),
+        emergency_contact_phone=kwargs.get("em_phone"),
+        emergency_contact_relationship=kwargs.get("em_rel"),
         is_training=True,
         encounter=Encounter(type=kwargs["encounter_type"], date=date(2026, 9, 22)),
     )

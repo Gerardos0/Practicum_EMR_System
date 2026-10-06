@@ -44,21 +44,21 @@ export default function InstructorDashboard() {
           label="Notes to review"
           value={pending.length}
           tone="navy"
-          to="/review"
+          to="/review?status=pending_review"
           icon={<AssignmentOutlined fontSize="small" />}
         />
         <StatCard
           label="Waiting over a day"
           value={stale.length}
           tone="orange"
-          to="/review"
+          to="/review?status=pending_review"
           icon={<AssignmentOutlined fontSize="small" />}
         />
         <StatCard
           label="Returned to students"
           value={returned.length}
           tone="orangeSoft"
-          to="/review"
+          to="/review?status=returned"
           icon={<ReplayOutlined fontSize="small" />}
         />
         <StatCard
@@ -78,7 +78,7 @@ export default function InstructorDashboard() {
       </StatGrid>
 
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1.4fr 1fr" } }}>
-        <Panel title="Review queue" action={{ label: "Open queue", to: "/review" }} accent>
+        <Panel title="Review queue" action={{ label: "Open queue", to: "/review?status=pending_review" }} accent>
           {queue.loading && !queue.data ? <LinearProgress /> : pending.length === 0 ? (
             <EmptyState title="Nothing waiting">Students' assessment notes will land here after they submit for signature.</EmptyState>
           ) : (
