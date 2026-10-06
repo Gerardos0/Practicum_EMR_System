@@ -90,8 +90,11 @@ Open a terminal:
 ```bash
 cd backend
 source .venv/bin/activate
+python -m app.scripts.seed
 uvicorn app.main:app --reload
 ```
+
+Demo sign-in: `daniel.reyes@miners.utep.edu` / `practicum-demo`
 
 Backend:
 
@@ -140,6 +143,41 @@ uvicorn app.main:app --reload
 cd frontend
 npm run dev
 ```
+
+The API can also run in Docker. From the project folder:
+
+```bash
+docker compose --profile api up -d --build
+docker compose exec api python -m app.scripts.seed
+```
+
+API:
+
+```text
+http://localhost:8000
+```
+
+Migrations run when the container starts.
+
+## Deploy
+
+### API on Render
+
+In Render, New → Blueprint, and pick this repo. Set `SEED_DEMO_PASSWORD` when it asks.
+
+After the first deploy, open the service shell and run:
+
+```bash
+python -m app.scripts.seed
+```
+
+Copy the service URL. The database is the smallest paid Postgres plan. The free web service sleeps when idle.
+
+### Frontend on Vercel
+
+Import the repo. Root directory is `frontend`. Add `VITE_API_URL` and set it to the Render URL, with no trailing slash.
+
+`https://*.vercel.app` is allowed. For another domain, set `CORS_ORIGINS` on the Render service.
 
 ## Important
 

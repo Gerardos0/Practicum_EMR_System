@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: practicum-emr-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: practicum-emr-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGIN_REGEX
+        value: https://.*\.vercel\.app
+      - key: SEED_DEMO_PASSWORD
+        sync: false
+
+databases:
+  - name: practicum-emr-db
+    # free postgres is deleted after the trial
+    plan: 0.1c-256mb
+    region: oregon
+    postgresMajorVersion: "16"
+    databaseName: emr
+    user: emr
+    diskSizeGB: 1
