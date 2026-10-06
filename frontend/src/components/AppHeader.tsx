@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { AppBar, Box, Chip, IconButton, InputBase, MenuItem, Select, Toolbar, Typography } from "@mui/material";
 import MenuRounded from "@mui/icons-material/MenuRounded";
 import SearchRounded from "@mui/icons-material/SearchRounded";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/AuthContext";
 import { getCourse, listCoursesForUser } from "../api/courses";
 import { utep } from "../theme/tokens";
@@ -19,6 +19,7 @@ const pickerSx = {
 
 export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const heading = usePageHeadingValue();
   const { user, activeRole, discipline, courseId, switchRole, selectCourse } = useSession();
   const [q, setQ] = useState("");
@@ -35,7 +36,11 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
   const search = (e: FormEvent) => {
     e.preventDefault();
     const term = q.trim();
-    navigate(term ? `/patients?q=${encodeURIComponent(term)}` : "/patients");
+    const next = new URLSearchParams(location.pathname === "/patients" ? location.search : "");
+    if (term) next.set("q", term);
+    else next.delete("q");
+    const qs = next.toString();
+    navigate(qs ? `/patients?${qs}` : "/patients");
   };
 
   return (
@@ -70,7 +75,18 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
           >
             <SearchRounded fontSize="small" />
             <InputBase
-              value={q} onChange={(e) => setQ(e.target.value)} sx={{ flex: 1, fontSize: 14 }}
+              value={q} onChange={(e) => {
+                const value = e.target.value;
+                setQ(value);
+                if (location.pathname !== "/patients") return;
+                const next = new URLSearchParams(location.search);
+                const term = value.trim();
+                if (term) next.set("q", term);
+                else next.delete("q");
+                const qs = next.toString();
+                navigate(qs ? `/patients?${qs}` : "/patients", { replace: true });
+              }}
+              sx={{ flex: 1, fontSize: 14 }}
               placeholder={activeRole === "student" ? "Search name or MRN" : "Search patient, MRN, or student"}
               inputProps={{ "aria-label": "Search patients" }}
             />
