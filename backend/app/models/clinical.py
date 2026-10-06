@@ -46,7 +46,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     sex_at_birth: Mapped[str] = mapped_column(String(20))
     pronouns: Mapped[str | None] = mapped_column(String(40))
     course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"), index=True)
-    mode: Mapped[str] = mapped_column(String(20))  # practice | assessment
+    mode: Mapped[str] = mapped_column(String(20))
     case_key: Mapped[str] = mapped_column(String(50))
     source_patient_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("patients.id"))
     owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)

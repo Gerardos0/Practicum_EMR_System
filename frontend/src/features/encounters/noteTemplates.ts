@@ -1,8 +1,5 @@
 import type { Discipline, NoteTemplateId } from "../../types";
 
-// Discipline-specific structures from the client's sample templates.
-// Field ids are the keys stored in ClinicalNote.content (versioned JSONB on the backend).
-
 export type FieldKind = "text" | "textarea" | "icd10" | "medrec";
 
 export interface TemplateField {
@@ -161,7 +158,6 @@ export function defaultTemplateFor(discipline?: Discipline): NoteTemplateId {
   return "general_soap";
 }
 
-/** Returns the labels of required fields that are still empty. */
 export function missingRequired(
   templateId: NoteTemplateId, content: Record<string, string>, diagnosisCount: number,
 ): string[] {

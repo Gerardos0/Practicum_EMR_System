@@ -10,7 +10,6 @@ import { useAsync } from "../../utils/useAsync";
 import { trainingStripe, utep } from "../../theme/tokens";
 import { useSession } from "./AuthContext";
 
-/** "After selecting a class, students will see patient cases assigned to that class." */
 export default function SelectCoursePage() {
   const navigate = useNavigate();
   const { user, activeRole, switchRole, selectCourse, signOut } = useSession();

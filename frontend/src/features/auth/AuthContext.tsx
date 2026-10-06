@@ -134,7 +134,6 @@ export function useAuth() {
   return ctx;
 }
 
-/** For pages behind RequireAuth, where a session is guaranteed. */
 export function useSession() {
   const ctx = useAuth();
   if (!ctx.user || !ctx.activeRole) throw new Error("No active session");

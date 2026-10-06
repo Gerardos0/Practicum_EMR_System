@@ -17,7 +17,6 @@ export function PageHeadingProvider({ children }: { children: ReactNode }) {
   return <PageHeadingContext.Provider value={value}>{children}</PageHeadingContext.Provider>;
 }
 
-/** Puts the page title in the orange header bar. */
 export function usePageHeading(title: string) {
   const ctx = useContext(PageHeadingContext);
   const setHeading = ctx?.setHeading;

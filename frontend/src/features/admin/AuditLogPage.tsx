@@ -8,7 +8,6 @@ import { useAsync } from "../../utils/useAsync";
 import { useSession } from "../auth/AuthContext";
 import { usePageHeading } from "../../components/PageHeading";
 
-/** Who viewed or changed what, and when. Instructors see students' full trail; students never see this page. */
 export default function AuditLogPage() {
   usePageHeading("Activity log");
   const { courseId, activeRole } = useSession();

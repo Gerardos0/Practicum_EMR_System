@@ -175,6 +175,7 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
     await _member(db, joe, phar, roles["instructor"], None)
     await _charts(db, phar, pt, ana, sam, luis, gerardo, daniel, clarissa)
     await _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy)
+    await _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, therapy, hashed)
 
 
 async def _course(db, code: str, title: str, term: str, rubric: str) -> Course:
@@ -306,7 +307,6 @@ async def _charts(
         await _ensure_referral(db, einstein_sam.id, nursing.id, gerardo.id, "Diabetes education and foot-care teaching.", "routine")
         await _ensure_referral(db, james.id, nursing.id, daniel.id, "Heart-failure daily-weight teaching.", "urgent")
 
-    # Sam: still waiting on Gerardo (queue "Needs review")
     sam_note = await _ensure_note(
         db, einstein_sam, sam, pharmacy, gerardo,
         status="pending_review", template_id="pharmacy_mtm",
@@ -326,7 +326,6 @@ async def _charts(
     await _ensure_audit(db, sam.id, "chart.view", "patient", einstein_sam.id, phar.id, datetime(2026, 9, 22, 15, 2, 11, tzinfo=timezone.utc))
     await _ensure_audit(db, sam.id, "note.sign_submit", "note", sam_note.id, phar.id, datetime(2026, 9, 22, 15, 40, 2, tzinfo=timezone.utc))
 
-    # Ana: co-signed (queue "Co-signed")
     ana_note = await _ensure_note(
         db, einstein_ana, ana, pharmacy, gerardo,
         status="cosigned", template_id="pharmacy_mtm",
@@ -350,7 +349,6 @@ async def _charts(
     await _ensure_comment(db, ana_note, gerardo, "cosigned", "Clear assessment. Follow the empagliflozin coverage check before the next visit.")
     await _ensure_addendum(db, ana_note, ana, "Patient's insurance confirmed empagliflozin on formulary with a PA.")
 
-    # Daniel: returned diabetes note (queue "Returned" + student dashboard)
     daniel_note = await _ensure_note(
         db, einstein_daniel, daniel, pharmacy, gerardo,
         status="returned", template_id="pharmacy_mtm",
@@ -374,7 +372,6 @@ async def _charts(
     )
     await _ensure_audit(db, gerardo.id, "note.return", "note", daniel_note.id, phar.id, datetime(2026, 9, 25, 10, 5, tzinfo=timezone.utc))
 
-    # Clarissa: draft on her Einstein copy
     await _ensure_note(
         db, einstein_clarissa, clarissa, pharmacy, gerardo,
         status="draft", template_id="pharmacy_mtm",
@@ -387,7 +384,6 @@ async def _charts(
         updated=datetime(2026, 9, 26, 11, 45, tzinfo=timezone.utc),
     )
 
-    # Clarissa: returned anticoagulation note on Carmen
     carmen_note = await _ensure_note(
         db, carmen, clarissa, pharmacy, gerardo,
         status="returned", template_id="pharmacy_mtm",
@@ -410,7 +406,6 @@ async def _charts(
         "Spell out hold vs dose reduction, when to restart, the exact next INR date, and bleeding precautions you gave the patient.",
     )
 
-    # Daniel: in-progress draft on James (HF)
     await _ensure_note(
         db, james, daniel, pharmacy, gerardo,
         status="draft", template_id="pharmacy_mtm",
@@ -423,7 +418,6 @@ async def _charts(
         created=datetime(2026, 9, 27, 8, 30, tzinfo=timezone.utc),
     )
 
-    # Daniel: signed practice note on Rosa
     await _ensure_note(
         db, rosa, daniel, pharmacy, None,
         status="signed", template_id="pharmacy_mtm",
@@ -442,7 +436,6 @@ async def _charts(
         mode="practice",
     )
 
-    # Luis: returned PT SOAP on Linh
     if therapy:
         linh_note = await _ensure_note(
             db, linh, luis, therapy, gerardo,
@@ -1354,6 +1347,144 @@ def _patient(**kwargs) -> Patient:
         is_training=True,
         encounter=Encounter(type=kwargs["encounter_type"], date=date(2026, 9, 22)),
     )
+
+
+async def _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, therapy, hashed) -> None:
+    role = await db.scalar(select(Role).where(Role.code == "student"))
+    roster = [
+        ("peter.parker@miners.utep.edu", "Peter", "Parker", "800701001", "1001", phar, pharmacy),
+        ("wanda.maximoff@miners.utep.edu", "Wanda", "Maximoff", "800701002", "1002", phar, pharmacy),
+        ("stephen.strange@miners.utep.edu", "Stephen", "Strange", "800701003", "1003", phar, pharmacy),
+        ("scott.lang@miners.utep.edu", "Scott", "Lang", "800701004", "1004", phar, pharmacy),
+        ("maria.gonzalez@miners.utep.edu", "Maria", "Gonzalez", "800703001", "3301", phar, pharmacy),
+        ("diego.ramirez@miners.utep.edu", "Diego", "Ramirez", "800703002", "3302", phar, pharmacy),
+        ("bucky.barnes@miners.utep.edu", "Bucky", "Barnes", "800702001", "2001", pt, therapy),
+        ("jessica.jones@miners.utep.edu", "Jessica", "Jones", "800702002", "2002", pt, therapy),
+        ("matt.murdock@miners.utep.edu", "Matt", "Murdock", "800702003", "2003", pt, therapy),
+        ("andres.morales@miners.utep.edu", "Andres", "Morales", "800704001", "4401", pt, therapy),
+        ("valeria.castillo@miners.utep.edu", "Valeria", "Castillo", "800704002", "4402", pt, therapy),
+    ]
+    users = {}
+    for email, first, last, uid, phone, course, disc in roster:
+        user = await _person(db, email, first, last, uid, phone, hashed)
+        await _member(db, user, course, role, disc)
+        users[email] = user
+
+    async def chart(mrn, first, last, dob, sex, course, mode, owner, visit, cc, med, dose, problem, code, lab=None):
+        etype = "Office visit" if course is phar else "PT evaluation"
+        row = await _ensure_chart(db, mrn, lambda: _patient(
+            mrn=mrn, first=first, last=last, dob=dob, sex=sex,
+            pronouns="she/her" if sex == "Female" else "he/him",
+            course=course, mode=mode, case_key=mrn.lower(),
+            label=f"Test Patient {last}" if mode == "practice" else None,
+            owner=owner, cc=cc, hpi=cc,
+            lifecycle="Active", encounter_status=visit, care="Outpatient",
+            family="Noncontributory.", surgical="None.", social="Lives in El Paso. No current tobacco.",
+            encounter_type=etype,
+        ))
+        await db.refresh(row, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+        inhaled = med == "Albuterol"
+        _maybe_med(
+            row, med, dose=dose, route="Inhaled" if inhaled else "PO",
+            frequency="Every 4 hours as needed" if inhaled else "Once daily", indication=problem,
+        )
+        _maybe_problem(row, problem, code=code, since="2024")
+        _maybe_vital(row, "BP", "124/76 mmHg")
+        _maybe_vital(row, "Pulse", "72 bpm")
+        if lab:
+            _maybe_lab(row, lab[0], date(2026, 10, 1), value=lab[1], unit=lab[2], reference_range=lab[3], flag=lab[4])
+        if mode == "practice" and not row.snapshot:
+            row.snapshot = chart_snapshot(row)
+        return row
+
+    charts = {
+        "TR-M-STARK": await chart("TR-M-STARK", "Tony", "Stark", "1970-05-29", "Male", phar, "practice", None, "Checked in", "Chest tightness after he skips his evening water pill.", "Furosemide", "40 mg", "Chronic systolic heart failure", "I50.22", ("BNP", "910", "pg/mL", "<100", "H")),
+        "TR-M-POTTS": await chart("TR-M-POTTS", "Pepper", "Potts", "1972-02-12", "Female", phar, "practice", None, "Scheduled", "Blood pressure still high on two medicines.", "Lisinopril", "20 mg", "Essential hypertension", "I10"),
+        "TR-M-HOGAN": await chart("TR-M-HOGAN", "Happy", "Hogan", "1968-08-03", "Male", phar, "practice", None, "Checked out", "Morning sugars in the 160s.", "Metformin", "1000 mg", "Type 2 diabetes mellitus", "E11.9", ("Hemoglobin A1C", "7.4", "%", "4.0–5.6", "H")),
+        "TR-X-MORALES": await chart("TR-X-MORALES", "Guadalupe", "Morales", "1956-12-12", "Female", phar, "practice", None, "Checked in", "Blood pressure still high. Takes her medicine with breakfast.", "Lisinopril", "20 mg", "Essential hypertension", "I10", ("Potassium", "5.4", "mmol/L", "3.5–5.1", "H")),
+        "TR-X-HERNANDEZ": await chart("TR-X-HERNANDEZ", "Jose", "Hernandez", "1964-03-21", "Male", phar, "practice", None, "Scheduled", "Refill on metformin. Sugars better since he cut soda.", "Metformin", "1000 mg", "Type 2 diabetes mellitus", "E11.9"),
+        "TR-M-DANVERS": await chart("TR-M-DANVERS", "Carol", "Danvers", "1985-04-24", "Female", pt, "practice", None, "Checked in", "Right shoulder pain after a fall last week.", "Ibuprofen", "400 mg", "Pain in right shoulder", "M25.511", ("CRP", "18", "mg/L", "<10", "H")),
+        "TR-M-KHAN": await chart("TR-M-KHAN", "Kamala", "Khan", "2004-08-14", "Female", pt, "practice", None, "Scheduled", "Ankle sprain from basketball, two weeks ago.", "Ibuprofen", "400 mg", "Sprain of right ankle", "S93.401A"),
+        "TR-X-AGUILAR": await chart("TR-X-AGUILAR", "Beatriz", "Aguilar", "1974-08-30", "Female", pt, "practice", None, "Checked in", "Right knee pain after a fall in the kitchen.", "Acetaminophen", "500 mg", "Pain in right knee", "M25.561"),
+        "TR-M-FURY": await chart("TR-M-FURY", "Nick", "Fury", "1950-07-04", "Male", phar, "assessment", users["peter.parker@miners.utep.edu"], "In progress", "Home readings still in the 150s after a ministroke scare.", "Amlodipine", "5 mg", "Essential hypertension", "I10", ("LDL cholesterol", "128", "mg/dL", "<70", "H")),
+        "TR-M-MAY": await chart("TR-M-MAY", "May", "Parker", "1948-05-08", "Female", phar, "assessment", users["peter.parker@miners.utep.edu"], "Checked out", "Lightheaded after her blood pressure medicine was raised.", "Lisinopril", "20 mg", "Essential hypertension", "I10"),
+        "TR-M-PIETRO": await chart("TR-M-PIETRO", "Pietro", "Maximoff", "1988-02-10", "Male", phar, "assessment", users["wanda.maximoff@miners.utep.edu"], "Checked in", "Says his rescue inhaler makes his heart race.", "Albuterol", "2 puffs", "Mild intermittent asthma", "J45.20"),
+        "TR-M-VISION": await chart("TR-M-VISION", "Vision", "Shade", "1985-05-02", "Male", phar, "assessment", users["wanda.maximoff@miners.utep.edu"], "Checked in", "Ankle swelling on his calcium channel blocker.", "Amlodipine", "10 mg", "Essential hypertension", "I10"),
+        "TR-M-WONG": await chart("TR-M-WONG", "Wong", "Kamar-Taj", "1966-01-09", "Male", phar, "assessment", users["stephen.strange@miners.utep.edu"], "Scheduled", "Heartburn most nights. Takes calcium at bedtime.", "Omeprazole", "20 mg", "Gastro-esophageal reflux disease", "K21.9"),
+        "TR-M-PALMER": await chart("TR-M-PALMER", "Christine", "Palmer", "1979-07-19", "Female", phar, "assessment", users["stephen.strange@miners.utep.edu"], "Checked out", "Bruising on warfarin. Missed two doses last week.", "Warfarin", "5 mg", "Atrial fibrillation", "I48.91"),
+        "TR-M-LEWIS": await chart("TR-M-LEWIS", "Darcy", "Lewis", "1990-03-12", "Female", phar, "assessment", users["scott.lang@miners.utep.edu"], "In progress", "Morning sugars in the 180s on metformin alone.", "Metformin", "500 mg", "Type 2 diabetes mellitus", "E11.9"),
+        "TR-M-SELVIG": await chart("TR-M-SELVIG", "Erik", "Selvig", "1955-11-02", "Male", phar, "assessment", users["scott.lang@miners.utep.edu"], "Checked out", "Calf cramps on his water pill.", "Hydrochlorothiazide", "25 mg", "Essential hypertension", "I10"),
+        "TR-M-HOPE": await chart("TR-M-HOPE", "Hope", "van Dyne", "1980-09-16", "Female", phar, "assessment", users["scott.lang@miners.utep.edu"], "Checked out", "Still tired in the afternoons. Takes her thyroid pill with coffee.", "Levothyroxine", "75 mcg", "Hypothyroidism", "E03.9", ("TSH", "6.2", "mIU/L", "0.4–4.0", "H")),
+        "TR-X-SALAZAR": await chart("TR-X-SALAZAR", "Roberto", "Salazar", "1952-09-03", "Male", phar, "assessment", users["maria.gonzalez@miners.utep.edu"], "In progress", "Chest tightness when he walks to the store.", "Furosemide", "20 mg", "Chronic systolic heart failure", "I50.22", ("BNP", "640", "pg/mL", "<100", "H")),
+        "TR-X-VEGA": await chart("TR-X-VEGA", "Leticia", "Vega", "1959-02-14", "Female", phar, "assessment", users["maria.gonzalez@miners.utep.edu"], "Checked out", "Swelling in both ankles since the calcium channel blocker.", "Amlodipine", "10 mg", "Essential hypertension", "I10"),
+        "TR-X-CRUZ": await chart("TR-X-CRUZ", "Isabel", "Cruz", "1988-06-19", "Female", phar, "assessment", users["diego.ramirez@miners.utep.edu"], "Checked in", "Migraines most weeks. Uses the rescue medicine often.", "Sumatriptan", "50 mg", "Migraine, unspecified", "G43.909"),
+        "TR-X-DELGADO": await chart("TR-X-DELGADO", "Fernando", "Delgado", "1970-11-07", "Male", phar, "assessment", users["diego.ramirez@miners.utep.edu"], "Checked out", "Muscle aches after the statin was increased.", "Atorvastatin", "40 mg", "Hyperlipidemia", "E78.5"),
+        "TR-M-WILSON": await chart("TR-M-WILSON", "Sam", "Wilson", "1978-09-23", "Male", pt, "assessment", users["bucky.barnes@miners.utep.edu"], "Checked in", "Left shoulder pain after a weekend of painting.", "Ibuprofen", "400 mg", "Pain in left shoulder", "M25.512"),
+        "TR-M-BISHOP": await chart("TR-M-BISHOP", "Kate", "Bishop", "1996-01-29", "Female", pt, "assessment", users["bucky.barnes@miners.utep.edu"], "In progress", "Right knee stiffness after ACL repair.", "Ibuprofen", "400 mg", "Status post right ACL reconstruction", "M23.91"),
+        "TR-M-KNIGHT": await chart("TR-M-KNIGHT", "Misty", "Knight", "1982-06-06", "Female", pt, "assessment", users["jessica.jones@miners.utep.edu"], "In progress", "Right wrist stiffness after a fall.", "Acetaminophen", "500 mg", "Pain in right wrist", "M25.531"),
+        "TR-M-WING": await chart("TR-M-WING", "Colleen", "Wing", "1986-01-15", "Female", pt, "assessment", users["jessica.jones@miners.utep.edu"], "Checked out", "Low back pain after a long drive.", "Naproxen", "220 mg", "Low back pain", "M54.50"),
+        "TR-M-PAGE": await chart("TR-M-PAGE", "Karen", "Page", "1987-04-18", "Female", pt, "assessment", users["matt.murdock@miners.utep.edu"], "Checked in", "Neck pain that started at her desk.", "Ibuprofen", "400 mg", "Cervicalgia", "M54.2"),
+        "TR-M-NELSON": await chart("TR-M-NELSON", "Foggy", "Nelson", "1986-10-03", "Male", pt, "assessment", users["matt.murdock@miners.utep.edu"], "Checked out", "Ankle still swollen two weeks after a sprain.", "Ibuprofen", "400 mg", "Sprain of right ankle", "S93.401A"),
+        "TR-X-GALLEGOS": await chart("TR-X-GALLEGOS", "Hector", "Gallegos", "1983-04-02", "Male", pt, "assessment", users["andres.morales@miners.utep.edu"], "Checked in", "Low back pain after a warehouse shift.", "Naproxen", "220 mg", "Low back pain", "M54.50"),
+        "TR-X-IBARRA": await chart("TR-X-IBARRA", "Yolanda", "Ibarra", "1961-01-28", "Female", pt, "assessment", users["andres.morales@miners.utep.edu"], "Checked out", "Shoulder stiffness. Hard to reach the top shelf.", "Ibuprofen", "400 mg", "Pain in right shoulder", "M25.511"),
+        "TR-X-ORTIZ": await chart("TR-X-ORTIZ", "Camila", "Ortiz", "1995-07-11", "Female", pt, "assessment", users["valeria.castillo@miners.utep.edu"], "In progress", "Ankle sprain from a soccer game last week.", "Ibuprofen", "400 mg", "Sprain of right ankle", "S93.401A"),
+        "TR-X-SOTO": await chart("TR-X-SOTO", "Rafael", "Soto", "1967-05-16", "Male", pt, "assessment", users["valeria.castillo@miners.utep.edu"], "Checked out", "Neck pain from driving a delivery route.", "Acetaminophen", "500 mg", "Cervicalgia", "M54.2"),
+        "TR-M-CHAVEZ": await chart("TR-M-CHAVEZ", "America", "Chavez", "2001-06-01", "Female", pt, "assessment", luis, "Checked in", "Low back pain after a lifting shift.", "Naproxen", "220 mg", "Low back pain", "M54.50"),
+    }
+
+    pharm_pending = {"reason": "Follow-up from last week.", "recommendations": "Review the dose and what to watch for."}
+    pharm_back = {"reason": "Student plan is too thin.", "recommendations": "Change the medicine."}
+    pt_pending = {"subjective": "Pain with the activity that brought them in.", "measures": "Motion limited.", "plan": "Practice the movement. Recheck next visit."}
+    pt_back = {"subjective": "Still limited.", "plan": "Keep going."}
+    notes = [
+        ("TR-M-FURY", "peter.parker@miners.utep.edu", "pending_review", gerardo, pharm_pending, None),
+        ("TR-M-MAY", "peter.parker@miners.utep.edu", "returned", gerardo, pharm_back, "Name the dose you want her back on."),
+        ("TR-M-PIETRO", "wanda.maximoff@miners.utep.edu", "pending_review", gerardo, pharm_pending, None),
+        ("TR-M-VISION", "wanda.maximoff@miners.utep.edu", "returned", joe, pharm_back, "Offer the replacement medicine, not only a stop."),
+        ("TR-M-WONG", "stephen.strange@miners.utep.edu", "pending_review", joe, pharm_pending, None),
+        ("TR-M-PALMER", "stephen.strange@miners.utep.edu", "returned", gerardo, pharm_back, "Say what the next INR should be."),
+        ("TR-M-LEWIS", "scott.lang@miners.utep.edu", "pending_review", gerardo, pharm_pending, None),
+        ("TR-M-SELVIG", "scott.lang@miners.utep.edu", "returned", gerardo, pharm_back, "Check the potassium before you stop the water pill."),
+        ("TR-M-HOPE", "scott.lang@miners.utep.edu", "cosigned", joe, pharm_pending, None),
+        ("TR-X-SALAZAR", "maria.gonzalez@miners.utep.edu", "pending_review", gerardo, pharm_pending, None),
+        ("TR-X-VEGA", "maria.gonzalez@miners.utep.edu", "returned", gerardo, pharm_back, "Name the medicine you would use instead."),
+        ("TR-X-CRUZ", "diego.ramirez@miners.utep.edu", "pending_review", gerardo, pharm_pending, None),
+        ("TR-X-DELGADO", "diego.ramirez@miners.utep.edu", "returned", gerardo, pharm_back, "Name a dose he could try before you stop the statin."),
+        ("TR-M-WILSON", "bucky.barnes@miners.utep.edu", "pending_review", gerardo, pt_pending, None),
+        ("TR-M-BISHOP", "bucky.barnes@miners.utep.edu", "returned", gerardo, pt_back, "Add the flexion you want by next week, and one exercise with sets and reps."),
+        ("TR-M-KNIGHT", "jessica.jones@miners.utep.edu", "pending_review", gerardo, pt_pending, None),
+        ("TR-M-WING", "jessica.jones@miners.utep.edu", "returned", gerardo, pt_back, "Add today's pain score and one exercise with sets and reps."),
+        ("TR-M-PAGE", "matt.murdock@miners.utep.edu", "pending_review", gerardo, pt_pending, None),
+        ("TR-M-NELSON", "matt.murdock@miners.utep.edu", "returned", gerardo, pt_back, "Add a swelling measure and the next visit goal."),
+        ("TR-X-GALLEGOS", "andres.morales@miners.utep.edu", "pending_review", gerardo, pt_pending, None),
+        ("TR-X-IBARRA", "andres.morales@miners.utep.edu", "returned", gerardo, pt_back, "Add the range you measured and one exercise with sets and reps."),
+        ("TR-X-ORTIZ", "valeria.castillo@miners.utep.edu", "pending_review", gerardo, pt_pending, None),
+        ("TR-X-SOTO", "valeria.castillo@miners.utep.edu", "returned", gerardo, pt_back, "Add today's rotation and a goal for the next visit."),
+        ("TR-M-CHAVEZ", "luis", "pending_review", gerardo, pt_pending, None),
+    ]
+    for index, (mrn, author_key, status, reviewer, content, comment) in enumerate(notes):
+        author = luis if author_key == "luis" else users[author_key]
+        patient = charts[mrn]
+        disc = pharmacy if patient.course_id == phar.id else therapy
+        template = "pharmacy_mtm" if disc is pharmacy else "pt_daily_soap"
+        signed = datetime(2026, 9, 11, 10 + (index % 6), tzinfo=timezone.utc)
+        updated = datetime(2026, 9, 16, 9 + (index % 6), tzinfo=timezone.utc)
+        note = await _ensure_note(
+            db, patient, author, disc, reviewer if status != "draft" else None,
+            status=status, template_id=template, content=content, diagnoses=[],
+            created=signed, signed=None if status == "draft" else signed, updated=updated,
+            cosigned=updated if status == "cosigned" else None,
+            cosigned_by=reviewer if status == "cosigned" else None,
+        )
+        if comment:
+            await _ensure_comment(db, note, reviewer, "returned", comment)
+
+    await _ensure_appointment(db, charts["TR-M-STARK"].id, datetime(2026, 10, 9, 15, tzinfo=timezone.utc), "Heart failure check", "Pharmacy clinic")
+    await _ensure_appointment(db, charts["TR-X-MORALES"].id, datetime(2026, 10, 12, 15, tzinfo=timezone.utc), "Blood pressure follow-up", "Pharmacy clinic")
+    await _ensure_appointment(db, charts["TR-X-AGUILAR"].id, datetime(2026, 10, 15, 16, tzinfo=timezone.utc), "Knee evaluation", "Physical Therapy")
+    await _ensure_audit(db, daniel.id, "chart.view", "patient", charts["TR-M-STARK"].id, phar.id, datetime(2026, 10, 5, 14, 10, tzinfo=timezone.utc))
+    await _ensure_audit(db, users["maria.gonzalez@miners.utep.edu"].id, "note.sign_submit", "note", charts["TR-X-SALAZAR"].id, phar.id, datetime(2026, 10, 2, 15, 20, tzinfo=timezone.utc))
+    await _ensure_audit(db, users["andres.morales@miners.utep.edu"].id, "chart.view", "patient", charts["TR-X-GALLEGOS"].id, pt.id, datetime(2026, 10, 4, 11, 5, tzinfo=timezone.utc))
 
 
 def main() -> None:

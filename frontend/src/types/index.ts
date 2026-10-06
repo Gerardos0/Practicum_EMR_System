@@ -5,7 +5,6 @@ export type Discipline =
   | "speech_language_pathology"
   | "nursing";
 
-/** A user can hold several roles (client: "Yes, a user can have more than one role"). */
 export type Role = "student" | "instructor" | "admin" | "front_desk" | "patient";
 
 export interface RoleAssignment {
@@ -18,7 +17,7 @@ export interface User {
   id: string;
   fullName: string;
   email: string;
-  universityId?: string; // 800 number
+  universityId?: string;
   phoneLast4?: string;
   roles: RoleAssignment[];
 }
@@ -32,10 +31,8 @@ export interface Course {
   rubricFileName?: string;
 }
 
-/** Practice = shared, resettable, ungraded. Assessment = isolated copy per student, routed for review. */
 export type CaseMode = "practice" | "assessment";
 
-// Status is tracked across separate fields, never one dropdown.
 export type LifecycleStatus =
   | "Active" | "Inactive" | "Prospective" | "Discharged from practice" | "Archived" | "Deceased";
 export type EncounterStatus = "Scheduled" | "Checked in" | "In progress" | "Checked out" | "Closed";
@@ -104,12 +101,10 @@ export interface Patient {
   courseId: string;
   mode: CaseMode;
   caseTemplateId: string;
-  /** Set on assessment instances: the only student whose work appears on this copy. */
   ownerId?: string;
-  /** Populated for instructors viewing an assessment instance. */
   ownerName?: string;
   isTraining: true;
-  practiceLabel?: string; // "Test Patient A"
+  practiceLabel?: string;
   chiefComplaint: string;
   hpi: string;
   status: PatientStatus;
@@ -124,13 +119,6 @@ export interface Patient {
   encounter: Encounter;
 }
 
-/**
- * draft          -> being written, editable by author
- * signed         -> practice-mode note signed by author, no review
- * pending_review -> signed by student, waiting on instructor
- * returned       -> instructor sent it back, editable again
- * cosigned       -> final; changes only via addendum
- */
 export type NoteStatus = "draft" | "signed" | "pending_review" | "returned" | "cosigned";
 
 export type NoteTemplateId = "pharmacy_mtm" | "pt_daily_soap" | "general_soap";
@@ -166,7 +154,6 @@ export interface ClinicalNote {
   authorDiscipline: Discipline;
   mode: CaseMode;
   status: NoteStatus;
-  /** Optimistic-concurrency token. Saving with a stale version is rejected. */
   version: number;
   content: Record<string, string>;
   diagnoses: IcdCode[];

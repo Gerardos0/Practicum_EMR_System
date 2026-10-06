@@ -13,7 +13,6 @@ function pick(row: Record<string, unknown>, keys: string[]): string {
   return hit ? String(row[hit] ?? "").trim() : "";
 }
 
-/** Reads the first sheet of an .xlsx/.xls/.csv roster and validates each row. */
 export async function parseRosterFile(file: File): Promise<RosterRow[]> {
   const wb = XLSX.read(await file.arrayBuffer());
   const sheet = wb.Sheets[wb.SheetNames[0]];

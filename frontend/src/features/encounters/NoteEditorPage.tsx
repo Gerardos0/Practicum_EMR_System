@@ -32,7 +32,6 @@ export default function NoteEditorPage() {
   const [instructors, setInstructors] = useState<User[]>([]);
   const [loadError, setLoadError] = useState<Error>();
 
-  // Editable draft state
   const [templateId, setTemplateId] = useState<NoteTemplateId>(defaultTemplateFor(discipline));
   const [content, setContent] = useState<Record<string, string>>({});
   const [diagnoses, setDiagnoses] = useState<IcdCode[]>([]);
@@ -44,7 +43,6 @@ export default function NoteEditorPage() {
   const [showErrors, setShowErrors] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // ---- Load (or create) the note ---------------------------------------------------------
   const creating = useRef(false);
   useEffect(() => {
     let alive = true;
@@ -60,7 +58,6 @@ export default function NoteEditorPage() {
         if (noteId === "new") {
           if (creating.current) return;
           creating.current = true;
-          // Reuse an open draft rather than creating duplicates.
           const existing = (await listNotesForPatient(activeRole, patientId)).find(
             (n) => n.authorId === user.id && (n.status === "draft" || n.status === "returned"),
           );
@@ -89,7 +86,6 @@ export default function NoteEditorPage() {
     setRoutedToId(n.routedToId ?? (n.mode === "assessment" ? people[0]?.id ?? "" : ""));
   };
 
-  // ---- Autosave with optimistic concurrency ----------------------------------------------
   const latest = useRef({ templateId, content, diagnoses, routedToId });
   latest.current = { templateId, content, diagnoses, routedToId };
   const changeSeq = useRef(0);
@@ -139,7 +135,6 @@ export default function NoteEditorPage() {
     return () => clearTimeout(t);
   }, [content, diagnoses, templateId, routedToId, editable, save]);
 
-  // Warn before closing the tab with unsaved edits.
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (changeSeq.current !== savedSeq.current) e.preventDefault();
@@ -153,7 +148,6 @@ export default function NoteEditorPage() {
     setContent((c) => ({ ...c, [id]: typeof next === "function" ? next(c[id] ?? "") : next }));
   };
 
-  // ---- Sign ------------------------------------------------------------------------------
   const missing = missingRequired(templateId, content, diagnoses.length);
   const needsRoute = note?.mode === "assessment" && !routedToId;
 

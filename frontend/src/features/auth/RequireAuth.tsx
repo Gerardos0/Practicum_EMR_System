@@ -5,7 +5,6 @@ import { useAuth } from "./AuthContext";
 
 interface Props {
   roles?: Role[];
-  /** Most screens are scoped to a course; the course picker itself is not. */
   needsCourse?: boolean;
 }
 

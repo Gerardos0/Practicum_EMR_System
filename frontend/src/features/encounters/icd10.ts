@@ -1,6 +1,5 @@
 import type { IcdCode } from "../../types";
 
-// Demo subset. Sprint 2: search the ICD-10 reference table on the backend.
 export const ICD10: IcdCode[] = [
   { code: "E11.65", label: "Type 2 diabetes mellitus with hyperglycemia" },
   { code: "E11.9", label: "Type 2 diabetes mellitus without complications" },

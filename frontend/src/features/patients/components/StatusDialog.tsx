@@ -13,7 +13,6 @@ interface Props {
   onSave: (status: PatientStatus) => Promise<void>;
 }
 
-/** Instructor-only. Status is split into independent fields: a patient can be Active, Checked in, and Inpatient at once. */
 export default function StatusDialog({ patient, open, onClose, onSave }: Props) {
   const [s, setS] = useState<PatientStatus>(patient.status);
   const [error, setError] = useState("");

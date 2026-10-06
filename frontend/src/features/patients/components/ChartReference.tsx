@@ -2,7 +2,6 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Typography } from "
 import ExpandMoreRounded from "@mui/icons-material/ExpandMoreRounded";
 import type { Patient } from "../../../types";
 
-/** Read-only chart context shown beside the note editor and the instructor review. */
 export default function ChartReference({ patient: p }: { patient: Patient }) {
   const sections = [
     {

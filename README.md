@@ -20,8 +20,6 @@ Electronic Medical Record (EMR) system built as our practicum project.
 **Development & Testing**
 - Docker Compose
 - Pytest
-- Vitest + React Testing Library
-- Playwright
 
 **Deployment**
 - Docker

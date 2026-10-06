@@ -8,7 +8,6 @@ interface Props {
   onAdd?: (body: string) => Promise<void>;
 }
 
-/** Signed notes are immutable. Corrections are appended, never overwritten. */
 export default function Addenda({ items, onAdd }: Props) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);

@@ -2,7 +2,6 @@ import { Box, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typograph
 import type { Patient } from "../../types";
 import EmptyState from "../../components/EmptyState";
 
-/** Columns follow the client's medication-review stage: how it's taken, how often, adherence. */
 export default function MedicationsTab({ patient }: { patient: Patient }) {
   if (patient.medications.length === 0) return <EmptyState title="No active medications" />;
   return (

@@ -14,7 +14,6 @@ interface Props {
   content: Record<string, string>;
   diagnoses: IcdCode[];
   readOnly?: boolean;
-  /** Field ids to flag as missing. */
   errors?: Set<string>;
   onField?: Setter;
   onDiagnoses?: (d: IcdCode[]) => void;
@@ -22,7 +21,6 @@ interface Props {
 
 const SOAP = new Set(["S", "O", "A", "P"]);
 
-/** Renders any template, editable or as a clean read-only document for review. */
 export default function NoteFields({ templateId, patient, content, diagnoses, readOnly, errors, onField, onDiagnoses }: Props) {
   const template = TEMPLATES[templateId];
 
