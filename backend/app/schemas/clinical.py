@@ -152,6 +152,11 @@ class StatusPatch(APIModel):
     program: str | None = None
 
 
+class AssignCase(APIModel):
+    source_patient_id: uuid.UUID
+    owner_id: uuid.UUID
+
+
 class IcdCode(APIModel):
     code: str
     label: str
