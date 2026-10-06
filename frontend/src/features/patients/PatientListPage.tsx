@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  InputAdornment, LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, TextField, Typography,
+  LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
 } from "@mui/material";
-import SearchRounded from "@mui/icons-material/SearchRounded";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { listPatients, resetPracticePatient, type PatientRow } from "../../api/patients";
 import { getCourse } from "../../api/courses";
@@ -20,10 +19,10 @@ export default function PatientListPage() {
   const navigate = useNavigate();
   const { activeRole, courseId } = useSession();
   const isStudent = activeRole === "student";
-  usePageHeading(isStudent ? "My patients" : "Patients");
+  usePageHeading(isStudent ? "My Patients" : "Patients");
   const [params, setParams] = useSearchParams();
   const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
-  const [query, setQuery] = useState("");
+  const query = params.get("q") ?? "";
   const [resetTarget, setResetTarget] = useState<PatientRow>();
   const [flash, setFlash] = useState("");
 
@@ -54,28 +53,18 @@ export default function PatientListPage() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "flex-end", gap: 2, flexWrap: "wrap", mb: 2 }}>
-        <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>{isStudent ? "My patients" : "Patients"}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {course.data ? `${course.data.code}: ${course.data.title}` : " "}
-          </Typography>
-        </Box>
-        <TextField
-          size="small" placeholder={isStudent ? "Search name or MRN" : "Search patient, MRN, or student"}
-          value={query} onChange={(e) => setQuery(e.target.value)} sx={{ width: { xs: "100%", sm: 320 } }}
-          slotProps={{
-            htmlInput: { "aria-label": "Search patients" },
-            input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment> },
-          }}
-        />
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>{isStudent ? "My Patients" : "Patients"}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {course.data ? `${course.data.code}: ${course.data.title}` : " "}
+        </Typography>
       </Box>
 
       {flash && <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>}
 
       <Paper>
         <Tabs
-          value={mode} onChange={(_, v) => setParams({ mode: v }, { replace: true })}
+          value={mode} onChange={(_, v) => setParams({ mode: v, ...(query ? { q: query } : {}) }, { replace: true })}
           sx={{ px: 1, borderBottom: 1, borderColor: "divider" }} aria-label="Case type"
         >
           <Tab value="assessment" label={`${isStudent ? "Assigned cases" : "Assessment cases"} (${counts.assessment})`} />
