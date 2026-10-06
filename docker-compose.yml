@@ -17,5 +17,21 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    profiles: ["api"]
+    build: ./backend
+    container_name: emr_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://emr:emr@db:5432/emr
+      JWT_SECRET_KEY: change-me-to-a-long-random-string
+      ENVIRONMENT: development
+      SEED_DEMO_PASSWORD: practicum-demo
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   emr_pgdata:
