@@ -11,8 +11,11 @@ interface Props {
   compact?: boolean;
 }
 
-/** Always-visible identity + allergy header, the way real EMRs pin it above every chart view. */
+const card = { borderRadius: "16px", overflow: "hidden" } as const;
+
+/** Always-visible identity + allergy header. Status is split across fields, never one dropdown. */
 export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
+  const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`;
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
     ["Setting", p.status.careSetting],
@@ -21,16 +24,40 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
   ];
 
   return (
-    <Paper component="section" aria-label="Patient" sx={{ overflow: "hidden" }}>
-      <Box sx={{ p: compact ? 2 : 2.5, display: "flex", gap: 3, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <Box sx={{ minWidth: 240, flex: "1 1 280px" }}>
-          <Typography component="h1" variant={compact ? "h6" : "h5"}>
+    <Paper component="section" aria-label="Patient" sx={card}>
+      <Box
+        sx={{
+          p: compact ? 2 : 2.5,
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: "auto minmax(0, 1fr)",
+          alignItems: "start",
+        }}
+      >
+        <Box
+          aria-hidden
+          sx={{
+            width: compact ? 44 : 52, height: compact ? 44 : 52, borderRadius: "50%",
+            bgcolor: utep.navy, color: "#fff", display: "grid", placeItems: "center",
+            fontWeight: 800, fontSize: compact ? 16 : 18,
+          }}
+        >
+          {initials}
+        </Box>
+
+        <Box sx={{ minWidth: 0 }}>
+          {!compact && (
+            <Typography variant="overline" sx={{ color: utep.ink2, fontWeight: 700, letterSpacing: 0 }}>
+              Patient profile
+            </Typography>
+          )}
+          <Typography component={compact ? "p" : "h1"} variant={compact ? "h6" : "h5"} sx={{ color: utep.navy, lineHeight: 1.2 }}>
             {p.lastName}, {p.firstName}
             {p.preferredName && (
               <Typography component="span" variant="body1" color="text.secondary"> ({p.preferredName})</Typography>
             )}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap" }}>
@@ -44,7 +71,10 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
         </Box>
 
         {!compact && (
-          <Box component="dl" sx={{ m: 0, display: "flex", flexWrap: "wrap", columnGap: 3.5, rowGap: 1, alignItems: "flex-end" }}>
+          <Box
+            component="dl"
+            sx={{ m: 0, display: "flex", flexWrap: "wrap", columnGap: 3.5, rowGap: 1, alignItems: "flex-end", gridColumn: "1 / -1" }}
+          >
             {statusItems.map(([k, v]) => (
               <Box key={k}>
                 <Typography component="dt" variant="caption" color="text.secondary">{k}</Typography>

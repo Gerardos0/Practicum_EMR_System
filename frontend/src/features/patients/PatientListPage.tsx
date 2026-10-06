@@ -13,18 +13,20 @@ import { formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
+import { usePageHeading } from "../../components/PageHeading";
 import type { CaseMode } from "../../types";
 
 export default function PatientListPage() {
   const navigate = useNavigate();
   const { activeRole, courseId } = useSession();
+  const isStudent = activeRole === "student";
+  usePageHeading(isStudent ? "My patients" : "Patients");
   const [params, setParams] = useSearchParams();
   const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
   const [query, setQuery] = useState("");
   const [resetTarget, setResetTarget] = useState<PatientRow>();
   const [flash, setFlash] = useState("");
 
-  const isStudent = activeRole === "student";
   const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
   const course = useAsync(() => getCourse(courseId), [courseId]);
 
@@ -54,7 +56,7 @@ export default function PatientListPage() {
     <Box>
       <Box sx={{ display: "flex", alignItems: "flex-end", gap: 2, flexWrap: "wrap", mb: 2 }}>
         <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography component="h1" variant="h5">{isStudent ? "My patients" : "Patients"}</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>{isStudent ? "My patients" : "Patients"}</Typography>
           <Typography variant="body2" color="text.secondary">
             {course.data ? `${course.data.code}: ${course.data.title}` : " "}
           </Typography>

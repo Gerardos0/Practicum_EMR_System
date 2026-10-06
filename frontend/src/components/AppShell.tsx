@@ -1,23 +1,36 @@
-import { Box, Link } from "@mui/material";
+import { useState } from "react";
+import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
+import { utep } from "../theme/tokens";
 import AppHeader from "./AppHeader";
+import SideNav from "./SideNav";
+import { PageHeadingProvider } from "./PageHeading";
 
 export default function AppShell() {
+  const [navOpen, setNavOpen] = useState(false);
+
   return (
-    <Box sx={{ minHeight: "100dvh", bgcolor: "background.default" }}>
-      <Link
-        href="#main"
-        sx={{
-          position: "absolute", left: 8, top: -48, zIndex: 2000, bgcolor: "background.paper", p: 1, borderRadius: 1,
-          "&:focus": { top: 8 },
-        }}
-      >
-        Skip to content
-      </Link>
-      <AppHeader />
-      <Box component="main" id="main" tabIndex={-1} sx={{ px: { xs: 2, md: 4 }, py: 3, maxWidth: 1440, mx: "auto", outline: "none" }}>
-        <Outlet />
+    <PageHeadingProvider>
+      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+        <Box
+          component="a" href="#main"
+          sx={{
+            position: "absolute", left: 8, top: -48, zIndex: 2000, px: 2, py: 1, borderRadius: 1,
+            bgcolor: utep.navy, color: "#fff", fontWeight: 700, "&:focus": { top: 8 },
+          }}
+        >
+          Skip to content
+        </Box>
+
+        <SideNav mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
+
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <AppHeader onOpenNav={() => setNavOpen(true)} />
+          <Box component="main" id="main" tabIndex={-1} sx={{ flex: 1, p: { xs: 2, md: 3 }, outline: "none" }}>
+            <Outlet />
+          </Box>
+        </Box>
       </Box>
-    </Box>
+    </PageHeadingProvider>
   );
 }

@@ -6,9 +6,11 @@ import { listAudit } from "../../api/audit";
 import { formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import { useSession } from "../auth/AuthContext";
+import { usePageHeading } from "../../components/PageHeading";
 
 /** Who viewed or changed what, and when. Instructors see students' full trail; students never see this page. */
 export default function AuditLogPage() {
+  usePageHeading("Activity log");
   const { courseId, activeRole } = useSession();
   const { data = [], loading } = useAsync(() => listAudit(courseId, activeRole), [courseId, activeRole]);
   const [q, setQ] = useState("");
@@ -23,7 +25,7 @@ export default function AuditLogPage() {
     <Box>
       <Box sx={{ display: "flex", alignItems: "flex-end", gap: 2, flexWrap: "wrap", mb: 2 }}>
         <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography component="h1" variant="h5">Activity log</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Activity log</Typography>
           <Typography variant="body2" color="text.secondary">Every chart view, note action, and denied attempt. Entries can't be edited or deleted.</Typography>
         </Box>
         <TextField size="small" placeholder="Filter by person, action, or record" value={q} onChange={(e) => setQ(e.target.value)} slotProps={{ htmlInput: { "aria-label": "Filter activity" } }} sx={{ width: { xs: "100%", sm: 300 } }} />

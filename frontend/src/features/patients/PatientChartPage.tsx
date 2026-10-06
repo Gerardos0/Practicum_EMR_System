@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { Box, Breadcrumbs, LinearProgress, Link, Paper, Stack, Tab, Tabs, Typography } from "@mui/material";
+import { Box, Breadcrumbs, LinearProgress, Link, Paper, Typography } from "@mui/material";
 import { Link as RouterLink, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/AuthContext";
 import { can } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
+import { utep } from "../../theme/tokens";
 import PageError from "../../components/PageError";
+import { usePageHeading } from "../../components/PageHeading";
 import PatientBanner from "./components/PatientBanner";
 import StatusDialog from "./components/StatusDialog";
 import SummaryTab from "./components/SummaryTab";
@@ -16,7 +18,7 @@ import LabsTab from "../labs/LabsTab";
 import SchedulingTab from "../scheduling/SchedulingTab";
 
 const TABS = [
-  { id: "summary", label: "Summary" },
+  { id: "summary", label: "Overview" },
   { id: "notes", label: "Notes" },
   { id: "medications", label: "Medications" },
   { id: "labs", label: "Labs" },
@@ -33,16 +35,20 @@ export default function PatientChartPage() {
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
   const notes = useAsync(() => listNotesForPatient(activeRole, patientId), [patientId, activeRole]);
+  const heading = patient.data
+    ? `${patient.data.lastName}, ${patient.data.firstName}`
+    : "Patient chart";
+  usePageHeading(heading);
 
   if (patient.error) return <PageError error={patient.error} />;
   if (!patient.data) return <LinearProgress aria-label="Loading chart" />;
   const p = patient.data;
 
   return (
-    <Stack spacing={2}>
-      <Breadcrumbs>
+    <Box>
+      <Breadcrumbs sx={{ mb: 2 }}>
         <Link component={RouterLink} to="/patients" underline="hover">Patients</Link>
-        <Typography color="text.primary">{p.lastName}, {p.firstName}</Typography>
+        <Typography color="text.primary">Profile</Typography>
       </Breadcrumbs>
 
       <PatientBanner
@@ -51,16 +57,42 @@ export default function PatientChartPage() {
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
 
-      <Paper sx={{ px: 1 }}>
-        <Tabs
-          value={tab} variant="scrollable" allowScrollButtonsMobile aria-label="Chart sections"
-          onChange={(_, v) => setParams({ tab: v }, { replace: true })}
-        >
-          {TABS.map((t) => (
-            <Tab key={t.id} value={t.id} label={t.id === "notes" && notes.data ? `${t.label} (${notes.data.length})` : t.label} />
-          ))}
-        </Tabs>
-      </Paper>
+      <Box
+        role="tablist"
+        aria-label="Chart sections"
+        sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", my: 2 }}
+      >
+        {TABS.map((t) => {
+          const selected = tab === t.id;
+          const label = t.id === "notes" && notes.data ? `${t.label} (${notes.data.length})` : t.label;
+          return (
+            <Box
+              key={t.id}
+              component="button"
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setParams({ tab: t.id }, { replace: true })}
+              sx={{
+                border: "none",
+                cursor: "pointer",
+                px: 1.75,
+                py: 1,
+                borderRadius: "999px",
+                fontWeight: 700,
+                fontSize: 14,
+                fontFamily: "inherit",
+                bgcolor: selected ? utep.navy : "#fff",
+                color: selected ? "#fff" : utep.navy,
+                boxShadow: selected ? "none" : `inset 0 0 0 1px ${utep.line}`,
+                "&:focus-visible": { outline: `3px solid ${utep.orange}`, outlineOffset: 2 },
+              }}
+            >
+              {label}
+            </Box>
+          );
+        })}
+      </Box>
 
       <Box role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label}>
         {tab === "summary" && (
@@ -73,7 +105,7 @@ export default function PatientChartPage() {
           />
         )}
         {tab === "notes" && (
-          <Paper sx={{ p: 2.5 }}>
+          <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
             <NotesList notes={notes.data ?? []} patientId={p.id} reviewer={!can(activeRole, "note:author")} />
           </Paper>
         )}
@@ -82,7 +114,7 @@ export default function PatientChartPage() {
         {tab === "scheduling" && <SchedulingTab patient={p} />}
       </Box>
 
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
         Opening this chart was recorded in the activity log.
       </Typography>
 
@@ -92,6 +124,6 @@ export default function PatientChartPage() {
           onSave={async (status) => patient.setData(await updatePatientStatus(activeRole, p.id, status))}
         />
       )}
-    </Stack>
+    </Box>
   );
 }

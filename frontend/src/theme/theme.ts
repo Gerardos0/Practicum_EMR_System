@@ -50,10 +50,16 @@ export function createAppTheme({ textScale, highContrast }: DisplayPrefs) {
         styleOverrides: { root: { border: `1px solid ${line}` } },
       },
       MuiAppBar: { styleOverrides: { root: { border: "none" } } },
+      MuiDrawer: { styleOverrides: { paper: { border: "none" } } },
       MuiMenu: { styleOverrides: { paper: { boxShadow: "0 8px 24px rgba(14,34,80,0.14)" } } },
       MuiTableCell: {
         styleOverrides: {
-          head: { fontWeight: 700, color: ink2, backgroundColor: highContrast ? "#FFFFFF" : "#F7F8FA" },
+          head: {
+            fontWeight: 700,
+            color: "#fff",
+            backgroundColor: highContrast ? utep.navyDark : utep.navy,
+            borderBottom: `3px solid ${utep.orange}`,
+          },
           root: { borderColor: line },
         },
       },

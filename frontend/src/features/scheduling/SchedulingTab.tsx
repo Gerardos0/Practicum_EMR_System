@@ -17,7 +17,7 @@ export default function SchedulingTab({ patient }: { patient: Patient }) {
 
   return (
     <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { md: "1fr 1fr" } }}>
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Upcoming appointments</Typography>
         {(appts.data ?? []).length === 0 && <Typography variant="body2" color="text.secondary">None scheduled.</Typography>}
         <Stack spacing={1.5}>
@@ -30,7 +30,7 @@ export default function SchedulingTab({ patient }: { patient: Patient }) {
         </Stack>
       </Paper>
 
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
           <Typography component="h2" variant="h6" sx={{ flex: 1 }}>Referrals</Typography>
           {can(activeRole, "referral:create") && <Button variant="outlined" onClick={() => setOpen(true)}>Create referral</Button>}

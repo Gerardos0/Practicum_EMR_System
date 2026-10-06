@@ -6,7 +6,7 @@ import EmptyState from "../../components/EmptyState";
 export default function MedicationsTab({ patient }: { patient: Patient }) {
   if (patient.medications.length === 0) return <EmptyState title="No active medications" />;
   return (
-    <Paper>
+    <Paper sx={{ borderRadius: "16px" }}>
       <Box sx={{ p: 2, pb: 1 }}>
         <Typography component="h2" variant="h6">Active medications</Typography>
         <Typography variant="body2" color="text.secondary">

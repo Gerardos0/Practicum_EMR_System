@@ -11,9 +11,11 @@ import { useSession } from "../auth/AuthContext";
 import { disciplineLabel } from "../../utils/labels";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
+import { usePageHeading } from "../../components/PageHeading";
 import { parseRosterFile, ROSTER_TEMPLATE_CSV } from "./parseRoster";
 
 export default function RosterImportPage() {
+  usePageHeading("Roster");
   const { courseId } = useSession();
   const fileInput = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<RosterRow[]>();
@@ -59,7 +61,7 @@ export default function RosterImportPage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography component="h1" variant="h5">Course roster</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>Course roster</Typography>
         <Typography variant="body2" color="text.secondary">{course.data ? `${course.data.code}: ${course.data.title}, ${course.data.term}` : " "}</Typography>
       </Box>
 
