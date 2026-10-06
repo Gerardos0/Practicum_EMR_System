@@ -263,7 +263,7 @@ export default function NoteEditorPage() {
                   <Alert severity="warning">Complete {missing.length} required {missing.length === 1 ? "field" : "fields"} before signing.</Alert>
                 )}
                 <Button variant="contained" size="large" onClick={trySign}>
-                  {!isAssessment ? "Sign note" : note.status === "returned" ? "Sign and resubmit" : "Sign and submit for review"}
+                  {!isAssessment ? "Sign note" : note.status === "returned" ? "Sign and resubmit" : "Submit for signature"}
                 </Button>
                 <Typography variant="caption" color="text.secondary" role="status" aria-live="polite">
                   {saveState === "saving" && "Saving…"}
@@ -288,7 +288,7 @@ export default function NoteEditorPage() {
       </Box>
 
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>{isAssessment ? "Sign and submit this note?" : "Sign this note?"}</DialogTitle>
+        <DialogTitle>{isAssessment ? "Submit this note for signature?" : "Sign this note?"}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             {isAssessment
@@ -298,7 +298,7 @@ export default function NoteEditorPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Keep editing</Button>
-          <Button variant="contained" onClick={doSign}>{isAssessment ? "Sign and submit" : "Sign note"}</Button>
+          <Button variant="contained" onClick={doSign}>{isAssessment ? "Submit for signature" : "Sign note"}</Button>
         </DialogActions>
       </Dialog>
     </Stack>

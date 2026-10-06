@@ -13,6 +13,7 @@ import ReviewQueuePage from "./features/encounters/ReviewQueuePage";
 import NoteReviewPage from "./features/encounters/NoteReviewPage";
 import RosterImportPage from "./features/admin/RosterImportPage";
 import AuditLogPage from "./features/admin/AuditLogPage";
+import DashboardPage from "./features/dashboard/DashboardPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { homePathFor } from "./utils/permissions";
 
@@ -39,6 +40,9 @@ export default function App() {
 
             <Route element={<RequireAuth />}>
               <Route element={<AppShell />}>
+                <Route element={<RequireAuth roles={["student", "instructor"]} />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                </Route>
                 <Route path="/patients" element={<PatientListPage />} />
                 <Route path="/patients/:patientId" element={<PatientChartPage />} />
 

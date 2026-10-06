@@ -7,7 +7,7 @@ import { formatDate } from "../../utils/format";
 export default function LabsTab({ patient }: { patient: Patient }) {
   if (patient.labs.length === 0) return <EmptyState title="No lab results on file" />;
   return (
-    <Paper>
+    <Paper sx={{ borderRadius: "16px" }}>
       <Typography component="h2" variant="h6" sx={{ p: 2, pb: 1 }}>Lab results</Typography>
       <Box sx={{ overflowX: "auto" }}>
         <Table>

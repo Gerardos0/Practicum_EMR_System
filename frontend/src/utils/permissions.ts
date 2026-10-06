@@ -30,8 +30,9 @@ export function can(role: Role, action: Action): boolean {
 
 export function homePathFor(role: Role): string {
   switch (role) {
+    case "student":
     case "instructor":
-      return "/review";
+      return "/dashboard";
     case "admin":
       return "/admin/roster";
     default:
