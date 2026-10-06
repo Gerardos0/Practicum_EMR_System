@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { listPatients, resetPracticePatient, type PatientRow } from "../../api/patients";
-import { getCourse } from "../../api/courses";
+//import { getCourse } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
 import { can } from "../../utils/permissions";
 import { formatDateTime } from "../../utils/format";
@@ -27,7 +27,7 @@ export default function PatientListPage() {
   const [flash, setFlash] = useState("");
 
   const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
-  const course = useAsync(() => getCourse(courseId), [courseId]);
+  //const course = useAsync(() => getCourse(courseId), [courseId]);
 
   const counts = useMemo(() => ({
     assessment: rows.data?.filter((r) => r.patient.mode === "assessment").length ?? 0,
@@ -53,15 +53,7 @@ export default function PatientListPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>{isStudent ? "My Patients" : "Patients"}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {course.data ? `${course.data.code}: ${course.data.title}` : " "}
-        </Typography>
-      </Box>
-
       {flash && <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>}
-
       <Paper>
         <Tabs
           value={mode} onChange={(_, v) => setParams({ mode: v, ...(query ? { q: query } : {}) }, { replace: true })}
