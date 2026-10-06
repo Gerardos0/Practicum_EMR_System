@@ -1,4 +1,4 @@
-"""Demo courses, users, and charts. From backend/: python -m app.scripts.seed"""
+"""Demo courses, users, and charts."""
 import argparse
 import asyncio
 import getpass
@@ -19,12 +19,14 @@ from app.models.clinical import (
     Appointment,
     ClinicalNote,
     Course,
+    NoteComment,
     CourseMembership,
     Encounter,
     LabResult,
     Medication,
     Patient,
     Problem,
+    Referral,
     Vital,
 )
 from app.models.user import Discipline, Permission, Role, User
@@ -170,6 +172,7 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
     await _member(db, gerardo, pt, roles["instructor"], None)
     await _member(db, joe, phar, roles["instructor"], None)
     await _charts(db, phar, pt, ana, sam, luis, gerardo)
+    await _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy)
 
 
 async def _course(db, code: str, title: str, term: str, rubric: str) -> Course:
@@ -330,6 +333,167 @@ async def _charts(db, phar: Course, pt: Course, ana: User, sam: User, luis: User
     await db.flush()
     db.add(AuditEvent(occurred_at=datetime(2026, 9, 22, 15, 2, 11, tzinfo=timezone.utc), actor_user_id=sam.id, action="chart.view", entity_type="patient", entity_id=str(einstein_sam.id), result="ok", course_id=phar.id))
     db.add(AuditEvent(occurred_at=datetime(2026, 9, 22, 15, 40, 2, tzinfo=timezone.utc), actor_user_id=sam.id, action="note.sign_submit", entity_type="note", entity_id=str(note.id), result="ok", course_id=phar.id))
+
+
+async def _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy) -> None:
+    rosa = await db.scalar(select(Patient).where(Patient.mrn == "TR-20001"))
+    if rosa is not None and not await db.scalar(select(Appointment.id).where(Appointment.patient_id == rosa.id)):
+        db.add(Appointment(
+            patient_id=rosa.id,
+            when=datetime(2026, 10, 20, 15, 0, tzinfo=timezone.utc),
+            kind="Blood pressure follow-up",
+            with_whom="Pharmacy clinic",
+        ))
+        db.add(Referral(
+            patient_id=rosa.id,
+            to_discipline_id=therapy.id,
+            reason="Ankle swelling on amlodipine. Please evaluate gait and edema.",
+            urgency="routine",
+            created_by_id=daniel.id,
+        ))
+
+    if await db.scalar(select(Patient.id).where(Patient.mrn == "TR-20003")) is None:
+        elena = _patient(
+            mrn="TR-20003", first="Elena", last="Vasquez", preferred=None, dob="1976-11-02", sex="Female",
+            pronouns="she/her", course=phar, mode="practice", case_key="practice_c", label="Test Patient C",
+            cc="Asthma follow-up. Using her rescue inhaler most days.",
+            hpi="49-year-old female with asthma since childhood. Albuterol several times a day for the past month. Wakes up short of breath twice a week. No fever.",
+            lifecycle="Active", encounter_status="Scheduled", care="Outpatient",
+            family="Brother: asthma.", surgical="None.", social="Teacher. No tobacco. Cat at home.",
+            encounter_type="Office visit",
+        )
+        elena.allergies.append(Allergy(substance="Aspirin", reaction="Wheezing", severity="moderate"))
+        elena.medications.extend([
+            Medication(name="Albuterol", dose="2 puffs", route="Inhaled", frequency="Every 4 hours as needed", indication="Asthma"),
+            Medication(name="Fluticasone", dose="110 mcg", route="Inhaled", frequency="Twice daily", indication="Asthma", adherence="Misses evening dose"),
+        ])
+        elena.problems.append(Problem(code="J45.30", description="Mild persistent asthma, uncomplicated", since="childhood"))
+        elena.labs.append(LabResult(name="Peak flow", value="310", unit="L/min", reference_range="380–450", flag="L", collected_at=date(2026, 10, 1)))
+        elena.vitals.extend([
+            Vital(label="BP", value="128/76 mmHg"), Vital(label="Pulse", value="88 bpm"),
+            Vital(label="SpO₂", value="96%"), Vital(label="Weight", value="64 kg"),
+        ])
+        db.add(elena)
+        await db.flush()
+        await db.refresh(elena, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+        elena.snapshot = chart_snapshot(elena)
+        db.add(Appointment(
+            patient_id=elena.id,
+            when=datetime(2026, 10, 28, 16, 30, tzinfo=timezone.utc),
+            kind="Inhaler technique check",
+            with_whom="Pharmacy clinic",
+        ))
+
+    if await db.scalar(select(Patient.id).where(Patient.mrn == "TR-10021-DR")) is None:
+        helen = _patient(
+            mrn="TR-10021-DR", first="Helen", last="Cho", preferred=None, dob="1954-04-18", sex="Female",
+            pronouns="she/her", course=phar, mode="assessment", case_key="case_hf", owner=daniel,
+            cc="More short of breath when walking to the mailbox.",
+            hpi="72-year-old female with heart failure. Weight up 4 pounds in a week. Taking furosemide most mornings. Ankles swollen by evening. No chest pain.",
+            lifecycle="Active", encounter_status="In progress", care="Outpatient",
+            family="Father: heart failure.", surgical="Hysterectomy (2008).", social="Lives with her daughter. No tobacco.",
+            encounter_type="Office visit",
+        )
+        helen.allergies.append(Allergy(substance="Lisinopril", reaction="Cough", severity="mild"))
+        helen.medications.extend([
+            Medication(name="Furosemide", dose="20 mg", route="PO", frequency="Once daily", indication="Heart failure", adherence="Skips the dose when she has plans"),
+            Medication(name="Carvedilol", dose="6.25 mg", route="PO", frequency="Twice daily", indication="Heart failure"),
+        ])
+        helen.problems.append(Problem(code="I50.22", description="Chronic systolic heart failure", since="2019"))
+        helen.labs.append(LabResult(name="BNP", value="840", unit="pg/mL", reference_range="<100", flag="H", collected_at=date(2026, 10, 2)))
+        helen.vitals.extend([
+            Vital(label="BP", value="108/64 mmHg"), Vital(label="Pulse", value="92 bpm"),
+            Vital(label="SpO₂", value="94%"), Vital(label="Weight", value="81 kg"),
+        ])
+        db.add(helen)
+        await db.flush()
+        db.add(ClinicalNote(
+            patient_id=helen.id,
+            encounter_id=helen.encounter.id,
+            template_id="pharmacy_mtm",
+            author_id=daniel.id,
+            discipline_id=pharmacy.id,
+            mode="assessment",
+            status="draft",
+            version=2,
+            content={
+                "reason": "Short of breath and a 4-pound weight gain.",
+                "med_experience": "Takes furosemide in the morning. Skips it when she will be out of the house.",
+            },
+            diagnoses=[],
+        ))
+
+    if await db.scalar(select(Patient.id).where(Patient.mrn == "TR-10030-CD")) is None:
+        oscar = _patient(
+            mrn="TR-10030-CD", first="Oscar", last="Nguyen", preferred=None, dob="1961-08-09", sex="Male",
+            pronouns="he/him", course=phar, mode="assessment", case_key="case_statin", owner=clarissa,
+            cc="Here to talk about his cholesterol medicine.",
+            hpi="64-year-old male with type 2 diabetes and an LDL of 148. Not on a statin. Says a neighbor told him statins ruin your muscles. No muscle pain now.",
+            lifecycle="Active", encounter_status="Checked out", care="Outpatient",
+            family="Mother: stroke at 68.", surgical="None.", social="Retired bus driver. Former smoker, quit 2015.",
+            encounter_type="Office visit",
+        )
+        oscar.medications.append(Medication(name="Metformin", dose="1000 mg", route="PO", frequency="Twice daily", indication="Type 2 diabetes"))
+        oscar.problems.extend([
+            Problem(code="E11.9", description="Type 2 diabetes mellitus without complications", since="2014"),
+            Problem(code="E78.5", description="Hyperlipidemia, unspecified", since="2024"),
+        ])
+        oscar.labs.append(LabResult(name="LDL cholesterol", value="148", unit="mg/dL", reference_range="<100", flag="H", collected_at=date(2026, 9, 28)))
+        oscar.vitals.extend([Vital(label="BP", value="136/82 mmHg"), Vital(label="Pulse", value="74 bpm")])
+        db.add(oscar)
+        await db.flush()
+        returned = ClinicalNote(
+            patient_id=oscar.id,
+            encounter_id=oscar.encounter.id,
+            template_id="pharmacy_mtm",
+            author_id=clarissa.id,
+            discipline_id=pharmacy.id,
+            mode="assessment",
+            status="returned",
+            version=3,
+            content={
+                "reason": "Cholesterol follow-up.",
+                "recommendations": "Start a statin.",
+                "rationale": "LDL is high.",
+            },
+            diagnoses=[{"code": "E78.5", "label": "Hyperlipidemia, unspecified"}],
+            routed_to_id=gerardo.id,
+            signed_at=datetime(2026, 10, 3, 18, 10, tzinfo=timezone.utc),
+        )
+        db.add(returned)
+        await db.flush()
+        db.add(NoteComment(
+            note_id=returned.id,
+            author_id=gerardo.id,
+            body="Name the statin and dose, and say why a moderate-intensity statin fits this patient.",
+            kind="returned",
+            created_at=datetime(2026, 10, 4, 15, 0, tzinfo=timezone.utc),
+        ))
+
+    ana_chart = await db.scalar(select(Patient).where(Patient.mrn == "TR-10057-AR"))
+    if ana_chart is not None and not await db.scalar(select(ClinicalNote.id).where(ClinicalNote.patient_id == ana_chart.id, ClinicalNote.archived.is_(False))):
+        done = datetime(2026, 9, 30, 17, 5, tzinfo=timezone.utc)
+        db.add(ClinicalNote(
+            patient_id=ana_chart.id,
+            encounter_id=ana_chart.encounter.id,
+            template_id="pharmacy_mtm",
+            author_id=ana.id,
+            discipline_id=pharmacy.id,
+            mode="assessment",
+            status="cosigned",
+            version=5,
+            content={
+                "reason": "Diabetes follow-up, home glucose 180–230.",
+                "recommendations": "Increase metformin to 1000 mg twice daily. Recheck A1C in 3 months.",
+                "rationale": "A1C 10.5% on metformin 500 mg daily, with missed doses. Renal function is fine.",
+            },
+            diagnoses=[{"code": "E11.65", "label": "Type 2 diabetes mellitus with hyperglycemia"}],
+            routed_to_id=gerardo.id,
+            signed_at=datetime(2026, 9, 30, 16, 40, tzinfo=timezone.utc),
+            cosigned_at=done,
+            cosigned_by_id=gerardo.id,
+            updated_at=done,
+        ))
 
 
 def _t2dm(course: Course, owner: User, mrn: str) -> Patient:
