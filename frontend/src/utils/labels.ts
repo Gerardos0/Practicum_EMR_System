@@ -19,7 +19,7 @@ export const roleLabel: Record<Role, string> = {
 export const noteStatusLabel: Record<NoteStatus, string> = {
   draft: "Draft",
   signed: "Signed",
-  pending_review: "Pending review",
+  pending_review: "Needs review",
   returned: "Returned for revision",
   cosigned: "Co-signed",
 };

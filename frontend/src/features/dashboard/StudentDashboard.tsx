@@ -61,14 +61,14 @@ export default function StudentDashboard() {
           label="Returned notes"
           value={returned.length}
           tone="orangeSoft"
-          to="/patients"
+          to={returned.length > 0 ? "/patients" : undefined}
           icon={<ReplayOutlined fontSize="small" />}
         />
         <StatCard
           label="Awaiting review"
           value={pending.length}
           tone="navySoft"
-          to="/patients"
+          to={pending.length > 0 ? "/patients" : undefined}
           icon={<AssignmentOutlined fontSize="small" />}
         />
         <StatCard

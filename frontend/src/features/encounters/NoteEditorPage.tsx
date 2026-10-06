@@ -53,7 +53,9 @@ export default function NoteEditorPage() {
         const p = await getPatient(activeRole, patientId);
         if (!alive) return;
         setPatient(p);
-        setInstructors(await listInstructors(courseId));
+        const people = await listInstructors(courseId);
+        if (!alive) return;
+        setInstructors(people);
 
         if (noteId === "new") {
           if (creating.current) return;
@@ -68,7 +70,7 @@ export default function NoteEditorPage() {
         }
         const n = await getNote(activeRole, noteId);
         if (!alive) return;
-        hydrate(n);
+        hydrate(n, people);
       } catch (e) {
         if (alive) setLoadError(e as Error);
       }
@@ -78,13 +80,13 @@ export default function NoteEditorPage() {
   }, [patientId, noteId]);
 
   const version = useRef(0);
-  const hydrate = (n: ClinicalNote) => {
+  const hydrate = (n: ClinicalNote, people: User[] = instructors) => {
     setNote(n);
     version.current = n.version;
     setTemplateId(n.templateId);
     setContent(n.content);
     setDiagnoses(n.diagnoses);
-    setRoutedToId(n.routedToId ?? "");
+    setRoutedToId(n.routedToId ?? (n.mode === "assessment" ? people[0]?.id ?? "" : ""));
   };
 
   // ---- Autosave with optimistic concurrency ----------------------------------------------
@@ -119,6 +121,12 @@ export default function NoteEditorPage() {
       saving.current = false;
     }
   }, [note, activeRole]);
+
+  useEffect(() => {
+    if (!editable || !note || note.routedToId || !routedToId) return;
+    changeSeq.current += 1;
+    void save();
+  }, [editable, note, routedToId, save]);
 
   const markDirty = () => {
     changeSeq.current += 1;

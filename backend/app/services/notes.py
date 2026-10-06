@@ -4,8 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.clinical import ClinicalNote, NoteAddendum, NoteComment, Patient
-from app.models.user import Discipline, User
+from app.models.clinical import ClinicalNote, CourseMembership, NoteAddendum, NoteComment, Patient
+from app.models.user import Discipline, Role, User
 from app.services.access import can, require
 from app.services.audit import log_event
 from app.services.charts import utcnow
@@ -94,7 +94,15 @@ async def sign_note(db, note: ClinicalNote, author: User, expected_version: int,
         raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead.")
     _check_version(note, expected_version)
     if note.mode == "assessment" and note.routed_to_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose an instructor to review this note.")
+        instructor_id = await db.scalar(
+            select(CourseMembership.user_id)
+            .join(Role, Role.id == CourseMembership.role_id)
+            .where(CourseMembership.course_id == course_id, Role.code == "instructor")
+            .limit(1)
+        )
+        if instructor_id is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose an instructor to review this note.")
+        note.routed_to_id = instructor_id
     note.status = "pending_review" if note.mode == "assessment" else "signed"
     note.signed_at = utcnow()
     note.updated_at = note.signed_at

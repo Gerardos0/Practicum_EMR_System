@@ -182,6 +182,10 @@ async def test_return_and_resubmit(client):
     )
     assert resigned.status_code == 200, resigned.text
     assert resigned.json()["status"] == "pending_review"
+    queue_after = await client.get("/api/v1/review-queue", headers=instructor, params={"course_id": course, "role": "instructor"})
+    statuses = {item["note"]["status"] for item in queue_after.json()}
+    assert "pending_review" in statuses
+    assert "returned" in statuses or "cosigned" in statuses
 
 
 @pytest.mark.asyncio
@@ -225,7 +229,7 @@ async def test_instructor_assigns_and_unassigns_assessment_copy(client):
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     student, me = await login(client, "daniel.reyes@miners.utep.edu")
     course = await course_id(client, instructor, "PHAR 5320")
-    source = await patient_by_mrn(client, instructor, course, "instructor", "TR-10057-AR")
+    source = await patient_by_mrn(client, instructor, course, "instructor", "TR-20003")
 
     blocked = await client.post(
         "/api/v1/patients",

@@ -245,13 +245,13 @@ async def review_queue(
             select(ClinicalNote)
             .join(Patient, Patient.id == ClinicalNote.patient_id)
             .where(
-                ClinicalNote.routed_to_id == user.id,
                 ClinicalNote.mode == "assessment",
-                ClinicalNote.status != "draft",
+                ClinicalNote.status.in_(("pending_review", "returned", "cosigned")),
                 ClinicalNote.archived.is_(False),
                 Patient.course_id == course_id,
+                Patient.deleted_at.is_(None),
             )
-            .order_by(ClinicalNote.signed_at.desc())
+            .order_by(ClinicalNote.updated_at.desc())
         )
     ).all()
     items = []

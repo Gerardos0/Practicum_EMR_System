@@ -150,6 +150,11 @@ export function templatesFor(discipline?: Discipline): NoteTemplate[] {
   );
 }
 
+export function templateName(id?: string): string {
+  if (id && id in TEMPLATES) return TEMPLATES[id as NoteTemplateId].name;
+  return "Clinical note";
+}
+
 export function defaultTemplateFor(discipline?: Discipline): NoteTemplateId {
   if (discipline === "pharmacy") return "pharmacy_mtm";
   if (discipline === "physical_therapy") return "pt_daily_soap";
