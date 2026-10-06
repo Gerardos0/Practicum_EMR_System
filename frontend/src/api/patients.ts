@@ -22,13 +22,3 @@ export async function updatePatientStatus(role: Role, id: string, patch: Partial
 export async function resetPracticePatient(role: Role, id: string): Promise<void> {
   await request<void>(`/patients/${id}/reset`, { method: "POST", query: { role } });
 }
-
-export async function assignCase(
-  role: Role, courseId: string, sourcePatientId: string, ownerId: string,
-): Promise<Patient> {
-  return request<Patient>("/patients", {
-    method: "POST",
-    query: { course_id: courseId, role },
-    json: { sourcePatientId, ownerId },
-  });
-}
