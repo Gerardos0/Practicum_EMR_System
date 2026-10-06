@@ -7,10 +7,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.api.deps import DbSession, get_current_user_allow_password_change
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
+import re
+
 from app.schemas.auth import ChangePasswordRequest, Token
-from app.schemas.user import UserOut
+from app.schemas.clinical import PublicUser
 from app.services.audit import log_event
-from app.services.auth import authenticate_user, permission_codes
+from app.services.auth import authenticate_user
+from app.services.serialize import user_out
+
+UTEP_EMAIL = re.compile(r"@(miners\.)?utep\.edu$", re.IGNORECASE)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,7 +32,10 @@ async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],  # "username" field = email
     db: DbSession,
 ):
-    user = await authenticate_user(db, form.username, form.password)
+    email = form.username.strip()
+    if not UTEP_EMAIL.search(email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use your UTEP email address (@utep.edu or @miners.utep.edu).")
+    user = await authenticate_user(db, email, form.password)
     if user is None:
         await log_event(
             db,
@@ -56,21 +64,22 @@ async def login(
     return Token(
         access_token=create_access_token(str(user.id)),
         must_change_password=user.must_change_password,
+        user=PublicUser.model_validate(await user_out(db, user)),
     )
 
 
-@router.get("/me", response_model=UserOut)
-async def me(user: UserAllowPwChange):
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        discipline=user.discipline.code if user.discipline else None,
+@router.post("/refresh", response_model=Token)
+async def refresh(user: UserAllowPwChange, db: DbSession):
+    return Token(
+        access_token=create_access_token(str(user.id)),
         must_change_password=user.must_change_password,
-        roles=sorted(role.code for role in user.roles),
-        permissions=sorted(permission_codes(user)),
+        user=PublicUser.model_validate(await user_out(db, user)),
     )
+
+
+@router.get("/me", response_model=PublicUser, response_model_exclude_none=True)
+async def me(user: UserAllowPwChange, db: DbSession):
+    return await user_out(db, user)
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

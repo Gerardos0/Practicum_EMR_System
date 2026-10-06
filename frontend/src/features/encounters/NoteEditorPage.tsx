@@ -50,7 +50,7 @@ export default function NoteEditorPage() {
     let alive = true;
     (async () => {
       try {
-        const p = await getPatient(user, activeRole, patientId);
+        const p = await getPatient(activeRole, patientId);
         if (!alive) return;
         setPatient(p);
         setInstructors(await listInstructors(courseId));
@@ -59,14 +59,14 @@ export default function NoteEditorPage() {
           if (creating.current) return;
           creating.current = true;
           // Reuse an open draft rather than creating duplicates.
-          const existing = (await listNotesForPatient(user, activeRole, patientId)).find(
+          const existing = (await listNotesForPatient(activeRole, patientId)).find(
             (n) => n.authorId === user.id && (n.status === "draft" || n.status === "returned"),
           );
-          const n = existing ?? (await createDraft(user, discipline ?? "pharmacy", p, defaultTemplateFor(discipline)));
+          const n = existing ?? (await createDraft(discipline ?? "pharmacy", p, defaultTemplateFor(discipline), activeRole));
           navigate(`/patients/${patientId}/notes/${n.id}`, { replace: true });
           return;
         }
-        const n = await getNote(user, activeRole, noteId);
+        const n = await getNote(activeRole, noteId);
         if (!alive) return;
         hydrate(n);
       } catch (e) {
@@ -103,9 +103,9 @@ export default function NoteEditorPage() {
     saving.current = true;
     setSaveState("saving");
     try {
-      const res = await saveDraft(user, note.id, version.current, {
+      const res = await saveDraft(note.id, version.current, {
         ...latest.current, routedToId: latest.current.routedToId || undefined,
-      });
+      }, activeRole);
       version.current = res.version;
       savedSeq.current = seq;
       setSavedAt(res.updatedAt);
@@ -118,7 +118,7 @@ export default function NoteEditorPage() {
     } finally {
       saving.current = false;
     }
-  }, [note, user]);
+  }, [note, activeRole]);
 
   const markDirty = () => {
     changeSeq.current += 1;
@@ -163,7 +163,7 @@ export default function NoteEditorPage() {
     setConfirmOpen(false);
     if (!(await save())) return;
     try {
-      hydrate(await signNote(user, note!.id, version.current));
+      hydrate(await signNote(note!.id, version.current, activeRole));
       setShowErrors(false);
     } catch (e) {
       setError((e as Error).message);
@@ -236,7 +236,7 @@ export default function NoteEditorPage() {
               <Divider sx={{ my: 3 }} />
               <Addenda
                 items={note.addenda}
-                onAdd={note.authorId === user.id ? async (body) => hydrate(await addAddendum(user, note.id, body)) : undefined}
+                onAdd={note.authorId === user.id ? async (body) => hydrate(await addAddendum(note.id, body, activeRole)) : undefined}
               />
             </>
           )}

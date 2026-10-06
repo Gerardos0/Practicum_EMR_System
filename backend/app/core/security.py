@@ -1,5 +1,3 @@
-"""Password hashing + JWT helpers. Kept separate from routes so Entra ID
-can replace the login piece later without touching the rest of the app."""
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -30,7 +28,6 @@ def create_access_token(subject: str, expires_delta: timedelta | None = None) ->
 
 
 def decode_access_token(token: str) -> str | None:
-    """Returns the user id (sub) if the token is valid and unexpired, else None."""
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     except jwt.InvalidTokenError:  # covers expired, bad signature, malformed

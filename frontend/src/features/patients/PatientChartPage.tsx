@@ -28,11 +28,11 @@ export default function PatientChartPage() {
   const { patientId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "summary") as TabId;
-  const { user, activeRole } = useSession();
+  const { activeRole } = useSession();
   const [statusOpen, setStatusOpen] = useState(false);
 
-  const patient = useAsync(() => getPatient(user, activeRole, patientId), [patientId, user.id, activeRole]);
-  const notes = useAsync(() => listNotesForPatient(user, activeRole, patientId), [patientId, user.id, activeRole]);
+  const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
+  const notes = useAsync(() => listNotesForPatient(activeRole, patientId), [patientId, activeRole]);
 
   if (patient.error) return <PageError error={patient.error} />;
   if (!patient.data) return <LinearProgress aria-label="Loading chart" />;
@@ -68,7 +68,7 @@ export default function PatientChartPage() {
             patient={p}
             notes={notes.data ?? []}
             onAdvance={async (next) => {
-              patient.setData(await updatePatientStatus(user, activeRole, p.id, { encounter: next }));
+              patient.setData(await updatePatientStatus(activeRole, p.id, { encounter: next }));
             }}
           />
         )}
@@ -89,7 +89,7 @@ export default function PatientChartPage() {
       {statusOpen && (
         <StatusDialog
           open patient={p} onClose={() => setStatusOpen(false)}
-          onSave={async (status) => patient.setData(await updatePatientStatus(user, activeRole, p.id, status))}
+          onSave={async (status) => patient.setData(await updatePatientStatus(activeRole, p.id, status))}
         />
       )}
     </Stack>

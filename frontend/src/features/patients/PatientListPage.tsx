@@ -17,7 +17,7 @@ import type { CaseMode } from "../../types";
 
 export default function PatientListPage() {
   const navigate = useNavigate();
-  const { user, activeRole, courseId } = useSession();
+  const { activeRole, courseId } = useSession();
   const [params, setParams] = useSearchParams();
   const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
   const [query, setQuery] = useState("");
@@ -25,7 +25,7 @@ export default function PatientListPage() {
   const [flash, setFlash] = useState("");
 
   const isStudent = activeRole === "student";
-  const rows = useAsync(() => listPatients(user, activeRole, courseId), [user.id, activeRole, courseId]);
+  const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
   const course = useAsync(() => getCourse(courseId), [courseId]);
 
   const counts = useMemo(() => ({
@@ -44,7 +44,7 @@ export default function PatientListPage() {
 
   const doReset = async () => {
     if (!resetTarget) return;
-    await resetPracticePatient(user, activeRole, resetTarget.patient.id);
+    await resetPracticePatient(activeRole, resetTarget.patient.id);
     setFlash(`${resetTarget.patient.practiceLabel} was reset. Students' practice notes were archived.`);
     setResetTarget(undefined);
     rows.reload();

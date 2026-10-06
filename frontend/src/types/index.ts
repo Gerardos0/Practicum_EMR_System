@@ -1,6 +1,3 @@
-// Domain types shared across features. These mirror the FastAPI schemas so
-// swapping the mock API for real endpoints doesn't ripple through the UI.
-
 export type Discipline =
   | "pharmacy"
   | "physical_therapy"

@@ -5,10 +5,12 @@ import {
 import { listAudit } from "../../api/audit";
 import { formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
+import { useSession } from "../auth/AuthContext";
 
 /** Who viewed or changed what, and when. Instructors see students' full trail; students never see this page. */
 export default function AuditLogPage() {
-  const { data = [], loading } = useAsync(() => listAudit(), []);
+  const { courseId, activeRole } = useSession();
+  const { data = [], loading } = useAsync(() => listAudit(courseId, activeRole), [courseId, activeRole]);
   const [q, setQ] = useState("");
   const [deniedOnly, setDeniedOnly] = useState(false);
 

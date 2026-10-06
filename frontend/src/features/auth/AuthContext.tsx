@@ -1,48 +1,90 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Discipline, Role, RoleAssignment, User } from "../../types";
+import {
+  readSession, refreshAccessToken, SESSION_EVENT, setSignedOutNotice, tokenExpiresAt, writeSession,
+  type StoredSession,
+} from "../../api/client";
 
-interface Session {
-  user: User;
-  activeRole: Role;
-  courseId?: string;
-}
+const IDLE_MS = 15 * 60 * 1000;
 
 interface AuthCtx {
-  session: Session | null;
+  session: StoredSession | null;
   user: User | null;
   activeRole: Role | null;
   assignment: RoleAssignment | null;
   discipline: Discipline | undefined;
   courseId: string | undefined;
-  signIn: (user: User) => void;
+  signIn: (user: User, accessToken: string, mustChangePassword: boolean) => void;
   signOut: () => void;
+  clearPasswordChange: () => void;
   switchRole: (role: Role) => void;
   selectCourse: (courseId: string) => void;
 }
 
-const KEY = "emr.session";
 const AuthContext = createContext<AuthCtx | null>(null);
 
-function load(): Session | null {
-  try {
-    return JSON.parse(sessionStorage.getItem(KEY) ?? "null");
-  } catch {
+function load(): StoredSession | null {
+  const session = readSession();
+  if (!session) return null;
+  const exp = tokenExpiresAt(session.accessToken);
+  if (exp !== null && exp <= Date.now()) {
+    writeSession(null, false);
     return null;
   }
+  return session;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(load);
+  const [session, setSession] = useState<StoredSession | null>(load);
+  const sessionRef = useRef(session);
 
-  const persist = useCallback((s: Session | null) => {
-    setSession(s);
-    try {
-      if (s) sessionStorage.setItem(KEY, JSON.stringify(s));
-      else sessionStorage.removeItem(KEY);
-    } catch {
-      /* ignore */
-    }
+  const persist = useCallback((next: StoredSession | null) => {
+    setSession(next);
+    writeSession(next, false);
   }, []);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    const sync = () => setSession(readSession());
+    window.addEventListener(SESSION_EVENT, sync);
+    return () => window.removeEventListener(SESSION_EVENT, sync);
+  }, []);
+
+  const accessToken = session?.accessToken;
+  useEffect(() => {
+    if (!accessToken) return;
+
+    let idle = 0;
+    const arm = () => {
+      window.clearTimeout(idle);
+      idle = window.setTimeout(() => {
+        setSignedOutNotice("You were signed out after 15 minutes of inactivity.");
+        persist(null);
+      }, IDLE_MS);
+    };
+
+    let lastRefreshCheck = 0;
+    const onActivity = () => {
+      arm();
+      const now = Date.now();
+      if (now - lastRefreshCheck < 30_000) return;
+      lastRefreshCheck = now;
+      const token = sessionRef.current?.accessToken;
+      const exp = token ? tokenExpiresAt(token) : null;
+      if (exp !== null && exp - now < 5 * 60 * 1000) void refreshAccessToken();
+    };
+
+    arm();
+    const events = ["pointerdown", "keydown"] as const;
+    events.forEach((name) => window.addEventListener(name, onActivity));
+    return () => {
+      window.clearTimeout(idle);
+      events.forEach((name) => window.removeEventListener(name, onActivity));
+    };
+  }, [accessToken, persist]);
 
   const value = useMemo<AuthCtx>(() => {
     const assignment = session?.user.roles.find((r) => r.role === session.activeRole) ?? null;
@@ -53,19 +95,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       assignment,
       discipline: assignment?.discipline,
       courseId: session?.courseId,
-      signIn: (user) => {
+      signIn: (user, accessToken, mustChangePassword) => {
         const first = user.roles[0];
-        const onlyCourse = user.roles.length === 1 && first.courseIds.length === 1 ? first.courseIds[0] : undefined;
-        persist({ user, activeRole: first.role, courseId: onlyCourse });
+        const onlyCourse = user.roles.length === 1 && first?.courseIds.length === 1 ? first.courseIds[0] : undefined;
+        persist({
+          user,
+          activeRole: first?.role ?? "student",
+          courseId: onlyCourse,
+          accessToken,
+          mustChangePassword,
+        });
       },
       signOut: () => persist(null),
-      switchRole: (role) => {
-        if (!session) return;
-        const next = session.user.roles.find((r) => r.role === role);
-        const keepCourse = session.courseId && next?.courseIds.includes(session.courseId);
-        persist({ ...session, activeRole: role, courseId: keepCourse ? session.courseId : undefined });
+      clearPasswordChange: () => {
+        if (!sessionRef.current) return;
+        persist({ ...sessionRef.current, mustChangePassword: false });
       },
-      selectCourse: (courseId) => session && persist({ ...session, courseId }),
+      switchRole: (role) => {
+        const current = sessionRef.current;
+        if (!current) return;
+        const next = current.user.roles.find((r) => r.role === role);
+        const keepCourse = current.courseId && next?.courseIds.includes(current.courseId);
+        persist({ ...current, activeRole: role, courseId: keepCourse ? current.courseId : undefined });
+      },
+      selectCourse: (courseId) => {
+        const current = sessionRef.current;
+        if (current) persist({ ...current, courseId });
+      },
     };
   }, [session, persist]);
 

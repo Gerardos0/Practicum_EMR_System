@@ -22,9 +22,9 @@ const FILTERS: { id: NoteStatus | "all"; label: string }[] = [
 
 export default function ReviewQueuePage() {
   const navigate = useNavigate();
-  const { user, courseId } = useSession();
+  const { activeRole, courseId } = useSession();
   const [filter, setFilter] = useState<NoteStatus | "all">("pending_review");
-  const queue = useAsync(() => listReviewQueue(user, courseId), [user.id, courseId]);
+  const queue = useAsync(() => listReviewQueue(courseId, activeRole), [courseId, activeRole]);
   const course = useAsync(() => getCourse(courseId), [courseId]);
 
   const items = (queue.data ?? []).filter((q) => filter === "all" || q.note.status === filter);
