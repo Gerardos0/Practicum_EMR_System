@@ -218,3 +218,56 @@ async def test_roster_import_and_audit(client):
     actions = {item["action"] for item in audit.json()}
     assert "roster.import" in actions
     assert "chart.view" in actions
+
+
+@pytest.mark.asyncio
+async def test_instructor_assigns_and_unassigns_assessment_copy(client):
+    instructor, _ = await login(client, "gerardo.sillas@utep.edu")
+    student, me = await login(client, "daniel.reyes@miners.utep.edu")
+    course = await course_id(client, instructor, "PHAR 5320")
+    source = await patient_by_mrn(client, instructor, course, "instructor", "TR-10057-AR")
+
+    blocked = await client.post(
+        "/api/v1/patients",
+        headers=student,
+        params={"course_id": course, "role": "student"},
+        json={"sourcePatientId": source["id"], "ownerId": me["user"]["id"]},
+    )
+    assert blocked.status_code == 403
+
+    assigned = await client.post(
+        "/api/v1/patients",
+        headers=instructor,
+        params={"course_id": course, "role": "instructor"},
+        json={"sourcePatientId": source["id"], "ownerId": me["user"]["id"]},
+    )
+    assert assigned.status_code == 200, assigned.text
+    body = assigned.json()
+    assert body["ownerId"] == me["user"]["id"]
+    listed = await client.get("/api/v1/patients", headers=student, params={"course_id": course, "role": "student"})
+    assert body["id"] in {row["patient"]["id"] for row in listed.json()}
+
+    again = await client.post(
+        "/api/v1/patients",
+        headers=instructor,
+        params={"course_id": course, "role": "instructor"},
+        json={"sourcePatientId": source["id"], "ownerId": me["user"]["id"]},
+    )
+    assert again.status_code == 409
+
+    removed = await client.delete(
+        f"/api/v1/patients/{body['id']}",
+        headers=instructor,
+        params={"role": "instructor"},
+    )
+    assert removed.status_code == 204
+    after = await client.get("/api/v1/patients", headers=student, params={"course_id": course, "role": "student"})
+    assert body["id"] not in {row["patient"]["id"] for row in after.json()}
+
+    reassigned = await client.post(
+        "/api/v1/patients",
+        headers=instructor,
+        params={"course_id": course, "role": "instructor"},
+        json={"sourcePatientId": source["id"], "ownerId": me["user"]["id"]},
+    )
+    assert reassigned.status_code == 200, reassigned.text

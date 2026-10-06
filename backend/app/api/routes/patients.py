@@ -1,15 +1,16 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.clinical import ClinicalNote, Patient
-from app.schemas.clinical import PatientOut, PatientRowOut, StatusPatch
-from app.services.access import memberships_for
+from app.models.user import User
+from app.schemas.clinical import AssignCase, PatientOut, PatientRowOut, StatusPatch
+from app.services.access import memberships_for, require_course
 from app.services.audit import log_event
-from app.services.charts import apply_status, ensure_visible, load_patient, owner_name_for, reset_practice
+from app.services.charts import apply_status, assign_case, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
 from app.services.serialize import patient_out
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -60,6 +61,28 @@ async def list_patients(
             }
         )
     return visible
+
+
+@router.post("", response_model=PatientOut, response_model_exclude_none=True)
+async def assign_patient(
+    body: AssignCase,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    course_id: Annotated[uuid.UUID, Query()],
+    role: Annotated[str, Query()],
+):
+    rows = await memberships_for(db, user.id)
+    require_course(role, course_id, user, rows)
+    source = await load_patient(db, body.source_patient_id)
+    owner = await db.get(User, body.owner_id)
+    if owner is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That student isn't on the roster.")
+    clone = await assign_case(
+        db, source=source, owner=owner, actor=user, role=role, course_id=course_id, ip=_ip(request),
+    )
+    await db.commit()
+    return patient_out(clone, owner_name=owner_name_for(clone, role))
 
 
 def full_owner(patient: Patient) -> str | None:
@@ -121,4 +144,19 @@ async def reset_patient(
     rows = await memberships_for(db, user.id)
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
     await reset_practice(db, patient, user, role, _ip(request))
+    await db.commit()
+
+
+@router.delete("/{patient_id}", status_code=204)
+async def unassign_patient(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    await unassign_case(db, patient, user, role, _ip(request))
     await db.commit()

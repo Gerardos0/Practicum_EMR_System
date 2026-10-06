@@ -4,8 +4,7 @@ import {
   LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { listPatients, resetPracticePatient, type PatientRow } from "../../api/patients";
-//import { getCourse } from "../../api/courses";
+import { listPatients, resetPracticePatient, unassignCase, type PatientRow } from "../../api/patients";
 import { useSession } from "../auth/AuthContext";
 import { can } from "../../utils/permissions";
 import { formatDateTime } from "../../utils/format";
@@ -13,6 +12,7 @@ import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
 import { usePageHeading } from "../../components/PageHeading";
+import AssignCaseDialog from "./components/AssignCaseDialog";
 import type { CaseMode } from "../../types";
 
 export default function PatientListPage() {
@@ -24,10 +24,12 @@ export default function PatientListPage() {
   const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
   const query = params.get("q") ?? "";
   const [resetTarget, setResetTarget] = useState<PatientRow>();
+  const [unassignTarget, setUnassignTarget] = useState<PatientRow>();
+  const [assignOpen, setAssignOpen] = useState(false);
   const [flash, setFlash] = useState("");
 
   const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
-  //const course = useAsync(() => getCourse(courseId), [courseId]);
+  const canAssign = can(activeRole, "patient:create");
 
   const counts = useMemo(() => ({
     assessment: rows.data?.filter((r) => r.patient.mode === "assessment").length ?? 0,
@@ -51,6 +53,14 @@ export default function PatientListPage() {
     rows.reload();
   };
 
+  const doUnassign = async () => {
+    if (!unassignTarget) return;
+    await unassignCase(activeRole, unassignTarget.patient.id);
+    setFlash(`${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} was removed from ${unassignTarget.ownerName ?? "the student"}.`);
+    setUnassignTarget(undefined);
+    rows.reload();
+  };
+
   return (
     <Box>
       {flash && <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>}
@@ -63,21 +73,29 @@ export default function PatientListPage() {
           <Tab value="practice" label={`Practice patients (${counts.practice})`} />
         </Tabs>
 
-        <Typography variant="body2" color="text.secondary" sx={{ px: 2, pt: 1.5 }}>
-          {mode === "assessment"
-            ? isStudent
-              ? "Cases your instructor assigned to you. Each one is your own copy: no one else's notes appear on it."
-              : "One private copy per student. Open a case to see that student's work."
-            : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 2, pt: 1.5, flexWrap: "wrap" }}>
+          <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 220 }}>
+            {mode === "assessment"
+              ? isStudent
+                ? "Cases your instructor assigned to you. Each one is your own copy: no one else's notes appear on it."
+                : "One private copy per student. Open a case to see that student's work, or remove it from them."
+              : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
+          </Typography>
+          {canAssign && (
+            <Button size="small" variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button>
+          )}
+        </Box>
 
         {rows.loading && <LinearProgress sx={{ mt: 1 }} />}
 
         <Box sx={{ overflowX: "auto", p: 1 }}>
           {!rows.loading && visible.length === 0 ? (
             <Box sx={{ p: 2 }}>
-              <EmptyState title={query ? "No patients match that search" : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}>
-                {query ? "Try a last name or the full MRN." : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : undefined}
+              <EmptyState
+                title={query ? "No patients match that search" : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
+                action={!query && mode === "assessment" && canAssign ? <Button variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button> : undefined}
+              >
+                {query ? "Try a last name or the full MRN." : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
               </EmptyState>
             </Box>
           ) : (
@@ -119,6 +137,9 @@ export default function PatientListPage() {
                         {mode === "practice" && can(activeRole, "patient:reset_practice") && (
                           <Button size="small" color="inherit" onClick={() => setResetTarget(r)} sx={{ mr: 1 }}>Reset</Button>
                         )}
+                        {mode === "assessment" && canAssign && (
+                          <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1 }}>Remove</Button>
+                        )}
                         <Button size="small" variant="outlined" onClick={() => navigate(`/patients/${p.id}`)}>Open chart</Button>
                       </TableCell>
                     </TableRow>
@@ -146,6 +167,33 @@ export default function PatientListPage() {
           <Button variant="contained" onClick={doReset}>Reset patient</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={Boolean(unassignTarget)} onClose={() => setUnassignTarget(undefined)}>
+        <DialogTitle>Remove this case from {unassignTarget?.ownerName ?? "the student"}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {unassignTarget?.patient.lastName}, {unassignTarget?.patient.firstName} will disappear from their patient list. Their notes on this copy are no longer reachable. Other students' copies are unchanged.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUnassignTarget(undefined)}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={doUnassign}>Remove assignment</Button>
+        </DialogActions>
+      </Dialog>
+
+      {assignOpen && (
+        <AssignCaseDialog
+          open
+          rows={rows.data ?? []}
+          onClose={() => setAssignOpen(false)}
+          onAssigned={(assigned) => {
+            const names = assigned.map((p) => `${p.lastName}, ${p.firstName}`).join("; ");
+            setFlash(`Assigned ${assigned.length === 1 ? "a case" : `${assigned.length} copies`}: ${names}.`);
+            setParams({ mode: "assessment" }, { replace: true });
+            rows.reload();
+          }}
+        />
+      )}
     </Box>
   );
 }
