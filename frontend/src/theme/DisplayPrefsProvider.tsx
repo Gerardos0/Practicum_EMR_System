@@ -2,7 +2,6 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { createAppTheme, type DisplayPrefs } from "./theme";
 
-// ADA: adjustable text size and contrast, remembered per device.
 const KEY = "emr.displayPrefs";
 const defaults: DisplayPrefs = { textScale: 1, highContrast: false };
 

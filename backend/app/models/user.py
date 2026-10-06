@@ -25,21 +25,21 @@ role_permissions = Table(
 class Discipline(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "disciplines"
 
-    code: Mapped[str] = mapped_column(String(50), unique=True)  # e.g. "nursing", "pt"
+    code: Mapped[str] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(100))
 
 
 class Permission(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "permissions"
 
-    code: Mapped[str] = mapped_column(String(100), unique=True)  # e.g. "patient:read"
+    code: Mapped[str] = mapped_column(String(100), unique=True)
     description: Mapped[str | None] = mapped_column(String(255))
 
 
 class Role(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "roles"
 
-    code: Mapped[str] = mapped_column(String(50), unique=True)  # e.g. "instructor", "front_desk"
+    code: Mapped[str] = mapped_column(String(50), unique=True)
     name: Mapped[str] = mapped_column(String(100))
 
     permissions: Mapped[list[Permission]] = relationship(secondary=role_permissions)

@@ -33,5 +33,5 @@ async def root():
 
 @app.get("/health")
 async def health(db: AsyncSession = Depends(get_db)):
-    await db.execute(text("SELECT 1"))  # proves the DB connection actually works
+    await db.execute(text("SELECT 1"))
     return {"status": "healthy", "database": "connected"}

@@ -3,7 +3,6 @@ import { IconButton, Tooltip } from "@mui/material";
 import MicNoneOutlined from "@mui/icons-material/MicNoneOutlined";
 import MicOutlined from "@mui/icons-material/MicOutlined";
 
-// Web Speech API isn't in the TS DOM lib yet; keep the typing local.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Recognition = any;
 
@@ -13,7 +12,6 @@ function getRecognitionCtor(): (new () => Recognition) | undefined {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-/** Voice input for note fields (client: "support dictation/voice input"). Hidden where unsupported. */
 export default function DictationButton({ onText, label }: { onText: (text: string) => void; label: string }) {
   const [listening, setListening] = useState(false);
   const rec = useRef<Recognition>(null);

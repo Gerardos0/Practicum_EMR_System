@@ -1,4 +1,3 @@
-# Replace the generated alembic/env.py with this.
 from logging.config import fileConfig
 
 from alembic import context

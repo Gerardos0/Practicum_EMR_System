@@ -1,7 +1,5 @@
 import type { Role } from "../types";
 
-// One place to answer "is this role allowed to do X?" in the UI.
-// The backend must enforce the same rules — hiding a button is not security.
 export type Action =
   | "patient:create"
   | "patient:update_status"

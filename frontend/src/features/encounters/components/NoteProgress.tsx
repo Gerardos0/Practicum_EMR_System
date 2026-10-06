@@ -2,7 +2,6 @@ import { Step, StepLabel, Stepper, Typography } from "@mui/material";
 import type { ClinicalNote } from "../../../types";
 import { formatDateTime } from "../../../utils/format";
 
-/** Where this note is in its lifecycle, including the return-for-revision loop. */
 export default function NoteProgress({ note }: { note: ClinicalNote }) {
   if (note.mode === "practice") {
     return (

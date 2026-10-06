@@ -13,7 +13,6 @@ interface Props {
 
 const card = { borderRadius: "16px", overflow: "hidden" } as const;
 
-/** Always-visible identity + allergy header. Status is split across fields, never one dropdown. */
 export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
   const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`;
   const statusItems: [string, string][] = [
