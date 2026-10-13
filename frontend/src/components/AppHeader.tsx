@@ -7,7 +7,7 @@ import { useSession } from "../features/auth/AuthContext";
 import { getCourse, listCoursesForUser } from "../api/courses";
 import { utep } from "../theme/tokens";
 import { disciplineLabel, roleLabel } from "../utils/labels";
-import { homePathFor } from "../utils/permissions";
+import { courseIdsForRole, homePathFor, uniqueRoles } from "../utils/permissions";
 import { useAsync } from "../utils/useAsync";
 import { usePageHeadingValue } from "./PageHeading";
 import type { Role } from "../types";
@@ -22,11 +22,15 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
   const location = useLocation();
   const heading = usePageHeadingValue();
   const { user, activeRole, discipline, courseId, switchRole, selectCourse } = useSession();
+  const roles = uniqueRoles(user);
   const [q, setQ] = useState("");
   const { data: courses = [] } = useAsync(() => listCoursesForUser(), [user.id]);
-  const course = useAsync(() => getCourse(courseId), [courseId]);
+  const course = useAsync(() => courseId ? getCourse(courseId) : Promise.resolve(undefined), [courseId]);
 
-  const roleCourses = courses.filter((c) => user.roles.find((r) => r.role === activeRole)?.courseIds.includes(c.id));
+  const roleCourseIds = courseIdsForRole(user, activeRole);
+  const roleCourses = activeRole === "admin"
+    ? courses
+    : courses.filter((c) => roleCourseIds.includes(c.id));
   const initials = user.fullName.split(" ").map((w) => w[0]).slice(0, 2).join("");
   const canSearch = activeRole !== "patient";
   const courseLabel = course.data
@@ -93,16 +97,16 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
           </Box>
         )}
 
-        {roleCourses.length > 1 && (
+        {courseId && roleCourses.length > 1 && (
           <Select
             size="small" value={courseId} inputProps={{ "aria-label": "Course" }}
             onChange={(e) => selectCourse(e.target.value)} sx={{ ...pickerSx, minWidth: 140 }}
           >
-            {roleCourses.map((c) => <MenuItem key={c.id} value={c.id}>{c.code}</MenuItem>)}
+            {roleCourses.map((c) => <MenuItem key={c.id} value={c.id}>{c.code}, {c.term}</MenuItem>)}
           </Select>
         )}
 
-        {user.roles.length > 1 && (
+        {roles.length > 1 && (
           <Select
             size="small" value={activeRole} inputProps={{ "aria-label": "Acting as" }}
             onChange={(e) => {
@@ -113,7 +117,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
             sx={{ ...pickerSx, bgcolor: utep.navy, color: "#fff", borderRadius: "999px", "& .MuiSvgIcon-root": { color: "#fff" } }}
             renderValue={(v) => `Acting as: ${roleLabel[v as Role]}`}
           >
-            {user.roles.map((r) => <MenuItem key={r.role} value={r.role}>{roleLabel[r.role]}</MenuItem>)}
+            {roles.map((role) => <MenuItem key={role} value={role}>{roleLabel[role]}</MenuItem>)}
           </Select>
         )}
 
