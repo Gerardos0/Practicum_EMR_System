@@ -117,13 +117,15 @@ export default function PatientListPage() {
               </EmptyState>
             </Box>
           ) : (
-            <Table>
+            <Table size="small" sx={{ minWidth: { xs: 0, sm: 640 } }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Patient</TableCell>
-                  {!isStudent && mode === "assessment" && <TableCell>Student</TableCell>}
-                  <TableCell>Age, sex</TableCell>
-                  <TableCell>Visit</TableCell>
+                  {!isStudent && mode === "assessment" && (
+                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Student</TableCell>
+                  )}
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Age, sex</TableCell>
+                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Visit</TableCell>
                   <TableCell>{isStudent ? "My note" : "Latest note"}</TableCell>
                   <TableCell align="right"><Box component="span" sx={visuallyHidden}>Actions</Box></TableCell>
                 </TableRow>
@@ -142,32 +144,52 @@ export default function PatientListPage() {
                       sx={{ cursor: "pointer" }}
                       aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
                     >
-                      <TableCell>
+                      <TableCell sx={{ maxWidth: { xs: 140, sm: "none" } }}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                           {p.lastName}, {p.firstName}
                           {p.practiceLabel && <Chip size="small" label={p.practiceLabel} variant="outlined" sx={{ ml: 1 }} />}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">MRN {p.mrn}</Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: { xs: "block", sm: "none" } }}
+                        >
+                          {p.ageYears} y, {p.sexAtBirth} · {p.status.encounter}
+                        </Typography>
                       </TableCell>
-                      {!isStudent && mode === "assessment" && <TableCell>{r.ownerName}</TableCell>}
-                      <TableCell>{p.ageYears} y, {p.sexAtBirth}</TableCell>
-                      <TableCell>
+                      {!isStudent && mode === "assessment" && (
+                        <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{r.ownerName}</TableCell>
+                      )}
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
+                        {p.ageYears} y, {p.sexAtBirth}
+                      </TableCell>
+                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                         <Chip size="small" label={p.status.encounter} color={p.status.encounter === "Checked in" || p.status.encounter === "In progress" ? "info" : "default"} variant="outlined" />
                       </TableCell>
                       <TableCell>
                         <NoteStatusChip status={r.latestNote?.status} />
                         {r.latestNote && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{formatDateTime(r.latestNote.updatedAt)}</Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: { xs: "none", sm: "block" } }}
+                          >
+                            {formatDateTime(r.latestNote.updatedAt)}
+                          </Typography>
                         )}
                       </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap", pl: { xs: 0.5, sm: 2 } }} onClick={(e) => e.stopPropagation()}>
                         {mode === "practice" && can(activeRole, "patient:reset_practice") && (
-                          <Button size="small" color="inherit" onClick={() => setResetTarget(r)} sx={{ mr: 1 }}>Reset</Button>
+                          <Button size="small" color="inherit" onClick={() => setResetTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>Reset</Button>
                         )}
                         {mode === "assessment" && canAssign && (
-                          <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1 }}>Remove</Button>
+                          <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>Remove</Button>
                         )}
-                        <Button size="small" variant="contained" onClick={open}>Open chart</Button>
+                        <Button size="small" variant="contained" onClick={open}>
+                          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Open chart</Box>
+                          <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Open</Box>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
