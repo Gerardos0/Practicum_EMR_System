@@ -63,7 +63,7 @@ export default function NoteReviewPage() {
 
   return (
     <Stack spacing={2}>
-      <Breadcrumbs>
+      <Breadcrumbs aria-label="Breadcrumb">
         <Link component={RouterLink} to="/review" underline="hover">Review queue</Link>
         <Typography color="text.primary">{note.authorName}</Typography>
       </Breadcrumbs>
