@@ -41,8 +41,10 @@ export default function PatientChartPage() {
 
   return (
     <Stack spacing={2}>
-      <Breadcrumbs>
-        <Link component={RouterLink} to="/patients" underline="hover">Patients</Link>
+      <Breadcrumbs aria-label="Breadcrumb">
+        <Link component={RouterLink} to="/patients" underline="hover">
+          {activeRole === "student" ? "My patients" : "Patients"}
+        </Link>
         <Typography color="text.primary">{p.lastName}, {p.firstName}</Typography>
       </Breadcrumbs>
 

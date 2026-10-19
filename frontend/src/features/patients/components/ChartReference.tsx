@@ -6,6 +6,15 @@ import type { Patient } from "../../../types";
 export default function ChartReference({ patient: p }: { patient: Patient }) {
   const sections = [
     {
+      title: "Visit",
+      body: (
+        <>
+          <Typography variant="body2"><b>Chief complaint:</b> {p.chiefComplaint}</Typography>
+          <Typography variant="body2" sx={{ mt: 0.75 }}><b>HPI:</b> {p.hpi}</Typography>
+        </>
+      ),
+    },
+    {
       title: "Medications", body: p.medications.map((m) => (
         <Typography key={m.id} variant="body2">{m.name} {m.dose} {m.route} {m.frequency.toLowerCase()}</Typography>
       )),

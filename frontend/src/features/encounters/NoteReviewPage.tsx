@@ -114,15 +114,22 @@ export default function NoteReviewPage() {
                 <TextField
                   id="review-comment" label="Feedback to the student" multiline minRows={4} value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  helperText="Required to return the note. Optional when co-signing."
+                  helperText="Required to return the note. Optional when co-signing. You leave comments — the student's wording stays theirs."
                 />
-                <Button variant="contained" size="large" disabled={busy} onClick={() => act("cosign")}>Co-sign note</Button>
-                <Button variant="outlined" color="error" disabled={busy} onClick={() => act("return")}>Return for revision</Button>
+                <Button variant="contained" size="large" disabled={busy} onClick={() => act("cosign")}>
+                  Co-sign and accept
+                </Button>
+                <Button variant="outlined" color="error" disabled={busy} onClick={() => act("return")}>
+                  Return for revision
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  Co-sign locks the note as final. Return unlocks it so the student can revise and resubmit.
+                </Typography>
               </Stack>
             )}
 
             <Alert severity="info" icon={false} sx={{ mt: 2 }}>
-              Record the score in the course gradebook. Grades aren't stored in the EMR, so students never see them here (FERPA).
+              Record the score in the course gradebook (Blackboard). Grades aren't stored in the EMR, so students never see them here (FERPA).
             </Alert>
           </Paper>
 

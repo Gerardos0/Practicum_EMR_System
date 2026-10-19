@@ -113,8 +113,18 @@ export default function PatientListPage() {
               <TableBody>
                 {visible.map((r) => {
                   const p = r.patient;
+                  const open = () => navigate(`/patients/${p.id}`);
                   return (
-                    <TableRow key={p.id} hover>
+                    <TableRow
+                      key={p.id}
+                      hover
+                      onClick={open}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
+                      sx={{ cursor: "pointer" }}
+                    >
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                           {p.lastName}, {p.firstName}
@@ -133,11 +143,11 @@ export default function PatientListPage() {
                           <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{formatDateTime(r.latestNote.updatedAt)}</Typography>
                         )}
                       </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                         {mode === "practice" && can(activeRole, "patient:reset_practice") && (
                           <Button size="small" color="inherit" onClick={() => setResetTarget(r)} sx={{ mr: 1 }}>Reset</Button>
                         )}
-                        <Button size="small" variant="outlined" onClick={() => navigate(`/patients/${p.id}`)}>Open chart</Button>
+                        <Button size="small" variant="contained" onClick={open}>Open chart</Button>
                       </TableCell>
                     </TableRow>
                   );

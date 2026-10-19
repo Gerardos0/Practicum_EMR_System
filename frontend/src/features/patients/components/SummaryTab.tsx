@@ -41,10 +41,58 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
     <Button variant="contained" onClick={() => navigate(`/patients/${p.id}/notes/new`)}>Start note</Button>
   ) : null;
 
+  const nextStep = (() => {
+    if (!isAuthor) return null;
+    if (openNote?.status === "returned") {
+      return {
+        severity: "error" as const,
+        title: "Your instructor returned this note",
+        body: "Open it, address the feedback, then sign and resubmit.",
+        action: noteButton,
+      };
+    }
+    if (openNote?.status === "draft") {
+      return {
+        severity: "info" as const,
+        title: "You have a draft in progress",
+        body: "Continue documenting, then sign and submit for review when you're ready.",
+        action: noteButton,
+      };
+    }
+    if (mine.some((n) => n.status === "pending_review")) {
+      return {
+        severity: "success" as const,
+        title: "Note submitted — waiting for co-signature",
+        body: "You can keep reviewing the chart. You'll edit again only if the note is returned.",
+        action: null,
+      };
+    }
+    if (mine.some((n) => n.status === "cosigned")) {
+      return {
+        severity: "success" as const,
+        title: "Note co-signed",
+        body: "This documentation is final. You can still add an addendum if something new comes up.",
+        action: null,
+      };
+    }
+    if (!submitted) {
+      return {
+        severity: "info" as const,
+        title: p.mode === "assessment" ? "Next: document this visit" : "Practice documenting on this patient",
+        body: p.mode === "assessment"
+          ? "Review the summary below, then start a note. You'll pick an instructor when you submit."
+          : "Practice notes aren't graded. Reset happens when an instructor restores the chart.",
+        action: noteButton,
+      };
+    }
+    return null;
+  })();
+
   return (
     <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "360px 1fr" }, alignItems: "start" }}>
       <Stack spacing={2}>
         <Card title="Problem list">
+          {p.problems.length === 0 && <Typography variant="body2" color="text.secondary">None on file</Typography>}
           {p.problems.map((pr) => (
             <Typography key={pr.description} variant="body2">
               {pr.code && <b>{pr.code} </b>}{pr.description}{pr.since && <Typography component="span" variant="body2" color="text.secondary"> since {pr.since}</Typography>}
@@ -82,6 +130,17 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
       </Stack>
 
       <Stack spacing={2}>
+        {nextStep && (
+          <Alert
+            severity={nextStep.severity}
+            action={nextStep.action ? <Box sx={{ display: "flex", alignItems: "center", pl: 1 }}>{nextStep.action}</Box> : undefined}
+            sx={{ alignItems: "center" }}
+          >
+            <Typography variant="subtitle2">{nextStep.title}</Typography>
+            <Typography variant="body2">{nextStep.body}</Typography>
+          </Alert>
+        )}
+
         <Paper sx={{ p: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", mb: 2 }}>
             <Box sx={{ flex: 1, minWidth: 200 }}>
@@ -93,7 +152,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
                 {ADVANCE_LABEL[next]}
               </Button>
             )}
-            {noteButton}
+            {!nextStep?.action && noteButton}
           </Box>
           {needsCosign && isAuthor && (
             <Alert severity="info" sx={{ mb: 2 }}>You can check the patient out once your instructor co-signs your note.</Alert>

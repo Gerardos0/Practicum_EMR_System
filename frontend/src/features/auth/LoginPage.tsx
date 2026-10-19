@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import {
-  Alert, Box, Button, IconButton, InputAdornment, Link, Paper, Stack, TextField, Typography,
+  Alert, Box, Button, IconButton, InputAdornment, Link, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography,
 } from "@mui/material";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
@@ -9,16 +9,22 @@ import MailOutlineRounded from "@mui/icons-material/MailOutlineRounded";
 import { useNavigate } from "react-router-dom";
 import { DEV_CODE, sendCode, startSignIn, verifyCode, type CodeChannel } from "../../api/auth";
 import { homePathFor } from "../../utils/permissions";
-import { utep } from "../../theme/tokens";
+import { trainingStripe, utep } from "../../theme/tokens";
 import { useAuth } from "./AuthContext";
 
-type Step = "credentials" | "channel" | "code";
+type StepId = "credentials" | "channel" | "code";
+
+const STEPS: { id: StepId; label: string }[] = [
+  { id: "credentials", label: "Sign in" },
+  { id: "channel", label: "Verify" },
+  { id: "code", label: "Enter code" },
+];
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
 
-  const [step, setStep] = useState<Step>("credentials");
+  const [step, setStep] = useState<StepId>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,6 +49,7 @@ export default function LoginPage() {
   const submitCredentials = (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return setError("Enter your UTEP email to continue.");
+    if (!password) return setError("Enter your password.");
     run(async () => {
       const res = await startSignIn(email, password);
       setChallenge({ id: res.challengeId, phoneLast4: res.phoneLast4, emailMasked: res.emailMasked });
@@ -73,20 +80,33 @@ export default function LoginPage() {
 
   const destination =
     channel === "sms" ? `your phone ending in ${challenge?.phoneLast4}` : challenge?.emailMasked;
+  const activeStep = STEPS.findIndex((s) => s.id === step);
 
   return (
     <Box sx={{ minHeight: "100dvh", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
       <Box component="header" sx={{ bgcolor: utep.orange, color: utep.navy, px: { xs: 2, sm: 3.5 }, height: 60, display: "flex", alignItems: "center" }}>
         <Typography component="span" sx={{ fontWeight: 800, fontSize: 18 }}>UTEP EMR</Typography>
+        <Typography component="span" sx={{ ml: 1.5, fontWeight: 600, fontSize: 13, opacity: 0.85, display: { xs: "none", sm: "inline" } }}>
+          Educational medical record
+        </Typography>
       </Box>
+      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
 
       <Box component="main" sx={{ flex: 1, display: "grid", placeItems: "center", px: 2, py: 5 }}>
-        <Paper component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>
+        <Paper component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 440, p: { xs: 3, sm: 4 } }}>
+          <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3, display: { xs: "none", sm: "flex" } }}>
+            {STEPS.map((s) => (
+              <Step key={s.id} completed={activeStep > STEPS.findIndex((x) => x.id === s.id)}>
+                <StepLabel>{s.label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+
           <Typography id="login-title" component="h1" variant="h5" sx={{ mb: 0.5 }}>
             {step === "credentials" ? "Sign in" : step === "channel" ? "Verify it's you" : "Enter your code"}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            {step === "credentials" && "For UTEP health sciences students and faculty. Every patient here is simulated."}
+            {step === "credentials" && "For UTEP health sciences students and faculty. Every patient here is simulated training data — never real PHI."}
             {step === "channel" && "We'll send a 6-digit code. Choose where to get it."}
             {step === "code" && `We sent a 6-digit code to ${destination}.`}
           </Typography>
@@ -119,6 +139,19 @@ export default function LoginPage() {
                 <Button type="submit" variant="contained" size="large" disabled={busy}>
                   {busy ? "Checking…" : "Continue"}
                 </Button>
+                {import.meta.env.DEV && (
+                  <Alert severity="info" icon={false}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Demo accounts</Typography>
+                    <Typography variant="body2" component="div">
+                      Student: <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>daniel.reyes@miners.utep.edu</Box>
+                      <br />
+                      Instructor: <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>gerardo.sillas@utep.edu</Box>
+                      <br />
+                      Password <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>practicum1</Box>
+                      {" · "}MFA <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>{DEV_CODE}</Box>
+                    </Typography>
+                  </Alert>
+                )}
               </Stack>
             </Box>
           )}
@@ -127,12 +160,12 @@ export default function LoginPage() {
             <Stack spacing={1.5}>
               {challenge?.phoneLast4 && (
                 <Button variant="outlined" size="large" startIcon={<SmsOutlined />} disabled={busy}
-                  onClick={() => chooseChannel("sms")} sx={{ justifyContent: "flex-start" }}>
+                  onClick={() => chooseChannel("sms")} sx={{ justifyContent: "flex-start", py: 1.5 }}>
                   Text me at •••-{challenge.phoneLast4}
                 </Button>
               )}
               <Button variant="outlined" size="large" startIcon={<MailOutlineRounded />} disabled={busy}
-                onClick={() => chooseChannel("email")} sx={{ justifyContent: "flex-start" }}>
+                onClick={() => chooseChannel("email")} sx={{ justifyContent: "flex-start", py: 1.5 }}>
                 Email me at {challenge?.emailMasked}
               </Button>
               <Link component="button" type="button" variant="body2" onClick={() => setStep("credentials")} sx={{ alignSelf: "flex-start", mt: 1 }}>
@@ -148,12 +181,12 @@ export default function LoginPage() {
                   label="6-digit code" autoFocus fullWidth value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   slotProps={{ htmlInput: { inputMode: "numeric", autoComplete: "one-time-code", maxLength: 6, style: { letterSpacing: "0.4em", fontSize: 20 } } }}
-                  helperText={import.meta.env.DEV ? `Dev / educational MFA code: ${DEV_CODE}` : undefined}
+                  helperText={import.meta.env.DEV ? `Educational MFA code: ${DEV_CODE}` : "Codes expire after a few minutes."}
                 />
                 <Button type="submit" variant="contained" size="large" disabled={busy || code.length !== 6}>
                   {busy ? "Verifying…" : "Verify and sign in"}
                 </Button>
-                <Stack direction="row" spacing={2}>
+                <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
                   <Link component="button" type="button" variant="body2" onClick={() => chooseChannel(channel)}>
                     Send a new code
                   </Link>
