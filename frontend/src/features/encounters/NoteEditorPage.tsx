@@ -180,8 +180,8 @@ export default function NoteEditorPage() {
 
   return (
     <Stack spacing={2}>
-      <Breadcrumbs>
-        <Link component={RouterLink} to="/patients" underline="hover">Patients</Link>
+      <Breadcrumbs aria-label="Breadcrumb">
+        <Link component={RouterLink} to="/patients" underline="hover">My patients</Link>
         <Link component={RouterLink} to={`/patients/${patient.id}`} underline="hover">{patient.lastName}, {patient.firstName}</Link>
         <Typography color="text.primary">{TEMPLATES[templateId].name}</Typography>
       </Breadcrumbs>
