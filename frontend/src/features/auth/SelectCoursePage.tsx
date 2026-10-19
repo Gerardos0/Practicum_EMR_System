@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box, Button, Card, CardActionArea, CardContent, Chip, Stack, ToggleButton, ToggleButtonGroup, Typography,
 } from "@mui/material";
+import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
 import { useNavigate } from "react-router-dom";
 import { listCoursesForUser } from "../../api/courses";
 import { disciplineLabel, roleLabel } from "../../utils/labels";
@@ -19,6 +20,15 @@ export default function SelectCoursePage() {
 
   const assignment = user.roles.find((r) => r.role === activeRole);
   const available = courses.filter((c) => assignment?.courseIds.includes(c.id));
+
+  const availableIds = available.map((c) => c.id).join(",");
+  // One course → pre-select so Open course is one click away.
+  useEffect(() => {
+    if (available.length === 1) setPicked(available[0].id);
+    else setPicked((prev) => (prev && available.some((c) => c.id === prev) ? prev : undefined));
+    // availableIds captures course identity for the active role
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRole, availableIds]);
 
   const go = () => {
     if (!picked) return;
@@ -61,22 +71,30 @@ export default function SelectCoursePage() {
         )}
 
         <Stack spacing={1.5} role="radiogroup" aria-label="Courses">
-          {available.map((c) => (
-            <Card
-              key={c.id}
-              sx={{ borderColor: picked === c.id ? "primary.main" : undefined, borderWidth: picked === c.id ? 2 : 1 }}
-            >
-              <CardActionArea role="radio" aria-checked={picked === c.id} onClick={() => setPicked(c.id)} onDoubleClick={go}>
-                <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1">{c.code}: {c.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">{c.term}</Typography>
-                  </Box>
-                  {assignment?.discipline && <Chip size="small" label={disciplineLabel[assignment.discipline]} />}
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          ))}
+          {available.map((c) => {
+            const selected = picked === c.id;
+            return (
+              <Card
+                key={c.id}
+                sx={{
+                  borderColor: selected ? "primary.main" : "divider",
+                  borderWidth: selected ? 2 : 1,
+                  bgcolor: selected ? "rgba(14,34,80,0.04)" : "background.paper",
+                }}
+              >
+                <CardActionArea role="radio" aria-checked={selected} onClick={() => setPicked(c.id)} onDoubleClick={go}>
+                  <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="subtitle1">{c.code}: {c.title}</Typography>
+                      <Typography variant="body2" color="text.secondary">{c.term}</Typography>
+                    </Box>
+                    {assignment?.discipline && <Chip size="small" label={disciplineLabel[assignment.discipline]} />}
+                    {selected && <CheckCircleRounded color="primary" aria-hidden />}
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            );
+          })}
           {!loading && available.length === 0 && (
             <Typography color="text.secondary">
               You aren't on any course roster yet. Ask your instructor to add you.
@@ -86,7 +104,7 @@ export default function SelectCoursePage() {
         </Stack>
 
         <Button variant="contained" size="large" sx={{ mt: 3 }} disabled={!picked} onClick={go}>
-          Open course
+          {picked ? "Open course" : "Select a course to continue"}
         </Button>
       </Box>
     </Box>

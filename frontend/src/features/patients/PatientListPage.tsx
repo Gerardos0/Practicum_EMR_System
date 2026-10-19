@@ -89,10 +89,10 @@ export default function PatientListPage() {
             : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
         </Typography>
 
-        {rows.loading && <LinearProgress sx={{ mt: 1 }} />}
+        {rows.loading && <LinearProgress sx={{ mt: 1 }} aria-label="Loading patients" />}
 
         <Box sx={{ overflowX: "auto", p: 1 }}>
-          {!rows.loading && visible.length === 0 ? (
+          {rows.loading ? null : visible.length === 0 ? (
             <Box sx={{ p: 2 }}>
               <EmptyState title={query ? "No patients match that search" : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}>
                 {query ? "Try a last name or the full MRN." : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : undefined}
@@ -121,9 +121,8 @@ export default function PatientListPage() {
                       onClick={open}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
                       tabIndex={0}
-                      role="link"
-                      aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
                       sx={{ cursor: "pointer" }}
+                      aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
                     >
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>

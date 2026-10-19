@@ -47,9 +47,8 @@ export default function NotesList({ notes, patientId, reviewer, emptyAction }: P
                 onClick={open}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
                 tabIndex={0}
-                role="link"
-                aria-label={`${label} ${TEMPLATES[n.templateId].name}`}
                 sx={{ cursor: "pointer" }}
+                aria-label={`${label} ${TEMPLATES[n.templateId].name}`}
               >
                 <TableCell>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>{TEMPLATES[n.templateId].name}</Typography>
