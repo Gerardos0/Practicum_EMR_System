@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   Box, Button, Card, CardActionArea, CardContent, Chip, Stack, ToggleButton, ToggleButtonGroup, Typography,
 } from "@mui/material";
@@ -13,9 +14,10 @@ import { useSession } from "./AuthContext";
 
 export default function SelectCoursePage() {
   const navigate = useNavigate();
-  const { user, activeRole, switchRole, selectCourse, signOut } = useSession();
+  const { user, activeRole, courseId, switchRole, selectCourse, signOut } = useSession();
   const [picked, setPicked] = useState<string>();
-  const { data: courses = [], loading } = useAsync(() => listCoursesForUser(), [user.id]);
+  const [opening, setOpening] = useState(false);
+  const { data: courses = [], loading, error } = useAsync(() => listCoursesForUser(), [user.id]);
 
   const assignment = user.roles.find((r) => r.role === activeRole);
   const available = courses.filter((c) => assignment?.courseIds.includes(c.id));
@@ -29,10 +31,17 @@ export default function SelectCoursePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRole, availableIds]);
 
+  // Navigate only after the session has the course — avoids empty queues/lists on first paint.
+  useEffect(() => {
+    if (!opening || !picked || courseId !== picked) return;
+    setOpening(false);
+    navigate(homePathFor(activeRole), { replace: true });
+  }, [opening, picked, courseId, activeRole, navigate]);
+
   const go = () => {
     if (!picked) return;
-    selectCourse(picked);
-    navigate(homePathFor(activeRole), { replace: true });
+    flushSync(() => selectCourse(picked));
+    setOpening(true);
   };
 
   return (
@@ -92,6 +101,10 @@ export default function SelectCoursePage() {
               </Card>
             );
           })}
+          {error && (
+            <Typography color="error">{error.message}</Typography>
+          )}
+          {loading && <Typography color="text.secondary">Loading your courses…</Typography>}
           {!loading && available.length === 0 && (
             <Typography color="text.secondary">
               You aren't on any course roster yet. Ask your instructor to add you.
@@ -99,8 +112,8 @@ export default function SelectCoursePage() {
           )}
         </Stack>
 
-        <Button variant="contained" size="large" sx={{ mt: 3 }} disabled={!picked} onClick={go}>
-          {picked ? "Open course" : "Select a course to continue"}
+        <Button variant="contained" size="large" sx={{ mt: 3 }} disabled={!picked || opening} onClick={go}>
+          {!picked ? "Select a course to continue" : opening ? "Opening…" : "Open course"}
         </Button>
       </Box>
     </Box>
