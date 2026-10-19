@@ -18,7 +18,7 @@ import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
-import { TEMPLATES, defaultTemplateFor, missingRequired, templatesFor } from "./noteTemplates";
+import { TEMPLATES, defaultTemplateFor, missingRequired, prefillFromPatient, templatesFor } from "./noteTemplates";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -163,10 +163,13 @@ export default function NoteEditorPage() {
 
   const doSign = async () => {
     setConfirmOpen(false);
+    // Flush any pending field edits, then sign against that version.
+    changeSeq.current += 1;
     if (!(await save())) return;
     try {
       hydrate(await signNote(note!.id, version.current, activeRole));
       setShowErrors(false);
+      savedSeq.current = changeSeq.current;
     } catch (e) {
       setError((e as Error).message);
     }
@@ -204,7 +207,20 @@ export default function NoteEditorPage() {
             {editable && note.status === "draft" && choices.length > 1 && (
               <TextField
                 select size="small" label="Template" value={templateId} sx={{ minWidth: 240 }}
-                onChange={(e) => { markDirty(); setTemplateId(e.target.value as NoteTemplateId); }}
+                onChange={(e) => {
+                  const next = e.target.value as NoteTemplateId;
+                  markDirty();
+                  setTemplateId(next);
+                  // Keep student edits; only fill empty fields for the new template.
+                  const seeded = prefillFromPatient(next, patient);
+                  setContent((prev) => {
+                    const merged = { ...seeded };
+                    for (const [k, v] of Object.entries(prev)) {
+                      if (v?.trim()) merged[k] = v;
+                    }
+                    return merged;
+                  });
+                }}
               >
                 {choices.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
               </TextField>
@@ -224,6 +240,11 @@ export default function NoteEditorPage() {
           )}
           {note.status === "cosigned" && note.feedback.length > 0 && (
             <Alert severity="success" sx={{ mb: 2.5 }}><FeedbackThread items={note.feedback} /></Alert>
+          )}
+          {editable && note.status === "draft" && (content.reason || content.cc || content.objective || content.exam) && (
+            <Alert severity="info" icon={false} sx={{ mb: 2.5 }}>
+              We prefilled chief complaint, vitals, and labs from the chart. Review and edit anything that needs to change before you sign.
+            </Alert>
           )}
           {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2.5 }}>{error}</Alert>}
 
