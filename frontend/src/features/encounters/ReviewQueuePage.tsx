@@ -74,9 +74,9 @@ export default function ReviewQueuePage() {
             <Tab key={f.id} value={f.id} label={f.id === "all" ? `${f.label} (${count("all")})` : `${f.label} (${count(f.id)})`} />
           ))}
         </Tabs>
-        {queue.loading && <LinearProgress />}
+        {queue.loading && <LinearProgress aria-label="Loading review queue" />}
         <Box sx={{ overflowX: "auto", p: 1 }}>
-          {!queue.loading && items.length === 0 ? (
+          {queue.loading ? null : items.length === 0 ? (
             <Box sx={{ p: 2 }}>
               <EmptyState title={filter === "pending_review" ? "You're caught up" : "Nothing here"}>
                 {filter === "pending_review"
@@ -106,9 +106,8 @@ export default function ReviewQueuePage() {
                       onClick={open}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
                       tabIndex={0}
-                      role="link"
-                      aria-label={`Review note by ${note.authorName}`}
                       sx={{ cursor: "pointer" }}
+                      aria-label={`Review note by ${note.authorName}`}
                     >
                       <TableCell sx={{ fontWeight: 600 }}>{note.authorName}</TableCell>
                       <TableCell>

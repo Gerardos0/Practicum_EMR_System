@@ -86,10 +86,10 @@ export default function PatientListPage() {
           )}
         </Box>
 
-        {rows.loading && <LinearProgress sx={{ mt: 1 }} />}
+        {rows.loading && <LinearProgress sx={{ mt: 1 }} aria-label="Loading patients" />}
 
         <Box sx={{ overflowX: "auto", p: 1 }}>
-          {!rows.loading && visible.length === 0 ? (
+          {rows.loading ? null : visible.length === 0 ? (
             <Box sx={{ p: 2 }}>
               <EmptyState
                 title={query ? "No patients match that search" : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
@@ -113,8 +113,17 @@ export default function PatientListPage() {
               <TableBody>
                 {visible.map((r) => {
                   const p = r.patient;
+                  const open = () => navigate(`/patients/${p.id}`);
                   return (
-                    <TableRow key={p.id} hover>
+                    <TableRow
+                      key={p.id}
+                      hover
+                      onClick={open}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
+                      tabIndex={0}
+                      sx={{ cursor: "pointer" }}
+                      aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
+                    >
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                           {p.lastName}, {p.firstName}
@@ -133,7 +142,7 @@ export default function PatientListPage() {
                           <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{formatDateTime(r.latestNote.updatedAt)}</Typography>
                         )}
                       </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      <TableCell align="right" sx={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                         {mode === "practice" && can(activeRole, "patient:reset_practice") && (
                           <Button size="small" color="inherit" onClick={() => setResetTarget(r)} sx={{ mr: 1 }}>Reset</Button>
                         )}
