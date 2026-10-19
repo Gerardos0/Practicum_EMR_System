@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert, Box, Button, LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { listReviewQueue } from "../../api/notes";
 import { getCourse } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
@@ -22,10 +22,19 @@ const FILTERS: { id: NoteStatus | "all"; label: string }[] = [
 
 export default function ReviewQueuePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, courseId } = useSession();
   const [filter, setFilter] = useState<NoteStatus | "all">("pending_review");
+  const [flash, setFlash] = useState("");
   const queue = useAsync(() => listReviewQueue(user, courseId), [user.id, courseId]);
   const course = useAsync(() => getCourse(courseId), [courseId]);
+
+  useEffect(() => {
+    const msg = (location.state as { flash?: string } | null)?.flash;
+    if (!msg) return;
+    setFlash(msg);
+    navigate(".", { replace: true, state: null });
+  }, [location.state, navigate]);
 
   const items = (queue.data ?? []).filter((q) => filter === "all" || q.note.status === filter);
   const count = (s: NoteStatus) => queue.data?.filter((q) => q.note.status === s).length ?? 0;
@@ -42,6 +51,10 @@ export default function ReviewQueuePage() {
         Open a note to read it beside the chart. Co-sign accepts the documentation; return sends it back with feedback the student must fix.
         Record scores in the course gradebook — grades are not stored here.
       </Typography>
+
+      {flash && (
+        <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>
+      )}
 
       {pendingCount > 0 && filter === "pending_review" && (
         <Alert severity="warning" sx={{ mb: 2 }}>
