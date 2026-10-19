@@ -46,9 +46,11 @@ export default function PatientChartPage() {
 
   return (
     <Box>
-      <Breadcrumbs sx={{ mb: 2 }}>
-        <Link component={RouterLink} to="/patients" underline="hover">Patients</Link>
-        <Typography color="text.primary">Profile</Typography>
+      <Breadcrumbs aria-label="Breadcrumb" sx={{ mb: 2 }}>
+        <Link component={RouterLink} to="/patients" underline="hover">
+          {activeRole === "student" ? "My patients" : "Patients"}
+        </Link>
+        <Typography color="text.primary">{p.lastName}, {p.firstName}</Typography>
       </Breadcrumbs>
 
       <PatientBanner

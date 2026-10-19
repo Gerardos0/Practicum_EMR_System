@@ -140,7 +140,7 @@ export default function PatientListPage() {
                         {mode === "assessment" && canAssign && (
                           <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1 }}>Remove</Button>
                         )}
-                        <Button size="small" variant="outlined" onClick={() => navigate(`/patients/${p.id}`)}>Open chart</Button>
+                        <Button size="small" variant="contained" onClick={open}>Open chart</Button>
                       </TableCell>
                     </TableRow>
                   );

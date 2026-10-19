@@ -36,7 +36,12 @@ export default function SelectCoursePage() {
 
       <Box component="main" sx={{ maxWidth: 640, mx: "auto", px: 2, py: 5 }}>
         <Typography component="h1" variant="h5">Welcome, {user.fullName.split(" ")[0]}</Typography>
-        <Typography color="text.secondary" sx={{ mb: 3 }}>Choose the course you're working in today.</Typography>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>
+          Choose the course you're working in today.
+          {activeRole === "student" && " You'll see the patients and cases assigned to that class."}
+          {activeRole === "instructor" && " You'll review notes and manage the roster for that class."}
+          {activeRole === "admin" && " You'll manage rosters and activity for that class."}
+        </Typography>
 
         {user.roles.length > 1 && (
           <Box sx={{ mb: 3 }}>
