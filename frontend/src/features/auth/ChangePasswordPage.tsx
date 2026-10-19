@@ -7,7 +7,7 @@ import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
 import { useNavigate } from "react-router-dom";
 import { changePassword } from "../../api/auth";
 import { homePathFor } from "../../utils/permissions";
-import { utep } from "../../theme/tokens";
+import { trainingStripe, utep } from "../../theme/tokens";
 import { useSession } from "./AuthContext";
 
 /** FR-08: temporary passwords must be changed before clinical access. */
@@ -23,6 +23,7 @@ export default function ChangePasswordPage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (!currentPassword) return setError("Enter your current temporary password.");
     if (newPassword.length < 8) return setError("New password must be at least 8 characters.");
     if (newPassword !== confirm) return setError("New password and confirmation don't match.");
     setBusy(true);
@@ -44,6 +45,7 @@ export default function ChangePasswordPage() {
         <Box sx={{ flex: 1 }} />
         <Button color="inherit" onClick={signOut}>Sign out</Button>
       </Box>
+      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
 
       <Box component="main" sx={{ flex: 1, display: "grid", placeItems: "center", px: 2, py: 5 }}>
         <Paper component="section" aria-labelledby="pw-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>

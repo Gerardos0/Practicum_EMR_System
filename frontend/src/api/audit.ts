@@ -1,6 +1,6 @@
 import type { AuditEntry, User } from "../types";
 import { USE_MOCK, apiFetch, clone, latency, uid } from "./client";
-import { db } from "./mockDb";
+import { db, persistMockDb } from "./mockDb";
 
 /** Append-only client-side audit for mock mode. Live API writes audit server-side. */
 export function recordAudit(
@@ -15,6 +15,7 @@ export function recordAudit(
     id: uid("a"), timestamp: new Date().toISOString(),
     actorId: actor.id, actorName: actor.fullName, action, entity, result, detail,
   });
+  persistMockDb();
 }
 
 export async function listAudit(): Promise<AuditEntry[]> {

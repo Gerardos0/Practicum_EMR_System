@@ -1,8 +1,9 @@
 import type { ClinicalNote, IcdCode, NoteTemplateId, Patient, Role, User } from "../types";
 import { can } from "../utils/permissions";
 import { ApiError, USE_MOCK, apiFetch, clone, latency, uid } from "./client";
-import { db } from "./mockDb";
+import { db, persistMockDb } from "./mockDb";
 import { recordAudit } from "./audit";
+import { prefillFromPatient } from "../features/encounters/noteTemplates";
 
 const now = () => new Date().toISOString();
 
@@ -53,11 +54,12 @@ export async function createDraft(
   const note: ClinicalNote = {
     id: uid("n"), patientId: patient.id, encounterId: patient.encounter.id, templateId,
     authorId: author.id, authorName: author.fullName, authorDiscipline: discipline, mode: patient.mode,
-    status: "draft", version: 1, content: {}, diagnoses: [],
+    status: "draft", version: 1, content: prefillFromPatient(templateId, patient), diagnoses: [],
     createdAt: now(), updatedAt: now(), feedback: [], addenda: [],
   };
   db.notes.unshift(note);
   recordAudit(author, "note.create", `note/${note.id}`);
+  persistMockDb();
   return clone(note);
 }
 
@@ -83,6 +85,7 @@ export async function saveDraft(author: User, id: string, expectedVersion: numbe
     throw new ApiError(409, "This note was changed in another window. Reload to see the latest version before editing.");
   }
   Object.assign(n, patch, { version: n.version + 1, updatedAt: now() });
+  persistMockDb();
   return clone(n);
 }
 
@@ -103,6 +106,7 @@ export async function signNote(author: User, id: string, expectedVersion: number
   n.updatedAt = now();
   n.version += 1;
   recordAudit(author, n.mode === "assessment" ? "note.sign_submit" : "note.sign", `note/${id}`);
+  persistMockDb();
   return clone(n);
 }
 
@@ -129,6 +133,7 @@ export async function cosignNote(reviewer: User, role: Role, id: string, comment
     n.feedback.push({ id: uid("c"), authorId: reviewer.id, authorName: reviewer.fullName, body: comment.trim(), kind: "cosigned", createdAt: now() });
   }
   recordAudit(reviewer, "note.cosign", `note/${id}`);
+  persistMockDb();
   return clone(n);
 }
 
@@ -149,6 +154,7 @@ export async function returnNote(reviewer: User, role: Role, id: string, comment
   n.version += 1;
   n.feedback.push({ id: uid("c"), authorId: reviewer.id, authorName: reviewer.fullName, body: comment.trim(), kind: "returned", createdAt: now() });
   recordAudit(reviewer, "note.return", `note/${id}`);
+  persistMockDb();
   return clone(n);
 }
 

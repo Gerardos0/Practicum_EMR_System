@@ -166,15 +166,66 @@ const appointments: Appointment[] = [
 
 const referrals: Referral[] = [];
 
-export const db = {
-  users,
-  courses,
-  patients,
-  notes,
-  audit,
-  appointments,
-  referrals,
-  /** Original practice patients, so instructors can reset them for reuse. */
-  practiceSnapshots: new Map(patients.filter((p) => p.mode === "practice").map((p) => [p.id, structuredClone(p)])),
-  archivedNotes: [] as ClinicalNote[],
+const STORE_KEY = "emr.mockDb.v1";
+
+type Persisted = {
+  users: User[];
+  patients: Patient[];
+  notes: ClinicalNote[];
+  audit: AuditEntry[];
+  appointments: Appointment[];
+  referrals: Referral[];
+  archivedNotes: ClinicalNote[];
 };
+
+function loadPersisted(): Partial<Persisted> {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+const saved = loadPersisted();
+
+export const db = {
+  users: saved.users ?? users,
+  courses,
+  patients: saved.patients ?? patients,
+  notes: saved.notes ?? notes,
+  audit: saved.audit ?? audit,
+  appointments: saved.appointments ?? appointments,
+  referrals: saved.referrals ?? referrals,
+  /** Original practice patients, so instructors can reset them for reuse. */
+  practiceSnapshots: new Map(
+    (saved.patients ?? patients).filter((p) => p.mode === "practice").map((p) => [p.id, structuredClone(p)]),
+  ),
+  archivedNotes: saved.archivedNotes ?? ([] as ClinicalNote[]),
+};
+
+/** Keep mock clinical state across Vite HMR / soft reloads within the tab. */
+export function persistMockDb() {
+  try {
+    const payload: Persisted = {
+      users: db.users,
+      patients: db.patients,
+      notes: db.notes,
+      audit: db.audit,
+      appointments: db.appointments,
+      referrals: db.referrals,
+      archivedNotes: db.archivedNotes,
+    };
+    sessionStorage.setItem(STORE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function clearPersistedMockDb() {
+  try {
+    sessionStorage.removeItem(STORE_KEY);
+  } catch {
+    /* ignore */
+  }
+}

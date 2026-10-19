@@ -1,6 +1,6 @@
 import type { Discipline, RosterRow, User } from "../types";
 import { ApiError, USE_MOCK, apiFetch, clone, latency, uid } from "./client";
-import { db } from "./mockDb";
+import { db, persistMockDb } from "./mockDb";
 import { recordAudit } from "./audit";
 
 export async function listRoster(courseId: string): Promise<User[]> {
@@ -51,6 +51,7 @@ export async function importRoster(
     }
   }
   recordAudit(actor, "roster.import", `course/${courseId}`, "ok", `${added} added, ${alreadyEnrolled} already enrolled`);
+  persistMockDb();
   return { added, alreadyEnrolled };
 }
 
@@ -65,4 +66,5 @@ export async function removeFromCourse(actor: User, courseId: string, userId: st
     if (r.role === "student") r.courseIds = r.courseIds.filter((c) => c !== courseId);
   });
   recordAudit(actor, "roster.remove", `course/${courseId}`, "ok", `user/${userId}`);
+  persistMockDb();
 }

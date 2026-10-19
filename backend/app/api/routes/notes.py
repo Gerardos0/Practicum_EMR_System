@@ -16,6 +16,7 @@ from app.schemas.clinical import (
 )
 from app.services.access import can_cosign, require_app_role
 from app.services.audit import log_event
+from app.services.note_prefill import prefill_from_patient
 from app.services.serializers import note_out, patient_out
 
 router = APIRouter(prefix="/notes", tags=["notes"])
@@ -125,7 +126,7 @@ async def create_draft(body: CreateNoteIn, user: CurrentUser, db: DbSession):
         mode=patient.mode,
         status="draft",
         version=1,
-        content={},
+        content=prefill_from_patient(body.templateId, patient),
         diagnoses=[],
         feedback=[],
         addenda=[],

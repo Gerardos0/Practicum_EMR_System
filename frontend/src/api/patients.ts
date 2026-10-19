@@ -1,7 +1,7 @@
 import type { NoteStatus, Patient, PatientStatus, Role, User } from "../types";
 import { can } from "../utils/permissions";
 import { ApiError, USE_MOCK, apiFetch, clone, latency } from "./client";
-import { db } from "./mockDb";
+import { db, persistMockDb } from "./mockDb";
 import { recordAudit } from "./audit";
 
 export interface PatientRow {
@@ -71,6 +71,7 @@ export async function updatePatientStatus(
   }
   p.status = { ...p.status, ...patch };
   recordAudit(viewer, "patient.update_status", `patient/${id}`, "ok", JSON.stringify(patch));
+  persistMockDb();
   return clone(p);
 }
 
@@ -92,4 +93,5 @@ export async function resetPracticePatient(viewer: User, role: Role, id: string)
   db.notes.splice(0, db.notes.length, ...keep);
   db.archivedNotes.push(...archive);
   recordAudit(viewer, "patient.reset_practice", `patient/${id}`, "ok", `${archive.length} notes archived`);
+  persistMockDb();
 }
