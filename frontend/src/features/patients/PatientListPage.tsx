@@ -26,7 +26,7 @@ export default function PatientListPage() {
   const [resetTarget, setResetTarget] = useState<PatientRow>();
   const [unassignTarget, setUnassignTarget] = useState<PatientRow>();
   const [assignOpen, setAssignOpen] = useState(false);
-  const [flash, setFlash] = useState("");
+  const [flash, setFlash] = useState<{ severity: "success" | "error"; text: string }>();
 
   const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
   const canAssign = can(activeRole, "patient:create");
@@ -47,23 +47,41 @@ export default function PatientListPage() {
 
   const doReset = async () => {
     if (!resetTarget) return;
-    await resetPracticePatient(activeRole, resetTarget.patient.id);
-    setFlash(`${resetTarget.patient.practiceLabel} was reset. Students' practice notes were archived.`);
-    setResetTarget(undefined);
-    rows.reload();
+    try {
+      await resetPracticePatient(activeRole, resetTarget.patient.id);
+      setFlash({
+        severity: "success",
+        text: `${resetTarget.patient.practiceLabel} was reset. Students' practice notes were archived.`,
+      });
+      setResetTarget(undefined);
+      rows.reload();
+    } catch (e) {
+      setResetTarget(undefined);
+      setFlash({ severity: "error", text: (e as Error).message || "Couldn't reset that practice patient." });
+    }
   };
 
   const doUnassign = async () => {
     if (!unassignTarget) return;
-    await unassignCase(activeRole, unassignTarget.patient.id);
-    setFlash(`${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} was removed from ${unassignTarget.ownerName ?? "the student"}.`);
-    setUnassignTarget(undefined);
-    rows.reload();
+    try {
+      await unassignCase(activeRole, unassignTarget.patient.id);
+      setFlash({
+        severity: "success",
+        text: `${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} was removed from ${unassignTarget.ownerName ?? "the student"}.`,
+      });
+      setUnassignTarget(undefined);
+      rows.reload();
+    } catch (e) {
+      setUnassignTarget(undefined);
+      setFlash({ severity: "error", text: (e as Error).message || "Couldn't remove that assignment." });
+    }
   };
 
   return (
     <Box>
-      {flash && <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>}
+      {flash && (
+        <Alert severity={flash.severity} onClose={() => setFlash(undefined)} sx={{ mb: 2 }}>{flash.text}</Alert>
+      )}
       <Paper>
         <Tabs
           value={mode} onChange={(_, v) => setParams({ mode: v, ...(query ? { q: query } : {}) }, { replace: true })}
@@ -197,7 +215,10 @@ export default function PatientListPage() {
           onClose={() => setAssignOpen(false)}
           onAssigned={(assigned) => {
             const names = assigned.map((p) => `${p.lastName}, ${p.firstName}`).join("; ");
-            setFlash(`Assigned ${assigned.length === 1 ? "a case" : `${assigned.length} copies`}: ${names}.`);
+            setFlash({
+              severity: "success",
+              text: `Assigned ${assigned.length === 1 ? "a case" : `${assigned.length} copies`}: ${names}.`,
+            });
             setParams({ mode: "assessment" }, { replace: true });
             rows.reload();
           }}

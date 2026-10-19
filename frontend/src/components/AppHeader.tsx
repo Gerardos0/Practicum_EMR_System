@@ -104,7 +104,12 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
           {roleCourses.length > 1 && (
             <Select
               size="small" value={courseId} inputProps={{ "aria-label": "Course" }}
-              onChange={(e) => selectCourse(e.target.value)} sx={{ ...pickerSx, minWidth: 140 }}
+              onChange={(e) => {
+                selectCourse(e.target.value);
+                // Leave chart/review deep links so we don't show another course's patient.
+                navigate(homePathFor(activeRole));
+              }}
+              sx={{ ...pickerSx, minWidth: 140 }}
             >
               {roleCourses.map((c) => <MenuItem key={c.id} value={c.id}>{c.code}</MenuItem>)}
             </Select>

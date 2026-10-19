@@ -216,9 +216,23 @@ export function prefillFromPatient(templateId: NoteTemplateId, patient: Patient)
   put("hpi", patient.hpi);
   put("subjective", patient.chiefComplaint);
   put("objective", objective);
-  put("exam", objective ? `${objective}\n\nPhysical exam: (document findings)` : "");
+  // Chart vitals/labs only — avoid instructional stubs that look like finished PE text.
+  put("exam", objective);
   put("history", historyBlock(patient));
-  put("measures", vitals);
+  put("measures", objective || vitals);
 
   return draft;
+}
+
+/** Seed ICD picks from the chart problem list when codes are present. */
+export function diagnosesFromPatient(patient: Patient): { code: string; label: string }[] {
+  const out: { code: string; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const problem of patient.problems) {
+    const code = problem.code?.trim();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push({ code, label: problem.description || code });
+  }
+  return out;
 }

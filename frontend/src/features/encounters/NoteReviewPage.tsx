@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   Alert, Box, Breadcrumbs, Button, Divider, LinearProgress, Link, Paper, Stack, TextField, Typography,
 } from "@mui/material";
-import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { cosignNote, getNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
@@ -97,9 +96,9 @@ export default function NoteReviewPage() {
             <NoteProgress note={note} />
 
             {course.data?.rubricFileName && (
-              <Button startIcon={<DescriptionOutlined />} size="small" sx={{ mt: 1.5 }}>
-                Open rubric ({course.data.rubricFileName})
-              </Button>
+              <Alert severity="info" icon={false} sx={{ mt: 1.5 }}>
+                Course rubric on file: <b>{course.data.rubricFileName}</b>. Open it from your course materials (Blackboard) — file download in the EMR is next.
+              </Alert>
             )}
 
             {note.feedback.length > 0 && (

@@ -18,9 +18,12 @@ import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
-import { TEMPLATES, defaultTemplateFor, missingRequired, prefillFromPatient, templatesFor } from "./noteTemplates";
+import { TEMPLATES, defaultTemplateFor, diagnosesFromPatient, missingRequired, prefillFromPatient, templatesFor } from "./noteTemplates";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+/** Survives StrictMode remount so /notes/new doesn't POST two drafts. */
+const creatingDraftKeys = new Set<string>();
 
 export default function NoteEditorPage() {
   const { patientId = "", noteId = "new" } = useParams();
@@ -43,7 +46,6 @@ export default function NoteEditorPage() {
   const [showErrors, setShowErrors] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const creating = useRef(false);
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -56,13 +58,19 @@ export default function NoteEditorPage() {
         setInstructors(people);
 
         if (noteId === "new") {
-          if (creating.current) return;
-          creating.current = true;
-          const existing = (await listNotesForPatient(activeRole, patientId)).find(
-            (n) => n.authorId === user.id && (n.status === "draft" || n.status === "returned"),
-          );
-          const n = existing ?? (await createDraft(discipline ?? "pharmacy", p, defaultTemplateFor(discipline), activeRole));
-          navigate(`/patients/${patientId}/notes/${n.id}`, { replace: true });
+          const key = `${user.id}:${patientId}`;
+          if (creatingDraftKeys.has(key)) return;
+          creatingDraftKeys.add(key);
+          try {
+            const existing = (await listNotesForPatient(activeRole, patientId)).find(
+              (n) => n.authorId === user.id && (n.status === "draft" || n.status === "returned"),
+            );
+            const n = existing ?? (await createDraft(discipline ?? "pharmacy", p, defaultTemplateFor(discipline), activeRole));
+            if (!alive) return;
+            navigate(`/patients/${patientId}/notes/${n.id}`, { replace: true });
+          } finally {
+            creatingDraftKeys.delete(key);
+          }
           return;
         }
         const n = await getNote(activeRole, noteId);
@@ -220,6 +228,7 @@ export default function NoteEditorPage() {
                     }
                     return merged;
                   });
+                  setDiagnoses((prev) => (prev.length ? prev : diagnosesFromPatient(patient)));
                 }}
               >
                 {choices.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
@@ -241,9 +250,11 @@ export default function NoteEditorPage() {
           {note.status === "cosigned" && note.feedback.length > 0 && (
             <Alert severity="success" sx={{ mb: 2.5 }}><FeedbackThread items={note.feedback} /></Alert>
           )}
-          {editable && note.status === "draft" && (content.reason || content.cc || content.objective || content.exam) && (
+          {editable && note.status === "draft" && (
+            content.reason || content.cc || content.hpi || content.subjective || content.objective || content.exam || content.measures || content.history || diagnoses.length > 0
+          ) && (
             <Alert severity="info" icon={false} sx={{ mb: 2.5 }}>
-              We prefilled chief complaint, vitals, and labs from the chart. Review and edit anything that needs to change before you sign.
+              We prefilled what we could from the chart (complaint, vitals/labs, history, and any coded diagnoses). Review and complete the rest before you sign.
             </Alert>
           )}
           {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2.5 }}>{error}</Alert>}

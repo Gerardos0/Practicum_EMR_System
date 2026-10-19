@@ -61,13 +61,26 @@ _TEMPLATE_FIELDS: dict[str, set[str]] = {
         "recommendations", "monitoring", "education", "followup",
     },
     "pt_daily_soap": {
-        "visit_number", "subjective", "measures", "interventions", "dx", "assessment",
+        "visit_number", "subjective", "measures", "interventions", "dx", "progress",
         "plan", "goals",
     },
     "general_soap": {
         "cc", "hpi", "history", "ros", "exam", "dx", "rationale", "plan", "disposition",
     },
 }
+
+
+def diagnoses_from_patient(patient: Patient) -> list[dict[str, str]]:
+    """Seed ICD picks from the chart problem list when codes are present."""
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for problem in patient.problems or []:
+        code = (problem.code or "").strip()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        out.append({"code": code, "label": problem.description or code})
+    return out
 
 
 def prefill_from_patient(template_id: str, patient: Patient) -> dict[str, Any]:
@@ -86,7 +99,8 @@ def prefill_from_patient(template_id: str, patient: Patient) -> dict[str, Any]:
     put("hpi", patient.hpi or "")
     put("subjective", patient.chief_complaint or "")
     put("objective", objective)
-    put("exam", f"{objective}\n\nPhysical exam: (document findings)" if objective else "")
+    # Real chart vitals/labs only — no instructional stub that falsely satisfies required exam.
+    put("exam", objective)
     put("history", _history_block(patient))
-    put("measures", vitals)
+    put("measures", objective or vitals)
     return draft

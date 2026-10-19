@@ -58,7 +58,7 @@ export default function ReviewQueuePage() {
 
   return (
     <Box>
-      <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Review queue</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700 }}>Review queue</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {course.data ? `${course.data.code}: ` : ""}assessment notes students routed to you for co-signature
       </Typography>
