@@ -242,7 +242,7 @@ export default function NoteEditorPage() {
           {note.status === "returned" && (
             <Alert severity="error" sx={{ mb: 2.5 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Your instructor returned this note. Revise it and resubmit.</Typography>
-              <FeedbackThread items={note.feedback} />
+              <FeedbackThread items={note.feedback.filter((item) => !item.sectionId)} />
             </Alert>
           )}
           {note.status === "pending_review" && (
@@ -250,8 +250,8 @@ export default function NoteEditorPage() {
               Submitted to {reviewer?.fullName ?? "your instructor"}. You can edit again only if it's returned.
             </Alert>
           )}
-          {note.status === "cosigned" && note.feedback.length > 0 && (
-            <Alert severity="success" sx={{ mb: 2.5 }}><FeedbackThread items={note.feedback} /></Alert>
+          {note.status === "cosigned" && note.feedback.some((item) => !item.sectionId) && (
+            <Alert severity="success" sx={{ mb: 2.5 }}><FeedbackThread items={note.feedback.filter((item) => !item.sectionId)} /></Alert>
           )}
           {editable && note.status === "draft" && (
             content.reason || content.cc || content.hpi || content.subjective || content.objective || content.exam || content.measures || content.history || diagnoses.length > 0
@@ -265,6 +265,7 @@ export default function NoteEditorPage() {
           <NoteFields
             templateId={templateId} patient={patient} content={content} diagnoses={diagnoses}
             readOnly={!editable} errors={errorSet}
+            comments={note.feedback.filter((item) => item.sectionId)}
             onField={setField} onDiagnoses={(d) => { markDirty(); setDiagnoses(d); }}
           />
 

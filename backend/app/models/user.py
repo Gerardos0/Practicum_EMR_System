@@ -62,4 +62,6 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     discipline: Mapped[Discipline | None] = relationship()
     roles: Mapped[list[Role]] = relationship(secondary=user_roles)
-    memberships: Mapped[list["CourseMembership"]] = relationship(back_populates="user")
+    memberships: Mapped[list["CourseMembership"]] = relationship(
+        back_populates="user", foreign_keys="CourseMembership.user_id"
+    )

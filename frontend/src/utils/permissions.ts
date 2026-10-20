@@ -23,17 +23,20 @@ export type Action =
   | "course:manage_status"
   | "course:manage_access"
   | "user:manage_access"
-  | "report:run";
+  | "report:run"
+  | "case:author";
 
 const matrix: Record<Role, Action[]> = {
   student: ["encounter:advance", "note:author", "referral:create"],
   instructor: [
     "patient:create", "patient:update_status", "patient:reset_practice",
     "encounter:advance", "note:cosign", "referral:create", "roster:import", "audit:view", "instructor:remove",
+    "case:author",
   ],
   admin: [
     "patient:create", "patient:update_status", "patient:reset_practice", "roster:import", "audit:view",
     "instructor:remove", "course:create", "course:manage_status", "course:manage_access", "user:manage_access", "report:run",
+    "case:author",
   ],
   front_desk: ["patient:create"],
   patient: [],

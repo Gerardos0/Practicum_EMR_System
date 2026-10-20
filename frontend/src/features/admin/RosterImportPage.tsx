@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import type { Discipline, RosterRow, User } from "../../types";
-import { importRoster, listRoster, removeFromCourse, type TempPassword } from "../../api/roster";
+import { importRoster, listRoster, removeFromCourse, setRosterActive, type TempPassword } from "../../api/roster";
 import { getCourse, listInstructors } from "../../api/courses";
 import { setUserActive } from "../../api/users";
 import { useSession } from "../auth/AuthContext";
@@ -53,7 +53,14 @@ export default function RosterImportPage() {
     try {
       const res = await importRoster(courseId, discipline, list, importRole);
       setPasswords(res.temporaryPasswords);
-      setMessage({ kind: "success", text: `Added ${res.added} ${importRole}s to ${course.data?.code}.${res.alreadyEnrolled ? ` ${res.alreadyEnrolled} were already enrolled.` : ""}` });
+      const extras = [
+        res.reactivated ? `${res.reactivated} reactivated` : "",
+        res.alreadyEnrolled ? `${res.alreadyEnrolled} already enrolled` : "",
+      ].filter(Boolean);
+      setMessage({
+        kind: "success",
+        text: `Added ${res.added} ${importRole}s to ${course.data?.code}${extras.length ? `. ${extras.join(". ")}.` : "."}`,
+      });
       if (list === rows) {
         setRows(undefined);
         setFileName("");
@@ -160,8 +167,7 @@ export default function RosterImportPage() {
       <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6">Enrolled students ({roster.data?.length ?? 0})</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Remove a student if they leave the course. Their account and signed notes stay; they just lose access to this class.
-          Deactivate / reactivate without removing is planned next — for now, re-import restores access.
+          Deactivate keeps the student on the roster and keeps their charts and notes. They lose access until you reactivate them. Remove deletes the enrollment.
         </Typography>
         {(roster.data ?? []).length === 0 ? (
           <EmptyState title="No students yet">Upload a roster to add your class.</EmptyState>
@@ -169,27 +175,37 @@ export default function RosterImportPage() {
           <Box sx={{ overflowX: "auto" }}>
             <Table size="small">
               <TableHead>
-                <TableRow><TableCell>Name</TableCell><TableCell>Email</TableCell><TableCell>800 number</TableCell><TableCell>Discipline</TableCell><TableCell /></TableRow>
+                <TableRow><TableCell>Name</TableCell><TableCell>Email</TableCell><TableCell>800 number</TableCell><TableCell>Discipline</TableCell><TableCell>Access</TableCell><TableCell /></TableRow>
               </TableHead>
               <TableBody>
                 {roster.data?.map((u) => {
                   const d = u.roles.find((r) => r.role === "student" && r.courseIds.includes(courseId))?.discipline;
+                  const inactive = u.rosterStatus === "inactive";
                   return (
                     <TableRow key={u.id}>
                       <TableCell sx={{ fontWeight: 600 }}>{u.fullName}</TableCell>
                       <TableCell>{u.email}</TableCell>
                       <TableCell>{u.universityId ?? "—"}</TableCell>
                       <TableCell>{d ? disciplineLabel[d] : "—"}</TableCell>
+                      <TableCell><Chip size="small" label={inactive ? "Inactive" : "Active"} color={inactive ? "default" : "success"} /></TableCell>
                       <TableCell align="right">
+                        <Button size="small" color="warning" onClick={async () => {
+                          try {
+                            const updated = await setRosterActive(courseId, u.id, inactive);
+                            roster.setData((current) => current?.map((item) => item.id === u.id ? updated : item));
+                          } catch (e) {
+                            setMessage({ kind: "error", text: (e as Error).message });
+                          }
+                        }}>{inactive ? "Reactivate" : "Deactivate"}</Button>
                         {activeRole === "admin" && (
-                          <Button size="small" color="warning" disabled={u.id === user.id && u.isActive} onClick={async () => {
+                          <Button size="small" disabled={u.id === user.id && u.isActive} onClick={async () => {
                             try {
                               await setUserActive(u.id, !u.isActive);
                               roster.setData((current) => current?.map((item) => item.id === u.id ? { ...item, isActive: !u.isActive } : item));
                             } catch (e) {
                               setMessage({ kind: "error", text: (e as Error).message });
                             }
-                          }}>{u.isActive ? "Deactivate" : "Reactivate"}</Button>
+                          }}>{u.isActive ? "Deactivate account" : "Reactivate account"}</Button>
                         )}
                         <Button size="small" color="error" onClick={() => setRemoving({ person: u, role: "student" })}>Remove</Button>
                       </TableCell>
@@ -241,7 +257,9 @@ export default function RosterImportPage() {
       <Dialog open={Boolean(removing)} onClose={() => setRemoving(undefined)}>
         <DialogTitle>Remove {removing?.person.fullName} from {course.data?.code}?</DialogTitle>
         <DialogContent>
-          <DialogContentText>They lose access to this course's patients. Their signed notes stay in the record.</DialogContentText>
+          <DialogContentText>
+            Remove deletes this enrollment. Deactivate is the reversible choice: it keeps their charts and notes and only turns access off.
+          </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRemoving(undefined)}>Cancel</Button>

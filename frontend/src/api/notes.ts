@@ -58,6 +58,12 @@ export async function returnNote(role: Role, id: string, comment: string): Promi
   });
 }
 
+export async function commentOnNote(
+  role: Role, id: string, body: { sectionId?: string; body: string },
+): Promise<ClinicalNote> {
+  return request<ClinicalNote>(`/notes/${id}/comments`, { method: "POST", query: { role }, json: body });
+}
+
 export async function addAddendum(id: string, body: string, role: Role): Promise<ClinicalNote> {
   return request<ClinicalNote>(`/notes/${id}/addenda`, {
     method: "POST",

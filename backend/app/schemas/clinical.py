@@ -29,6 +29,8 @@ class PublicUser(APIModel):
     must_change_password: bool = False
     is_active: bool = True
     roles: list[RoleAssignmentOut]
+    roster_status: Literal["active", "inactive"] | None = None
+    deactivated_at: datetime | None = None
 
 
 class CourseOut(APIModel):
@@ -133,6 +135,7 @@ class PatientOut(APIModel):
     practice_label: str | None = None
     chief_complaint: str
     hpi: str
+    past_medical_history: str = ""
     status: StatusOut
     allergies: list[AllergyOut]
     medications: list[MedicationOut]
@@ -181,7 +184,13 @@ class NoteCommentOut(APIModel):
     author_name: str
     body: str
     kind: str
+    section_id: str | None = None
     created_at: datetime
+
+
+class SectionCommentIn(APIModel):
+    section_id: Literal["S", "O", "MR", "A", "P"] | None = None
+    body: str = Field(min_length=1)
 
 
 class AddendumOut(APIModel):
@@ -289,7 +298,93 @@ class TempPassword(APIModel):
 class RosterImportResult(APIModel):
     added: int
     already_enrolled: int
+    reactivated: int = 0
     temporary_passwords: list[TempPassword] = []
+
+
+class CaseAllergyIn(APIModel):
+    substance: str = ""
+    reaction: str | None = None
+    severity: str | None = None
+
+
+class CaseMedicationIn(APIModel):
+    name: str = ""
+    dose: str = ""
+    route: str = ""
+    frequency: str = ""
+    indication: str | None = None
+    adherence: str | None = None
+
+
+class CaseProblemIn(APIModel):
+    code: str | None = None
+    description: str = ""
+    since: str | None = None
+
+
+class CaseLabIn(APIModel):
+    name: str = ""
+    value: str = ""
+    unit: str = ""
+    reference_range: str = ""
+    flag: str | None = None
+    collected_at: date | None = None
+
+
+class CaseVitalIn(APIModel):
+    label: str = ""
+    value: str = ""
+
+
+class CaseIn(APIModel):
+    first_name: str
+    last_name: str
+    preferred_name: str | None = None
+    dob: date
+    sex_at_birth: str
+    pronouns: str | None = None
+    chief_complaint: str = ""
+    hpi: str = ""
+    past_medical_history: str = ""
+    surgical_history: str = ""
+    family_history: str = ""
+    social_history: str = ""
+    encounter_type: str = "Office visit"
+    care_setting: str = "Outpatient"
+    lifecycle: str = "Active"
+    encounter_status: str = "Scheduled"
+    program: str | None = None
+    allergies: list[CaseAllergyIn] = []
+    medications: list[CaseMedicationIn] = []
+    problems: list[CaseProblemIn] = []
+    labs: list[CaseLabIn] = []
+    vitals: list[CaseVitalIn] = []
+
+
+class CaseOut(PatientOut):
+    created_by_name: str | None = None
+    updated_at: datetime
+
+
+class AnswerDiagnosis(APIModel):
+    rank: int = 0
+    code: str = ""
+    label: str = ""
+    rationale: str = ""
+
+
+class AnswerKeyIn(APIModel):
+    diagnoses: list[AnswerDiagnosis] = []
+    plan_points: list[str] = []
+    rationale: str = ""
+
+
+class AnswerKeyOut(APIModel):
+    diagnoses: list[AnswerDiagnosis] = []
+    plan_points: list[str] = []
+    rationale: str = ""
+    updated_at: datetime | None = None
 
 
 class AuditOut(APIModel):

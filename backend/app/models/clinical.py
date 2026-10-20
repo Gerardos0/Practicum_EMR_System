@@ -30,8 +30,11 @@ class CourseMembership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
     role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"))
     discipline_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("disciplines.id"))
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deactivated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
-    user: Mapped[User] = relationship(back_populates="memberships")
+    user: Mapped[User] = relationship(back_populates="memberships", foreign_keys=[user_id])
+    deactivated_by: Mapped[User | None] = relationship(foreign_keys=[deactivated_by_id])
     course: Mapped[Course] = relationship()
     role: Mapped["Role"] = relationship()
     discipline: Mapped["Discipline"] = relationship()
@@ -52,6 +55,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     case_key: Mapped[str] = mapped_column(String(50))
     source_patient_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("patients.id"))
     owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     practice_label: Mapped[str | None] = mapped_column(String(80))
     chief_complaint: Mapped[str] = mapped_column(Text)
     hpi: Mapped[str] = mapped_column(Text)
@@ -59,6 +63,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     encounter_status: Mapped[str] = mapped_column(String(40))
     care_setting: Mapped[str] = mapped_column(String(40))
     program: Mapped[str | None] = mapped_column(String(80))
+    past_medical_history: Mapped[str] = mapped_column(Text, default="", server_default="")
     family_history: Mapped[str] = mapped_column(Text, default="")
     surgical_history: Mapped[str] = mapped_column(Text, default="")
     social_history: Mapped[str] = mapped_column(Text, default="")
@@ -70,8 +75,10 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     emergency_contact_relationship: Mapped[str | None] = mapped_column(String(60))
     is_training: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    answer_key_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    owner: Mapped[User | None] = relationship(lazy="selectin")
+    owner: Mapped[User | None] = relationship(foreign_keys=[owner_id], lazy="selectin")
+    created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id], lazy="selectin")
     allergies: Mapped[list["Allergy"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     medications: Mapped[list["Medication"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     problems: Mapped[list["Problem"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
@@ -173,6 +180,7 @@ class NoteComment(UUIDPrimaryKeyMixin, Base):
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     body: Mapped[str] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(String(20))
+    section_id: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     author: Mapped[User] = relationship(lazy="selectin")
@@ -196,6 +204,20 @@ class Appointment(UUIDPrimaryKeyMixin, Base):
     when: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     kind: Mapped[str] = mapped_column(String(120))
     with_whom: Mapped[str] = mapped_column(String(120))
+
+
+class CaseAnswerKey(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """One shared key per case master. Read live from the master; never copied onto a student chart."""
+
+    __tablename__ = "case_answer_keys"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), unique=True)
+    diagnoses: Mapped[list[Any]] = mapped_column(JSONB)
+    plan_points: Mapped[list[Any]] = mapped_column(JSONB)
+    rationale: Mapped[str] = mapped_column(Text, default="", server_default="")
+    updated_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+    updated_by: Mapped[User] = relationship(lazy="selectin")
 
 
 class Referral(UUIDPrimaryKeyMixin, Base):

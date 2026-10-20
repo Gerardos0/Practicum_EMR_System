@@ -10,6 +10,7 @@ export interface TempPassword {
 export interface RosterImportResult {
   added: number;
   alreadyEnrolled: number;
+  reactivated: number;
   temporaryPasswords: TempPassword[];
 }
 
@@ -27,6 +28,11 @@ export async function importRoster(
 }
 
 export { listInstructors };
+
+export async function setRosterActive(courseId: string, userId: string, active: boolean): Promise<User> {
+  const action = active ? "reactivate" : "deactivate";
+  return request<User>(`/courses/${courseId}/roster/${userId}/${action}`, { method: "POST" });
+}
 
 export async function removeFromCourse(courseId: string, userId: string, role: "student" | "instructor" = "student"): Promise<void> {
   await request<void>(`/courses/${courseId}/roster/${userId}`, { method: "DELETE", query: { role } });

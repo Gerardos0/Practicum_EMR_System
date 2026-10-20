@@ -7,8 +7,9 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.models.clinical import ClinicalNote, Patient
 from app.models.user import User
-from app.schemas.clinical import AssignCase, PatientOut, PatientRowOut, StatusPatch
+from app.schemas.clinical import AnswerKeyOut, AssignCase, PatientOut, PatientRowOut, StatusPatch
 from app.services.access import ensure_course_open, memberships_for, require_course
+from app.services.answer_keys import deny_answer_key, read_answer_key
 from app.services.audit import log_event
 from app.services.charts import apply_status, assign_case, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
 from app.services.serialize import patient_out
@@ -35,7 +36,11 @@ async def list_patients(
     patients = list(
         (
             await db.scalars(
-                select(Patient).where(Patient.course_id == course_id, Patient.deleted_at.is_(None)).order_by(Patient.last_name)
+                select(Patient).where(
+                    Patient.course_id == course_id,
+                    Patient.deleted_at.is_(None),
+                    Patient.mode != "case",
+                ).order_by(Patient.last_name)
             )
         ).all()
     )
@@ -114,6 +119,29 @@ async def get_patient(
     )
     await db.commit()
     return patient_out(patient, owner_name=owner_name_for(patient, role))
+
+
+@router.get("/{patient_id}/answer-key", response_model=AnswerKeyOut, response_model_exclude_none=True)
+async def get_copy_answer_key(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await deny_answer_key(
+        db, user=user, role=role, rows=rows, course_id=patient.course_id,
+        entity_id=str(patient.id), ip=_ip(request), action="answer_key.view",
+    )
+    payload = await read_answer_key(db, patient)
+    await log_event(
+        db, action="answer_key.view", entity_type="patient", entity_id=str(patient.id),
+        actor_user_id=user.id, course_id=patient.course_id, ip_address=_ip(request),
+    )
+    await db.commit()
+    return payload
 
 
 @router.patch("/{patient_id}/status", response_model=PatientOut, response_model_exclude_none=True)

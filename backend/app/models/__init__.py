@@ -3,6 +3,7 @@ from app.models.audit import AuditEvent  # noqa: F401
 from app.models.clinical import (  # noqa: F401
     Allergy,
     Appointment,
+    CaseAnswerKey,
     ClinicalNote,
     Course,
     CourseMembership,

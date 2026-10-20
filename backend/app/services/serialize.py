@@ -50,6 +50,7 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
         "practice_label": patient.practice_label,
         "chief_complaint": patient.chief_complaint,
         "hpi": patient.hpi,
+        "past_medical_history": patient.past_medical_history,
         "status": {
             "lifecycle": patient.lifecycle,
             "encounter": patient.encounter_status,
@@ -136,6 +137,7 @@ def note_out(note: ClinicalNote) -> dict:
                 "author_name": full_name(item.author),
                 "body": item.body,
                 "kind": item.kind,
+                "section_id": item.section_id,
                 "created_at": item.created_at,
             }
             for item in sorted(note.feedback, key=lambda item: item.created_at)
@@ -150,6 +152,13 @@ def note_out(note: ClinicalNote) -> dict:
             for item in sorted(note.addenda, key=lambda item: item.created_at)
         ],
     }
+
+
+def authored_case_out(patient: Patient) -> dict:
+    payload = patient_out(patient, owner_name=None)
+    payload["created_by_name"] = full_name(patient.created_by) if patient.created_by else None
+    payload["updated_at"] = patient.updated_at
+    return payload
 
 
 def appointment_out(row: Appointment) -> dict:

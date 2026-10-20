@@ -11,6 +11,8 @@ import PatientChartPage from "./features/patients/PatientChartPage";
 import NoteEditorPage from "./features/encounters/NoteEditorPage";
 import ReviewQueuePage from "./features/encounters/ReviewQueuePage";
 import NoteReviewPage from "./features/encounters/NoteReviewPage";
+import CaseListPage from "./features/cases/CaseListPage";
+import CaseEditorPage from "./features/cases/CaseEditorPage";
 import RosterImportPage from "./features/admin/RosterImportPage";
 import AuditLogPage from "./features/admin/AuditLogPage";
 import CourseAdminPage from "./features/admin/CourseAdminPage";
@@ -67,6 +69,9 @@ export default function App() {
                   <Route element={<RequireAuth roles={["instructor", "admin"]} />}>
                     <Route path="/admin/roster" element={<RosterImportPage />} />
                     <Route path="/audit" element={<AuditLogPage />} />
+                    <Route path="/cases" element={<CaseListPage />} />
+                    <Route path="/cases/new" element={<CaseEditorPage />} />
+                    <Route path="/cases/:caseId" element={<CaseEditorPage />} />
                   </Route>
 
                   <Route path="*" element={<NotFoundPage />} />

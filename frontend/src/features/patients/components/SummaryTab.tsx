@@ -225,7 +225,8 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
 
       <Paper sx={card}>
         <Typography component="h2" variant="h6" sx={titleSx}>History</Typography>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { md: "repeat(3, 1fr)" } }}>
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { md: "1fr 1fr" } }}>
+          <Detail label="Past medical history" value={p.pastMedicalHistory} />
           <Detail label="Family history" value={p.familyHistory} />
           <Detail label="Surgical history" value={p.surgicalHistory} />
           <Detail label="Social history" value={p.socialHistory} />

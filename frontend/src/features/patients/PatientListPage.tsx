@@ -31,12 +31,16 @@ export default function PatientListPage() {
   const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
   const canAssign = can(activeRole, "patient:create");
 
+  const clinical = useMemo(
+    () => (rows.data ?? []).filter((r) => r.patient.mode !== "case"),
+    [rows.data],
+  );
   const counts = useMemo(() => ({
-    assessment: rows.data?.filter((r) => r.patient.mode === "assessment").length ?? 0,
-    practice: rows.data?.filter((r) => r.patient.mode === "practice").length ?? 0,
-  }), [rows.data]);
+    assessment: clinical.filter((r) => r.patient.mode === "assessment").length,
+    practice: clinical.filter((r) => r.patient.mode === "practice").length,
+  }), [clinical]);
 
-  const visible = (rows.data ?? [])
+  const visible = clinical
     .filter((r) => r.patient.mode === mode)
     .filter((r) => {
       const q = query.trim().toLowerCase();

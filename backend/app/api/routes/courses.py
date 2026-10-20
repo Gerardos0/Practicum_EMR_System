@@ -1,10 +1,12 @@
 import re
 import secrets
 import uuid
+from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.security import hash_password
@@ -19,7 +21,7 @@ from app.schemas.clinical import (
     RosterImportResult,
     TempPassword,
 )
-from app.services.access import ensure_course_open, memberships_for, require, require_course, require_held_role
+from app.services.access import can, ensure_course_open, memberships_for, require, require_course, require_held_role
 from app.services.audit import log_event
 from app.services.serialize import course_out, user_out
 
@@ -126,18 +128,23 @@ async def list_roster(course_id: uuid.UUID, db: DbSession, user: CurrentUser, re
     role = _staff_role(user, rows, course_id)
     require(role, "roster:import", "Your role can't view the roster.")
     members = (
-        await db.scalars(select(CourseMembership).where(CourseMembership.course_id == course_id))
+        await db.scalars(
+            select(CourseMembership)
+            .where(CourseMembership.course_id == course_id)
+            .options(selectinload(CourseMembership.role), selectinload(CourseMembership.discipline))
+        )
     ).all()
-    students: list[User] = []
+    payload = []
     seen: set[uuid.UUID] = set()
     for member in members:
-        held = await db.get(Role, member.role_id)
-        if held and held.code == "student" and member.user_id not in seen:
-            person = await db.get(User, member.user_id)
-            if person:
-                students.append(person)
-                seen.add(person.id)
-    return [await user_out(db, person) for person in students]
+        if member.role is None or member.role.code != "student" or member.user_id in seen:
+            continue
+        person = await db.get(User, member.user_id)
+        if person is None:
+            continue
+        seen.add(person.id)
+        payload.append(await _roster_member(db, member, person))
+    return payload
 
 
 @router.post("/{course_id}/roster/import", response_model=RosterImportResult)
@@ -161,6 +168,7 @@ async def import_roster(
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Roles are not seeded.")
     added = 0
     already = 0
+    reactivated = 0
     passwords: list[TempPassword] = []
     for row in body.rows:
         email = row.email.strip().lower()
@@ -190,7 +198,12 @@ async def import_roster(
             )
         )
         if existing:
-            already += 1
+            if existing.deactivated_at is not None:
+                existing.deactivated_at = None
+                existing.deactivated_by_id = None
+                reactivated += 1
+            else:
+                already += 1
             continue
         db.add(
             CourseMembership(
@@ -209,10 +222,26 @@ async def import_roster(
         actor_user_id=user.id,
         course_id=course_id,
         ip_address=_ip(request),
-        detail=f"{added} {body.role}s added, {already} already enrolled",
+        detail=f"{added} {body.role}s added, {reactivated} reactivated, {already} already enrolled",
     )
     await db.commit()
-    return RosterImportResult(added=added, already_enrolled=already, temporary_passwords=passwords)
+    return RosterImportResult(
+        added=added, already_enrolled=already, reactivated=reactivated, temporary_passwords=passwords
+    )
+
+
+@router.post("/{course_id}/roster/{user_id}/deactivate", response_model=PublicUser, response_model_exclude_none=True)
+async def deactivate_student(
+    course_id: uuid.UUID, user_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request
+):
+    return await _set_roster_active(course_id, user_id, db, user, request, active=False)
+
+
+@router.post("/{course_id}/roster/{user_id}/reactivate", response_model=PublicUser, response_model_exclude_none=True)
+async def reactivate_student(
+    course_id: uuid.UUID, user_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request
+):
+    return await _set_roster_active(course_id, user_id, db, user, request, active=True)
 
 
 @router.delete("/{course_id}/roster/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -291,6 +320,80 @@ async def update_course_status(
     )
     await db.commit()
     return course_out(course, [str(person.id) for person in await _instructors(db, course.id)])
+
+
+async def _roster_member(db, member: CourseMembership, person: User) -> dict:
+    payload = await user_out(db, person)
+    payload["roster_status"] = "inactive" if member.deactivated_at else "active"
+    payload["deactivated_at"] = member.deactivated_at
+    if member.deactivated_at and member.discipline is not None:
+        course_id = str(member.course_id)
+        code = member.discipline.code
+        match = next(
+            (item for item in payload["roles"] if item["role"] == "student" and item.get("discipline") == code),
+            None,
+        )
+        if match is None:
+            payload["roles"].append({"role": "student", "discipline": code, "course_ids": [course_id]})
+        elif course_id not in match["course_ids"]:
+            match["course_ids"].append(course_id)
+    return payload
+
+
+async def _set_roster_active(course_id, user_id, db, user: User, request: Request, *, active: bool) -> dict:
+    rows = await memberships_for(db, user.id)
+    action = "roster.reactivate" if active else "roster.deactivate"
+    try:
+        role = _staff_role(user, rows, course_id)
+    except HTTPException:
+        role = ""
+    if not can(role, "roster:import"):
+        await log_event(
+            db,
+            action=action,
+            entity_type="course",
+            entity_id=str(course_id),
+            actor_user_id=user.id,
+            result="denied",
+            course_id=course_id,
+            ip_address=_ip(request),
+            detail="Role cannot change roster access.",
+        )
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't edit the roster.")
+    await ensure_course_open(db, course_id)
+    student_role = await db.scalar(select(Role).where(Role.code == "student"))
+    membership = await db.scalar(
+        select(CourseMembership)
+        .where(
+            CourseMembership.user_id == user_id,
+            CourseMembership.course_id == course_id,
+            CourseMembership.role_id == student_role.id,
+        )
+        .options(selectinload(CourseMembership.discipline), selectinload(CourseMembership.role))
+    )
+    if membership is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That student is not on this roster.")
+    if active and membership.deactivated_at is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This student is already active in this course.")
+    if not active and membership.deactivated_at is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This student is already inactive in this course.")
+    membership.deactivated_at = None if active else datetime.now(timezone.utc)
+    membership.deactivated_by_id = None if active else user.id
+    person = await db.get(User, user_id)
+    await log_event(
+        db,
+        action=action,
+        entity_type="course",
+        entity_id=str(course_id),
+        actor_user_id=user.id,
+        course_id=course_id,
+        ip_address=_ip(request),
+        detail=f"student user/{user_id}",
+    )
+    await db.commit()
+    await db.refresh(membership, attribute_names=["deactivated_at", "discipline", "role"])
+    return await _roster_member(db, membership, person)
 
 
 def _staff_role(user: User, rows, course_id: uuid.UUID) -> str:
