@@ -10,6 +10,7 @@ from app.schemas.clinical import (
     AddendumBody,
     CommentBody,
     DraftCreate,
+    SectionCommentIn,
     DraftPatch,
     NoteOut,
     QueueItemOut,
@@ -20,6 +21,7 @@ from app.services.audit import log_event
 from app.services.charts import ensure_visible, load_patient
 from app.services.notes import (
     add_addendum,
+    add_section_comment,
     cosign_note,
     create_draft,
     ensure_can_read,
@@ -209,6 +211,23 @@ async def return_for_revision(
     patient = await load_patient(db, note.patient_id)
     await ensure_course_open(db, patient.course_id)
     await return_note(db, note, user, role, body.comment, _ip(request), patient.course_id)
+    await db.commit()
+    return note_out(await _reload(db, note))
+
+
+@router.post("/notes/{note_id}/comments", response_model=NoteOut, response_model_exclude_none=True)
+async def comment(
+    note_id: uuid.UUID,
+    body: SectionCommentIn,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    note = await _reviewable(db, user, role, note_id, request)
+    patient = await load_patient(db, note.patient_id)
+    await ensure_course_open(db, patient.course_id)
+    await add_section_comment(db, note, user, role, body.section_id, body.body, _ip(request), patient.course_id)
     await db.commit()
     return note_out(await _reload(db, note))
 

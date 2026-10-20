@@ -17,6 +17,7 @@ from app.models.audit import AuditEvent
 from app.models.clinical import (
     Allergy,
     Appointment,
+    CaseAnswerKey,
     ClinicalNote,
     Course,
     NoteComment,
@@ -66,6 +67,7 @@ PERMISSIONS = {
     "user:manage_access": "Deactivate or reactivate user accounts",
     "report:run": "Run course reports",
     "audit:view": "Review the audit trail",
+    "case:author": "Create and edit case masters",
 }
 
 
@@ -290,7 +292,12 @@ async def _charts(
     _fill_carmen(carmen)
     _fill_james(james)
     _fill_linh(linh)
+    maya = await _ensure_chart(db, "CASE-10001", lambda: _maya(phar, gerardo))
+    andre = await _ensure_chart(db, "CASE-10002", lambda: _andre(pt, gerardo))
+    await _ensure_answer_key(db, maya, gerardo, _maya_key())
+    await _ensure_answer_key(db, andre, gerardo, _andre_key())
     await db.flush()
+    await _demo_case_work(db, maya, andre, ana, clarissa, luis, gerardo, pharmacy, therapy)
 
     for practice in (rosa, elena, marcus, hector, priya, omar, keisha, tomas, nadine, sofia, deshawn):
         await db.refresh(practice, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
@@ -465,6 +472,234 @@ async def _charts(
         )
 
 
+async def _ensure_answer_key(db, patient: Patient, author: User, payload: dict) -> None:
+    found = await db.scalar(select(CaseAnswerKey.id).where(CaseAnswerKey.patient_id == patient.id))
+    if found is not None:
+        return
+    db.add(CaseAnswerKey(
+        patient_id=patient.id,
+        diagnoses=payload["diagnoses"],
+        plan_points=payload["plan_points"],
+        rationale=payload["rationale"],
+        updated_by_id=author.id,
+    ))
+
+
+def _maya_key() -> dict:
+    return {
+        "diagnoses": [
+            {
+                "rank": 1,
+                "code": "N39.0",
+                "label": "Urinary tract infection, site not specified",
+                "rationale": "Dysuria, frequency, and a positive leukocyte esterase point to a lower urinary tract infection.",
+            },
+            {
+                "rank": 2,
+                "code": "N30.00",
+                "label": "Acute cystitis without hematuria",
+                "rationale": "Suprapubic discomfort without fever or flank pain fits uncomplicated cystitis.",
+            },
+        ],
+        "plan_points": [
+            "Choose an antibiotic that avoids the sulfa allergy.",
+            "Counsel on fluids and when to return for fever or flank pain.",
+        ],
+        "rationale": "Expected pharmacy workup for uncomplicated cystitis in a patient with a sulfa allergy and treated hypertension.",
+    }
+
+
+def _andre_key() -> dict:
+    return {
+        "diagnoses": [
+            {
+                "rank": 1,
+                "code": "M54.50",
+                "label": "Low back pain, unspecified",
+                "rationale": "Mechanical low back pain after lifting, without red-flag neurologic symptoms.",
+            },
+            {
+                "rank": 2,
+                "code": "M54.41",
+                "label": "Lumbago with sciatica, right side",
+                "rationale": "Keep as a differential if the pain radiates below the knee. The story so far does not confirm it.",
+            },
+        ],
+        "plan_points": [
+            "Screen for cauda equina red flags before exercise.",
+            "Start with activity as tolerated and hip-hinge coaching for lifting.",
+        ],
+        "rationale": "Expected PT evaluation for recent mechanical low back pain in a warehouse worker.",
+    }
+
+
+async def _demo_case_work(db, maya, andre, ana, clarissa, luis, gerardo, pharmacy, therapy) -> None:
+    """Assigned copies with notes and section comments, so review shows the answer key."""
+    for master in (maya, andre):
+        await db.refresh(
+            master,
+            attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"],
+        )
+
+    maya_ana = await _ensure_chart(db, "TR-CASE-MAYA-AR", lambda: _clone_case(maya, "TR-CASE-MAYA-AR", ana))
+    maya_clarissa = await _ensure_chart(db, "TR-CASE-MAYA-CD", lambda: _clone_case(maya, "TR-CASE-MAYA-CD", clarissa))
+    andre_luis = await _ensure_chart(db, "TR-CASE-ANDRE-LO", lambda: _clone_case(andre, "TR-CASE-ANDRE-LO", luis))
+    for copy in (maya_ana, maya_clarissa, andre_luis):
+        await db.refresh(copy, attribute_names=["encounter"])
+
+    ana_note = await _ensure_note(
+        db, maya_ana, ana, pharmacy, gerardo,
+        status="pending_review", template_id="pharmacy_mtm",
+        content={
+            "reason": "Burning when she urinates. Also has high blood pressure.",
+            "med_experience": "Lisinopril 10 mg most mornings. No other medicines.",
+            "objective": "BP 128/78. Urinalysis positive for leukocyte esterase.",
+            "dtp": "Needs an antibiotic. Sulfa is fine if she has taken it before.",
+            "rationale": "Hypertension is her chronic problem, so it should lead the list. Dysuria is new.",
+            "recommendations": "Start Bactrim DS twice daily for 3 days. Continue lisinopril.",
+            "monitoring": "Call if she feels worse.",
+            "education": "Finish the antibiotic.",
+            "followup": "Clinic if needed.",
+        },
+        diagnoses=[
+            {"code": "I10", "label": "Essential (primary) hypertension"},
+            {"code": "N39.0", "label": "Urinary tract infection, site not specified"},
+        ],
+        created=datetime(2026, 10, 20, 13, 10, tzinfo=timezone.utc),
+        signed=datetime(2026, 10, 20, 13, 40, tzinfo=timezone.utc),
+    )
+    await _ensure_comment(
+        db, ana_note, gerardo, "comment",
+        "Add frequency and the absence of fever or flank pain. Those details decide uncomplicated cystitis.",
+        "S",
+    )
+    await _ensure_comment(
+        db, ana_note, gerardo, "comment",
+        "List cystitis ahead of the chronic hypertension. The blood pressure is background, not why she came in.",
+        "A",
+    )
+    await _ensure_comment(
+        db, ana_note, gerardo, "comment",
+        "She has a sulfa allergy. Name an antibiotic that avoids sulfa, with a dose, a duration, and what to do if she gets a fever or flank pain.",
+        "P",
+    )
+
+    clarissa_note = await _ensure_note(
+        db, maya_clarissa, clarissa, pharmacy, gerardo,
+        status="returned", template_id="pharmacy_mtm",
+        content={
+            "reason": "Pain with urination for two days.",
+            "med_experience": "Takes lisinopril. Allergic to sulfa.",
+            "objective": "Temperature not written down. Urinalysis not mentioned.",
+            "dtp": "Infection.",
+            "rationale": "Sounds like a UTI.",
+            "recommendations": "Give an antibiotic.",
+            "followup": "Come back if not better.",
+        },
+        diagnoses=[{"code": "N39.0", "label": "Urinary tract infection, site not specified"}],
+        created=datetime(2026, 10, 18, 9, 0, tzinfo=timezone.utc),
+        signed=datetime(2026, 10, 18, 9, 30, tzinfo=timezone.utc),
+        updated=datetime(2026, 10, 18, 16, 0, tzinfo=timezone.utc),
+    )
+    await _ensure_comment(
+        db, clarissa_note, gerardo, "returned",
+        "Return this and revise the objective and the plan before you resubmit. The comments on those sections say what is missing.",
+    )
+    await _ensure_comment(
+        db, clarissa_note, gerardo, "comment",
+        "Put the urinalysis and temperature here. A positive leukocyte esterase and no fever belong in the objective.",
+        "O",
+    )
+    await _ensure_comment(
+        db, clarissa_note, gerardo, "comment",
+        "Name the drug, dose, and duration, and say it has to avoid sulfa. Add fluids and when to return.",
+        "P",
+    )
+
+    if therapy is None:
+        return
+    luis_note = await _ensure_note(
+        db, andre_luis, luis, therapy, gerardo,
+        status="pending_review", template_id="pt_daily_soap",
+        content={
+            "visit_number": "1",
+            "subjective": "Low back pain for five days after lifting a box. Worse with sitting.",
+            "measures": "Pain 6/10. Forward bend limited. No strength testing written down.",
+            "interventions": "Taught him to rest and avoid lifting.",
+            "progress": "First visit.",
+            "plan": "Come back next week.",
+        },
+        diagnoses=[{"code": "M54.41", "label": "Lumbago with sciatica, right side"}],
+        created=datetime(2026, 10, 20, 11, 0, tzinfo=timezone.utc),
+        signed=datetime(2026, 10, 20, 11, 25, tzinfo=timezone.utc),
+    )
+    await _ensure_comment(
+        db, luis_note, gerardo, "comment",
+        "Ask about saddle anesthesia, bowel and bladder changes, and fever before you treat this as mechanical pain.",
+        "S",
+    )
+    await _ensure_comment(
+        db, luis_note, gerardo, "comment",
+        "M54.50 fits this story. Sciatica stays a differential unless the pain goes below the knee.",
+        "A",
+    )
+    await _ensure_comment(
+        db, luis_note, gerardo, "comment",
+        "Add a red-flag screen and one exercise with sets, reps, and a cue for how he should lift.",
+        "P",
+    )
+
+
+def _clone_case(source: Patient, mrn: str, owner: User) -> Patient:
+    chart = Patient(
+        mrn=mrn,
+        first_name=source.first_name,
+        last_name=source.last_name,
+        preferred_name=source.preferred_name,
+        dob=source.dob,
+        sex_at_birth=source.sex_at_birth,
+        pronouns=source.pronouns,
+        course_id=source.course_id,
+        mode="assessment",
+        case_key=source.case_key,
+        source_patient_id=source.id,
+        owner_id=owner.id,
+        chief_complaint=source.chief_complaint,
+        hpi=source.hpi,
+        lifecycle=source.lifecycle,
+        encounter_status="In progress",
+        care_setting=source.care_setting,
+        program=source.program,
+        past_medical_history=source.past_medical_history,
+        family_history=source.family_history,
+        surgical_history=source.surgical_history,
+        social_history=source.social_history,
+        snapshot=chart_snapshot(source),
+        is_training=True,
+        encounter=Encounter(
+            type=source.encounter.type if source.encounter else "Office visit",
+            date=source.encounter.date if source.encounter else date(2026, 10, 20),
+        ),
+    )
+    for item in source.allergies:
+        chart.allergies.append(Allergy(substance=item.substance, reaction=item.reaction, severity=item.severity))
+    for item in source.medications:
+        chart.medications.append(Medication(
+            name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
+            indication=item.indication, adherence=item.adherence,
+        ))
+    for item in source.problems:
+        chart.problems.append(Problem(code=item.code, description=item.description, since=item.since))
+    for item in source.labs:
+        chart.labs.append(LabResult(
+            name=item.name, value=item.value, unit=item.unit, reference_range=item.reference_range,
+            flag=item.flag, collected_at=item.collected_at,
+        ))
+    for item in source.vitals:
+        chart.vitals.append(Vital(label=item.label, value=item.value))
+    return chart
+
+
 async def _ensure_chart(db, mrn: str, factory) -> Patient:
     found = await db.scalar(select(Patient).where(Patient.mrn == mrn))
     if found:
@@ -532,12 +767,22 @@ async def _ensure_note(
     return note
 
 
-async def _ensure_comment(db, note: ClinicalNote, author: User, kind: str, body: str) -> None:
+async def _ensure_comment(
+    db, note: ClinicalNote, author: User, kind: str, body: str, section_id: str | None = None,
+) -> None:
     found = await db.scalar(
-        select(NoteComment.id).where(NoteComment.note_id == note.id, NoteComment.kind == kind, NoteComment.body == body)
+        select(NoteComment.id).where(
+            NoteComment.note_id == note.id,
+            NoteComment.kind == kind,
+            NoteComment.body == body,
+            NoteComment.section_id == section_id if section_id else NoteComment.section_id.is_(None),
+        )
     )
     if found is None:
-        db.add(NoteComment(note_id=note.id, author_id=author.id, body=body, kind=kind, created_at=note.updated_at))
+        db.add(NoteComment(
+            note_id=note.id, author_id=author.id, body=body, kind=kind,
+            section_id=section_id, created_at=note.updated_at,
+        ))
 
 
 async def _ensure_addendum(db, note: ClinicalNote, author: User, body: str) -> None:
@@ -1321,6 +1566,59 @@ def _fill_t2dm(chart: Patient) -> None:
     _maybe_vital(chart, "BMI", "30.9")
 
 
+def _maya(course: Course, author: User) -> Patient:
+    chart = _patient(
+        mrn="CASE-10001", first="Maya", last="Chen", preferred=None, dob="1998-03-14", sex="Female",
+        pronouns="she/her", course=course, mode="case", case_key="case_dysuria",
+        cc="Burning with urination for two days.",
+        hpi="22-year-old woman with dysuria, frequency, and suprapubic discomfort. No fever, flank pain, or vaginal discharge. Drinks little water during lab days.",
+        lifecycle="Active", encounter_status="Scheduled", care="Outpatient", program="Pharmacy",
+        family="Mother: type 2 diabetes. Father: hypertension.",
+        surgical="None.",
+        social="Lives with a roommate. No tobacco. Occasional alcohol on weekends. Sexually active, no regular contraception discussion documented.",
+        encounter_type="Office visit",
+    )
+    chart.past_medical_history = "Hypertension, diagnosed last year. No prior urinary tract infections documented."
+    chart.created_by_id = author.id
+    _fill_maya(chart)
+    return chart
+
+
+def _fill_maya(chart: Patient) -> None:
+    _maybe_allergy(chart, "Sulfa drugs", "Rash", "moderate")
+    _maybe_med(chart, "Lisinopril", dose="10 mg", route="PO", frequency="Once daily", indication="Hypertension", adherence="Takes most mornings")
+    _maybe_problem(chart, "Essential hypertension", code="I10", since="2025")
+    _maybe_lab(chart, "Urinalysis", date(2026, 10, 20), value="Leukocyte esterase positive", unit="", reference_range="Negative", flag=None)
+    _maybe_vital(chart, "BP", "128/78")
+    _maybe_vital(chart, "Temp", "98.6 F")
+    _maybe_vital(chart, "Pulse", "82")
+
+
+def _andre(course: Course, author: User) -> Patient:
+    chart = _patient(
+        mrn="CASE-10002", first="Andre", last="Brooks", preferred=None, dob="1995-11-02", sex="Male",
+        pronouns="he/him", course=course, mode="case", case_key="case_lbp",
+        cc="Low back pain after lifting a box.",
+        hpi="30-year-old man with right-sided low back pain for five days, worse with sitting and bending. No saddle anesthesia, bowel or bladder changes, or fever.",
+        lifecycle="Active", encounter_status="Scheduled", care="Outpatient", program="Physical therapy",
+        family="Father: chronic back pain.",
+        surgical="None.",
+        social="Warehouse work, mostly standing and lifting. No tobacco. Plays recreational basketball.",
+        encounter_type="PT evaluation",
+    )
+    chart.past_medical_history = "No chronic illness. One prior episode of low back pain two years ago that resolved with rest."
+    chart.created_by_id = author.id
+    _fill_andre(chart)
+    return chart
+
+
+def _fill_andre(chart: Patient) -> None:
+    _maybe_med(chart, "Ibuprofen", dose="400 mg", route="PO", frequency="Every 8 hours as needed", indication="Back pain", adherence="Takes with food")
+    _maybe_problem(chart, "Low back pain", code="M54.50", since="This week")
+    _maybe_vital(chart, "Pain", "6/10")
+    _maybe_vital(chart, "BP", "118/74")
+
+
 def _patient(**kwargs) -> Patient:
     return Patient(
         mrn=kwargs["mrn"],
@@ -1491,6 +1789,21 @@ async def _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, thera
     await _ensure_audit(db, daniel.id, "chart.view", "patient", charts["TR-M-STARK"].id, phar.id, datetime(2026, 10, 5, 14, 10, tzinfo=timezone.utc))
     await _ensure_audit(db, users["maria.gonzalez@miners.utep.edu"].id, "note.sign_submit", "note", charts["TR-X-SALAZAR"].id, phar.id, datetime(2026, 10, 2, 15, 20, tzinfo=timezone.utc))
     await _ensure_audit(db, users["andres.morales@miners.utep.edu"].id, "chart.view", "patient", charts["TR-X-GALLEGOS"].id, pt.id, datetime(2026, 10, 4, 11, 5, tzinfo=timezone.utc))
+    await _deactivate_demo(db, users["scott.lang@miners.utep.edu"], phar, role, gerardo)
+
+
+async def _deactivate_demo(db, student: User, course: Course, role: Role, actor: User) -> None:
+    membership = await db.scalar(
+        select(CourseMembership).where(
+            CourseMembership.user_id == student.id,
+            CourseMembership.course_id == course.id,
+            CourseMembership.role_id == role.id,
+        )
+    )
+    if membership is None or membership.deactivated_at is not None:
+        return
+    membership.deactivated_at = datetime.now(timezone.utc)
+    membership.deactivated_by_id = actor.id
 
 
 def main() -> None:

@@ -3,7 +3,7 @@ import {
   Alert, Box, Breadcrumbs, Button, Divider, LinearProgress, Link, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { cosignNote, getNote, returnNote } from "../../api/notes";
+import { commentOnNote, cosignNote, getNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
 import { getCourse } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
@@ -19,6 +19,7 @@ import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
 import CourseRubricPanel from "./components/CourseRubricPanel";
+import AnswerKeyPanel from "./components/AnswerKeyPanel";
 import { templateName } from "./noteTemplates";
 
 export default function NoteReviewPage() {
@@ -75,7 +76,14 @@ export default function NoteReviewPage() {
 
       <PatientBanner patient={patient} ownerName={patient.ownerName} compact />
 
-      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 360px" }, alignItems: "start" }}>
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2.5,
+          alignItems: "start",
+          gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) 300px", lg: "minmax(0, 1fr) minmax(240px, 320px) 320px" },
+        }}
+      >
         <Paper component="article" aria-label="Student note" sx={{ p: { xs: 2, md: 3 } }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", mb: 2.5 }}>
             <Box sx={{ flex: 1 }}>
@@ -87,11 +95,22 @@ export default function NoteReviewPage() {
             </Box>
             <NoteStatusChip status={note.status} />
           </Box>
-          <NoteFields templateId={note.templateId} patient={patient} content={note.content} diagnoses={note.diagnoses} readOnly />
+          <NoteFields
+            templateId={note.templateId} patient={patient} content={note.content} diagnoses={note.diagnoses} readOnly
+            comments={note.feedback}
+            onComment={pending ? async (sectionId, body) => {
+              const updated = await commentOnNote(activeRole, note.id, { sectionId, body });
+              load.setData({ note: updated, patient });
+            } : undefined}
+          />
           {note.addenda.length > 0 && (<><Divider sx={{ my: 3 }} /><Addenda items={note.addenda} /></>)}
         </Paper>
 
-        <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 } }}>
+        <Paper sx={{ p: 2.5, position: { lg: "sticky" }, top: { lg: 88 }, gridColumn: { md: "2", lg: "2" } }}>
+          <AnswerKeyPanel role={activeRole} patientId={patient.id} />
+        </Paper>
+
+        <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 }, gridColumn: { xs: "1", md: "1 / -1", lg: "3" } }}>
           <Paper sx={{ p: 2.5 }}>
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>Your review</Typography>
             <NoteProgress note={note} />

@@ -20,6 +20,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "roster:import",
         "instructor:remove",
         "audit:view",
+        "case:author",
     ],
     "admin": [
         "patient:create",
@@ -33,6 +34,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "course:manage_access",
         "user:manage_access",
         "report:run",
+        "case:author",
     ],
     "front_desk": ["patient:create"],
     "patient": [],
@@ -57,6 +59,7 @@ async def memberships_for(db: AsyncSession, user_id: uuid.UUID) -> list[CourseMe
         select(CourseMembership)
         .join(Course, Course.id == CourseMembership.course_id)
         .where(CourseMembership.user_id == user_id)
+        .where(CourseMembership.deactivated_at.is_(None))
         .where(Course.status != "archived")
         .options(
             selectinload(CourseMembership.role),

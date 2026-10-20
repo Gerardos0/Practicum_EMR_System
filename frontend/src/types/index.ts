@@ -22,6 +22,8 @@ export interface User {
   phoneLast4?: string;
   isActive: boolean;
   roles: RoleAssignment[];
+  rosterStatus?: "active" | "inactive";
+  deactivatedAt?: string;
 }
 
 export interface Course {
@@ -34,7 +36,7 @@ export interface Course {
   rubricFileName?: string;
 }
 
-export type CaseMode = "practice" | "assessment";
+export type CaseMode = "practice" | "assessment" | "case";
 
 export type LifecycleStatus =
   | "Active" | "Inactive" | "Prospective" | "Discharged from practice" | "Archived" | "Deceased";
@@ -110,6 +112,7 @@ export interface Patient {
   practiceLabel?: string;
   chiefComplaint: string;
   hpi: string;
+  pastMedicalHistory: string;
   status: PatientStatus;
   allergies: Allergy[];
   medications: Medication[];
@@ -137,6 +140,7 @@ export interface NoteComment {
   authorName: string;
   body: string;
   kind: "returned" | "cosigned" | "comment";
+  sectionId?: "S" | "O" | "MR" | "A" | "P";
   createdAt: string;
 }
 
@@ -145,6 +149,11 @@ export interface Addendum {
   authorName: string;
   body: string;
   createdAt: string;
+}
+
+export interface AuthoredCase extends Patient {
+  createdByName?: string;
+  updatedAt: string;
 }
 
 export interface ClinicalNote {

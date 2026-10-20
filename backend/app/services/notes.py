@@ -10,6 +10,7 @@ from app.services.access import can, require
 from app.services.audit import log_event
 from app.services.note_prefill import diagnoses_from_patient, prefill_from_patient
 from app.services.charts import utcnow
+from app.services.templates import section_ids
 
 EDITABLE = {"draft", "returned"}
 
@@ -37,6 +38,8 @@ async def create_draft(
     ip: str | None,
 ) -> ClinicalNote:
     require(role, "note:author", "Your role can't write notes.")
+    if patient.mode == "case":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Edit the case instead of writing a note on the master.")
     if patient.encounter is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "This chart has no encounter to attach a note to.")
     discipline = await db.scalar(select(Discipline).where(Discipline.code == discipline_code))
@@ -182,6 +185,60 @@ async def return_note(db, note: ClinicalNote, reviewer: User, role: str, comment
         actor_user_id=reviewer.id,
         course_id=course_id,
         ip_address=ip,
+    )
+
+
+async def add_section_comment(
+    db,
+    note: ClinicalNote,
+    reviewer: User,
+    role: str,
+    section_id: str | None,
+    body: str,
+    ip: str | None,
+    course_id,
+) -> None:
+    if not can(role, "note:cosign"):
+        await log_event(
+            db,
+            action="note.comment",
+            entity_type="note",
+            entity_id=str(note.id),
+            actor_user_id=reviewer.id,
+            result="denied",
+            course_id=course_id,
+            ip_address=ip,
+            detail="Role cannot comment on notes.",
+        )
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't comment on notes.")
+    if note.status != "pending_review":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Comments can be added while a note is pending review.")
+    if section_id and section_id not in section_ids(note.template_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That section isn't on this note.")
+    text = body.strip()
+    if not text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Write a comment before saving.")
+    now = utcnow()
+    db.add(
+        NoteComment(
+            note_id=note.id,
+            author_id=reviewer.id,
+            body=text,
+            kind="comment",
+            section_id=section_id,
+            created_at=now,
+        )
+    )
+    await log_event(
+        db,
+        action="note.comment",
+        entity_type="note",
+        entity_id=str(note.id),
+        actor_user_id=reviewer.id,
+        course_id=course_id,
+        ip_address=ip,
+        detail=section_id or "whole note",
     )
 
 

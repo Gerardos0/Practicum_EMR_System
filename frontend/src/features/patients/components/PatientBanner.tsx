@@ -60,7 +60,9 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap" }}>
-            {p.mode === "assessment" ? (
+            {p.mode === "case" ? (
+              <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
+            ) : p.mode === "assessment" ? (
               <Chip size="small" label={ownerName ? `Assessment case: ${ownerName}` : "Assessment case: only your work appears here"} sx={{ bgcolor: utep.navy, color: "#fff" }} />
             ) : (
               <Chip size="small" label={`${p.practiceLabel ?? "Practice patient"}: shared, not graded`} variant="outlined" />

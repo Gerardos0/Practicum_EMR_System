@@ -9,7 +9,7 @@ from app.models.clinical import (
     Allergy, Appointment, ClinicalNote, CourseMembership, Encounter, LabResult, Medication, Patient, Problem, Vital,
 )
 from app.models.user import Role, User
-from app.services.access import full_name, require, require_course
+from app.services.access import can, full_name, require, require_course
 from app.services.audit import log_event
 
 LIFECYCLE = {"Active", "Inactive", "Prospective", "Discharged from practice", "Archived", "Deceased"}
@@ -26,6 +26,20 @@ async def load_patient(db: AsyncSession, patient_id: uuid.UUID) -> Patient:
 
 async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: str, rows, *, request_ip: str | None) -> None:
     require_course(role, patient.course_id, user, rows)
+    if patient.mode == "case" and not can(role, "case:author"):
+        await log_event(
+            db,
+            action="chart.view",
+            entity_type="patient",
+            entity_id=str(patient.id),
+            actor_user_id=user.id,
+            result="denied",
+            course_id=patient.course_id,
+            ip_address=request_ip,
+            detail="Case master is hidden from this role.",
+        )
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Case masters are only available to instructors.")
     if role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
         await log_event(
             db,
@@ -127,6 +141,7 @@ async def reset_practice(db: AsyncSession, patient: Patient, user: User, role: s
     patient.encounter_status = snap["encounter_status"]
     patient.care_setting = snap["care_setting"]
     patient.program = snap.get("program")
+    patient.past_medical_history = snap.get("past_medical_history", "")
     patient.family_history = snap["family_history"]
     patient.surgical_history = snap["surgical_history"]
     patient.social_history = snap["social_history"]
@@ -181,6 +196,7 @@ def chart_snapshot(patient: Patient) -> dict:
         "encounter_status": patient.encounter_status,
         "care_setting": patient.care_setting,
         "program": patient.program,
+        "past_medical_history": patient.past_medical_history,
         "family_history": patient.family_history,
         "surgical_history": patient.surgical_history,
         "social_history": patient.social_history,
@@ -277,9 +293,11 @@ async def assign_case(
         encounter_status="Scheduled",
         care_setting=source.care_setting,
         program=source.program,
+        past_medical_history=source.past_medical_history,
         family_history=source.family_history,
         surgical_history=source.surgical_history,
         social_history=source.social_history,
+        snapshot=chart_snapshot(source),
         insurance_payer=source.insurance_payer,
         insurance_member_id=source.insurance_member_id,
         insurance_group_number=source.insurance_group_number,
@@ -358,6 +376,7 @@ async def _student_in_course(db: AsyncSession, user_id: uuid.UUID, course_id: uu
         .where(
             CourseMembership.user_id == user_id,
             CourseMembership.course_id == course_id,
+            CourseMembership.deactivated_at.is_(None),
             Role.code == "student",
         )
     )
