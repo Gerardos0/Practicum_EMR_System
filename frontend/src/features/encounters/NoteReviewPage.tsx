@@ -18,6 +18,7 @@ import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
+import CourseRubricPanel from "./components/CourseRubricPanel";
 import { templateName } from "./noteTemplates";
 
 export default function NoteReviewPage() {
@@ -95,11 +96,7 @@ export default function NoteReviewPage() {
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>Your review</Typography>
             <NoteProgress note={note} />
 
-            {course.data?.rubricFileName && (
-              <Alert severity="info" icon={false} sx={{ mt: 1.5 }}>
-                Course rubric on file: <b>{course.data.rubricFileName}</b>. Open it from your course materials (Blackboard) — file download in the EMR is next.
-              </Alert>
-            )}
+            <CourseRubricPanel fileName={course.data?.rubricFileName} />
 
             {note.feedback.length > 0 && (
               <Box sx={{ mt: 2 }}><FeedbackThread items={note.feedback} /></Box>
