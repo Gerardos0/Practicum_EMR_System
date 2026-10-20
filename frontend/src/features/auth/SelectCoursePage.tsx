@@ -7,7 +7,7 @@ import CheckCircleRounded from "@mui/icons-material/CheckCircleRounded";
 import { useNavigate } from "react-router-dom";
 import { listCoursesForUser } from "../../api/courses";
 import { disciplineLabel, roleLabel } from "../../utils/labels";
-import { homePathFor } from "../../utils/permissions";
+import { courseIdsForRole, homePathFor, uniqueRoles } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
 import { trainingStripe, utep } from "../../theme/tokens";
 import { useSession } from "./AuthContext";
@@ -20,7 +20,9 @@ export default function SelectCoursePage() {
   const { data: courses = [], loading, error } = useAsync(() => listCoursesForUser(), [user.id]);
 
   const assignment = user.roles.find((r) => r.role === activeRole);
-  const available = courses.filter((c) => assignment?.courseIds.includes(c.id));
+  const roles = uniqueRoles(user);
+  const roleCourseIds = courseIdsForRole(user, activeRole);
+  const available = activeRole === "admin" ? courses : courses.filter((c) => roleCourseIds.includes(c.id));
 
   const availableIds = available.map((c) => c.id).join(",");
   // One course → pre-select so Open course is one click away.
@@ -62,15 +64,15 @@ export default function SelectCoursePage() {
           {activeRole === "admin" && " You'll manage rosters and activity for that class."}
         </Typography>
 
-        {user.roles.length > 1 && (
+        {roles.length > 1 && (
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle2" id="role-label" sx={{ mb: 1 }}>Sign in as</Typography>
             <ToggleButtonGroup
               exclusive value={activeRole} aria-labelledby="role-label" size="small"
               onChange={(_, r) => { if (r) { switchRole(r); setPicked(undefined); } }}
             >
-              {user.roles.map((r) => (
-                <ToggleButton key={r.role} value={r.role} sx={{ px: 2 }}>{roleLabel[r.role]}</ToggleButton>
+              {roles.map((role) => (
+                <ToggleButton key={role} value={role} sx={{ px: 2 }}>{roleLabel[role]}</ToggleButton>
               ))}
             </ToggleButtonGroup>
           </Box>
@@ -95,6 +97,7 @@ export default function SelectCoursePage() {
                       <Typography variant="body2" color="text.secondary">{c.term}</Typography>
                     </Box>
                     {assignment?.discipline && <Chip size="small" label={disciplineLabel[assignment.discipline]} />}
+                    <Chip size="small" variant="outlined" label={c.status} />
                     {selected && <CheckCircleRounded color="primary" aria-hidden />}
                   </CardContent>
                 </CardActionArea>
