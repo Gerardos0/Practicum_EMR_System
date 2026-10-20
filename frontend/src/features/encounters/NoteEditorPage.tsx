@@ -7,9 +7,10 @@ import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import type { ClinicalNote, IcdCode, NoteTemplateId, Patient, User } from "../../types";
 import { getPatient } from "../../api/patients";
 import { addAddendum, createDraft, getNote, listNotesForPatient, saveDraft, signNote } from "../../api/notes";
-import { listInstructors } from "../../api/courses";
+import { getCourse, listInstructors } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
 import { formatTime } from "../../utils/format";
+import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import PageError from "../../components/PageError";
 import PatientBanner from "../patients/components/PatientBanner";
@@ -18,6 +19,7 @@ import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
+import CourseRubricPanel from "./components/CourseRubricPanel";
 import { TEMPLATES, defaultTemplateFor, diagnosesFromPatient, missingRequired, prefillFromPatient, templatesFor } from "./noteTemplates";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -45,6 +47,7 @@ export default function NoteEditorPage() {
   const [error, setError] = useState("");
   const [showErrors, setShowErrors] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const course = useAsync(() => (courseId ? getCourse(courseId) : Promise.resolve(undefined)), [courseId]);
 
   useEffect(() => {
     let alive = true;
@@ -281,6 +284,7 @@ export default function NoteEditorPage() {
           <Paper sx={{ p: 2.5 }}>
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isAssessment ? "Submission" : "Practice note"}</Typography>
             <NoteProgress note={note} />
+            <CourseRubricPanel fileName={course.data?.rubricFileName} />
 
             {editable && (
               <Stack spacing={1.5} sx={{ mt: 2 }}>
