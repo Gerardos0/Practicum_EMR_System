@@ -547,7 +547,11 @@ async def test_return_and_resubmit(client):
     sam_headers, _ = await login(client, "sam.torres@miners.utep.edu")
     course = await course_id(client, instructor, "PHAR 5320")
     queue = await client.get("/api/v1/review-queue", headers=instructor, params={"course_id": course, "role": "instructor"})
-    pending = next(item["note"] for item in queue.json() if item["note"]["status"] == "pending_review")
+    pending = next(
+        item["note"]
+        for item in queue.json()
+        if item["note"]["status"] == "pending_review" and item["patient"]["mrn"] == "TR-10057-ST"
+    )
     returned = await client.post(
         f"/api/v1/notes/{pending['id']}/return",
         headers=instructor,
