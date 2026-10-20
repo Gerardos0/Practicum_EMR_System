@@ -1806,6 +1806,43 @@ async def _deactivate_demo(db, student: User, course: Course, role: Role, actor:
     membership.deactivated_by_id = actor.id
 
 
+async def _user_by_email(db, email: str) -> User | None:
+    return await db.scalar(select(User).where(User.email == email))
+
+
+async def ensure_live_demo() -> None:
+    """Add the Sprint 3 sample cases when this database already has the demo accounts.
+
+    Startup runs this after migrations. It does not create logins or change passwords.
+    Scott Lang is marked inactive only the first time the pharmacy case is added.
+    """
+    async with AsyncSessionLocal() as db:
+        phar = await db.scalar(select(Course).where(Course.code == "PHAR 5320").order_by(Course.term.desc()))
+        pt = await db.scalar(select(Course).where(Course.code == "PHYT 6310").order_by(Course.term.desc()))
+        pharmacy = await db.scalar(select(Discipline).where(Discipline.code == "pharmacy"))
+        therapy = await db.scalar(select(Discipline).where(Discipline.code == "physical_therapy"))
+        gerardo = await _user_by_email(db, "gerardo.sillas@utep.edu")
+        ana = await _user_by_email(db, "ana.rios@miners.utep.edu")
+        clarissa = await _user_by_email(db, "clarissa.dominguez@miners.utep.edu")
+        luis = await _user_by_email(db, "luis.ortega@miners.utep.edu")
+        scott = await _user_by_email(db, "scott.lang@miners.utep.edu")
+        student = await db.scalar(select(Role).where(Role.code == "student"))
+        if not all([phar, pt, pharmacy, therapy, gerardo, ana, clarissa, luis, scott, student]):
+            print("Live demo skipped: demo courses or accounts are not on this database.")
+            return
+        already = await db.scalar(select(Patient.id).where(Patient.mrn == "CASE-10001"))
+        maya = await _ensure_chart(db, "CASE-10001", lambda: _maya(phar, gerardo))
+        andre = await _ensure_chart(db, "CASE-10002", lambda: _andre(pt, gerardo))
+        await _ensure_answer_key(db, maya, gerardo, _maya_key())
+        await _ensure_answer_key(db, andre, gerardo, _andre_key())
+        await db.flush()
+        await _demo_case_work(db, maya, andre, ana, clarissa, luis, gerardo, pharmacy, therapy)
+        if already is None:
+            await _deactivate_demo(db, scott, phar, student, gerardo)
+        await db.commit()
+    print("Live demo cases are in place.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed EHR reference data")
     parser.add_argument("--admin-email", help="Create an extra admin account with this email")
