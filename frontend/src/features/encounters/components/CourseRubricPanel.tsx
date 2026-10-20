@@ -35,12 +35,8 @@ export default function CourseRubricPanel({ fileName }: { fileName?: string | nu
         {rubric.criteria.map((c) => (
           <ListItem key={c.id} alignItems="flex-start" sx={{ px: 0, py: 0.5 }}>
             <ListItemText
-              primary={c.label}
-              secondary={c.detail}
-              slotProps={{
-                primary: { variant: "body2", fontWeight: 700 },
-                secondary: { variant: "caption" },
-              }}
+              primary={<Typography variant="body2" sx={{ fontWeight: 700 }}>{c.label}</Typography>}
+              secondary={<Typography variant="caption" color="text.secondary">{c.detail}</Typography>}
             />
           </ListItem>
         ))}
