@@ -16,6 +16,7 @@ from app.schemas.clinical import (
     CourseCreate,
     CourseOut,
     CourseStatusPatch,
+    EnrollmentCreate,
     PublicUser,
     RosterImport,
     RosterImportResult,
@@ -42,6 +43,18 @@ def _ip(request: Request) -> str | None:
 
 def _require_admin(user: User, rows) -> None:
     require_held_role(user, "admin", rows)
+
+
+def _require_roster_role(staff_role: str, target_role: str) -> None:
+    if target_role == "student":
+        require(staff_role, "roster:import", "Your role can't edit the roster.")
+    elif target_role == "course_coordinator":
+        require(staff_role, "course:manage_access", "Only an administrator can add a course coordinator.")
+    elif target_role == "instructor":
+        if not (can(staff_role, "instructor:manage") or can(staff_role, "course:manage_access")):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a course coordinator or administrator can add instructors.")
+    else:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't edit the roster.")
 
 
 @router.post("", response_model=CourseOut, response_model_exclude_none=True, status_code=status.HTTP_201_CREATED)
@@ -154,15 +167,7 @@ async def import_roster(
 ):
     rows = await memberships_for(db, user.id)
     role = _staff_role(user, rows, course_id)
-    if body.role == "student":
-        require(role, "roster:import", "Your role can't import a roster.")
-    elif body.role == "course_coordinator":
-        require(role, "course:manage_access", "Only an administrator can add a course coordinator.")
-    elif body.role == "instructor":
-        if not (can(role, "instructor:manage") or can(role, "course:manage_access")):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a course coordinator or administrator can add instructors.")
-    else:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't import a roster.")
+    _require_roster_role(role, body.role)
     if any(row.problem for row in body.rows):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Fix the flagged rows before importing.")
     course = await db.get(Course, course_id)
@@ -182,6 +187,9 @@ async def import_roster(
         if not UTEP_EMAIL.search(email):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{email} is not a UTEP email address.")
         person = await db.scalar(select(User).where(User.email == email))
+        university_id = row.university_id.strip() or None
+        if person is None and body.role == "student" and not re.fullmatch(r"800\d{6}", university_id or ""):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{email} needs a 9-digit 800 number.")
         if person is None:
             first, last = _split_name(row.full_name)
             temporary = secrets.token_urlsafe(9)
@@ -189,7 +197,7 @@ async def import_roster(
                 email=email,
                 first_name=first,
                 last_name=last,
-                university_id=row.university_id,
+                university_id=university_id,
                 hashed_password=hash_password(temporary),
                 must_change_password=True,
                 is_active=True,
@@ -237,6 +245,60 @@ async def import_roster(
     )
 
 
+@router.post("/{course_id}/enrollments", response_model=PublicUser, response_model_exclude_none=True)
+async def enroll_existing(
+    course_id: uuid.UUID, body: EnrollmentCreate, db: DbSession, user: CurrentUser, request: Request
+):
+    rows = await memberships_for(db, user.id)
+    _require_roster_role(_staff_role(user, rows, course_id), body.role)
+    await ensure_course_open(db, course_id)
+    person = await db.get(User, body.user_id)
+    if person is None or person.deleted_at is not None or person.purged_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found.")
+    if person.archived_at is not None or not person.is_active:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Reactivate this account before enrolling it in a class.")
+    member_role = await db.scalar(select(Role).where(Role.code == body.role))
+    discipline = await db.scalar(select(Discipline).where(Discipline.code == body.discipline))
+    if member_role is None or discipline is None:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Roles are not seeded.")
+    existing = await db.scalar(
+        select(CourseMembership).where(
+            CourseMembership.user_id == person.id,
+            CourseMembership.course_id == course_id,
+            CourseMembership.role_id == member_role.id,
+        )
+    )
+    if existing and existing.deactivated_at is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This person is already enrolled in the class with that role.")
+    if existing:
+        existing.deactivated_at = None
+        existing.deactivated_by_id = None
+        existing.discipline_id = discipline.id
+        detail = "reactivated"
+    else:
+        db.add(
+            CourseMembership(
+                user_id=person.id,
+                course_id=course_id,
+                role_id=member_role.id,
+                discipline_id=discipline.id,
+            )
+        )
+        detail = "enrolled"
+    await log_event(
+        db,
+        action="roster.enroll",
+        entity_type="course",
+        entity_id=str(course_id),
+        actor_user_id=user.id,
+        course_id=course_id,
+        ip_address=_ip(request),
+        detail=f"{body.role} user/{person.id} {detail}",
+    )
+    await db.commit()
+    return await user_out(db, person)
+
+
 @router.post("/{course_id}/roster/{user_id}/deactivate", response_model=PublicUser, response_model_exclude_none=True)
 async def deactivate_student(
     course_id: uuid.UUID, user_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request
@@ -264,6 +326,8 @@ async def remove_from_course(
     staff_role = _staff_role(user, rows, course_id)
     if role == "student":
         require(staff_role, "roster:import", "Your role can't edit the roster.")
+    elif role == "course_coordinator":
+        require(staff_role, "course:manage_access", "Only an administrator can change a course coordinator.")
     else:
         if not (can(staff_role, "instructor:manage") or can(staff_role, "instructor:remove") or can(staff_role, "course:manage_access")):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't remove instructors.")

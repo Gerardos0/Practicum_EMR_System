@@ -16,6 +16,8 @@ import CaseEditorPage from "./features/cases/CaseEditorPage";
 import RosterImportPage from "./features/admin/RosterImportPage";
 import AuditLogPage from "./features/admin/AuditLogPage";
 import CourseAdminPage from "./features/admin/CourseAdminPage";
+import AdminHomePage from "./features/admin/AdminHomePage";
+import AdminPeoplePage from "./features/admin/AdminPeoplePage";
 import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import PatientPortalPage from "./features/portal/PatientPortalPage";
@@ -28,7 +30,7 @@ function LoginRoute() {
   if (!session) return <LoginPage />;
   if (session.mustChangePassword) return <Navigate to="/change-password" replace />;
   if (session.activeRole === "patient") return <Navigate to="/portal" replace />;
-  if (session.activeRole === "admin" && !session.courseId) return <Navigate to="/admin/courses" replace />;
+  if (session.activeRole === "admin" && !session.courseId) return <Navigate to="/admin" replace />;
   if (session.courseId) return <Navigate to={homePathFor(session.activeRole)} replace />;
   return <Navigate to="/select-course" replace />;
 }
@@ -49,8 +51,11 @@ export default function App() {
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route element={<AppShell />}>
                 <Route element={<RequireAuth roles={["admin"]} needsCourse={false} />}>
+                  <Route path="/admin" element={<AdminHomePage />} />
                   <Route path="/admin/courses" element={<CourseAdminPage />} />
+                  <Route path="/admin/people" element={<AdminPeoplePage />} />
                   <Route path="/admin/reports" element={<ReportsPage />} />
+                  <Route path="/admin/activity" element={<AuditLogPage />} />
                 </Route>
 
                 <Route element={<RequireAuth roles={["patient"]} needsCourse={false} />}>
@@ -61,8 +66,10 @@ export default function App() {
                   <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator"]} />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
                   </Route>
-                  <Route path="/patients" element={<PatientListPage />} />
-                  <Route path="/patients/:patientId" element={<PatientChartPage />} />
+                  <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk"]} />}>
+                    <Route path="/patients" element={<PatientListPage />} />
+                    <Route path="/patients/:patientId" element={<PatientChartPage />} />
+                  </Route>
 
                   <Route element={<RequireAuth roles={["student"]} />}>
                     <Route path="/patients/:patientId/notes/:noteId" element={<NoteEditorPage />} />
@@ -73,7 +80,7 @@ export default function App() {
                     <Route path="/review/:noteId" element={<NoteReviewPage />} />
                   </Route>
 
-                  <Route element={<RequireAuth roles={["instructor", "course_coordinator", "admin"]} />}>
+                  <Route element={<RequireAuth roles={["instructor", "course_coordinator"]} />}>
                     <Route path="/teaching" element={<TeachingPage />} />
                     <Route path="/audit" element={<AuditLogPage />} />
                   </Route>

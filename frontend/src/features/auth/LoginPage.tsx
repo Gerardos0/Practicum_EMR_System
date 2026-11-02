@@ -7,7 +7,7 @@ import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
 import { useNavigate } from "react-router-dom";
 import { login } from "../../api/auth";
 import { takeSignedOutNotice } from "../../api/client";
-import { homePathFor } from "../../utils/permissions";
+import { homePathFor, uniqueRoles } from "../../utils/permissions";
 import { trainingStripe, utep } from "../../theme/tokens";
 import { useAuth } from "./AuthContext";
 
@@ -40,8 +40,14 @@ export default function LoginPage() {
           navigate("/change-password", { replace: true });
           return;
         }
-        const oneRoleOneCourse = result.user.roles.length === 1 && result.user.roles[0].courseIds.length === 1;
-        navigate(oneRoleOneCourse ? homePathFor(result.user.roles[0].role) : "/select-course", { replace: true });
+        const roles = uniqueRoles(result.user);
+        const only = roles.length === 1 ? roles[0] : undefined;
+        const singleCourse = result.user.roles.length === 1 && result.user.roles[0].courseIds.length === 1;
+        if (only === "admin" || only === "patient" || singleCourse) {
+          navigate(homePathFor(only!), { replace: true });
+          return;
+        }
+        navigate("/select-course", { replace: true });
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setBusy(false));
@@ -99,6 +105,8 @@ export default function LoginPage() {
                     Student: <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>daniel.reyes@miners.utep.edu</Box>
                     <br />
                     Instructor: <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>gerardo.sillas@utep.edu</Box>
+                    <br />
+                    Administrator: <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>clarissa.dominguez@utep.edu</Box>
                     <br />
                     Password <Box component="code" sx={{ fontFamily: "inherit", fontWeight: 700 }}>practicum-demo</Box>
                   </Typography>

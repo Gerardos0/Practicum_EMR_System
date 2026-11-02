@@ -67,12 +67,11 @@ function useNav(): NavItem[] {
       { to: "/audit", label: "Activity log", icon: ICON.audit },
     ],
     admin: [
-      { to: "/admin/courses", label: "Courses", icon: ICON.courses },
+      { to: "/admin", label: "Home", icon: ICON.dashboard },
+      { to: "/admin/courses", label: "Classes", icon: ICON.courses },
+      { to: "/admin/people", label: "People", icon: ICON.roster },
       { to: "/admin/reports", label: "Reports", icon: ICON.reports },
-      { to: "/admin/roster", label: "Roster", icon: ICON.roster },
-      { to: "/teaching", label: "Grades and time", icon: ICON.teaching },
-      { to: "/audit", label: "Activity log", icon: ICON.audit },
-      { to: "/patients", label: "Patients", icon: ICON.patients },
+      { to: "/admin/activity", label: "Activity log", icon: ICON.audit },
     ],
     front_desk: [{ to: "/patients", label: "Patients", icon: ICON.patients }],
     patient: [{ to: "/portal", label: "My chart", icon: ICON.patients }],
@@ -147,7 +146,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
             key={item.to}
             component={NavLink}
             to={item.to}
-            end={item.to === "/dashboard"}
+            end={item.to === "/dashboard" || item.to === "/admin"}
             startIcon={item.icon}
             onClick={onNavigate}
             sx={itemSx}

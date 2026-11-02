@@ -17,7 +17,7 @@ const statusTone: Record<CourseStatus, "default" | "info" | "success" | "warning
 };
 
 export default function CourseAdminPage() {
-  usePageHeading("Courses");
+  usePageHeading("Classes");
   const { user } = useSession();
   const courses = useAsync(() => listCoursesForUser(), [user.id]);
   const [code, setCode] = useState("");
@@ -71,13 +71,13 @@ export default function CourseAdminPage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Course management</Typography>
-        <Typography variant="body2" color="text.secondary">Create courses and manage their lifecycle.</Typography>
+        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Classes</Typography>
+        <Typography variant="body2" color="text.secondary">Create a class and manage whether it is open for teaching.</Typography>
       </Box>
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 
       <Paper component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Create course</Typography>
+        <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Add a class</Typography>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ alignItems: { md: "flex-start" } }}>
           <TextField size="small" label="Course code" value={code} onChange={(e) => setCode(e.target.value)} required slotProps={{ htmlInput: { maxLength: 30 } }} />
           <TextField size="small" label="Title" value={title} onChange={(e) => setTitle(e.target.value)} required fullWidth slotProps={{ htmlInput: { maxLength: 200 } }} />
@@ -89,7 +89,7 @@ export default function CourseAdminPage() {
       <Paper>
         {courses.loading && <LinearProgress />}
         <Box sx={{ px: 2.5, pt: 2 }}>
-          <Typography component="h2" variant="h6">Courses ({courses.data?.length ?? 0})</Typography>
+          <Typography component="h2" variant="h6">Classes ({courses.data?.length ?? 0})</Typography>
         </Box>
         <Box sx={{ overflowX: "auto", p: 1 }}>
           <Table size="small">

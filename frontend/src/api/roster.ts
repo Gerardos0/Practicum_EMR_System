@@ -34,6 +34,17 @@ export async function setRosterActive(courseId: string, userId: string, active: 
   return request<User>(`/courses/${courseId}/roster/${userId}/${action}`, { method: "POST" });
 }
 
-export async function removeFromCourse(courseId: string, userId: string, role: "student" | "instructor" = "student"): Promise<void> {
+export async function removeFromCourse(
+  courseId: string, userId: string, role: "student" | "instructor" | "course_coordinator" = "student",
+): Promise<void> {
   await request<void>(`/courses/${courseId}/roster/${userId}`, { method: "DELETE", query: { role } });
+}
+
+export async function enrollInCourse(
+  courseId: string, userId: string, role: "student" | "instructor" | "course_coordinator", discipline: Discipline,
+): Promise<User> {
+  return request<User>(`/courses/${courseId}/enrollments`, {
+    method: "POST",
+    json: { userId, role, discipline },
+  });
 }
