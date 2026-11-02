@@ -57,7 +57,7 @@ async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: s
             status.HTTP_403_FORBIDDEN,
             "This case belongs to another student. Each assessment case is private to the student it was assigned to.",
         )
-    if role not in {"student", "instructor", "admin", "front_desk"}:
+    if role not in {"student", "instructor", "course_coordinator", "admin", "front_desk"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't open charts.")
 
 
@@ -169,23 +169,38 @@ async def reset_practice(db: AsyncSession, patient: Patient, user: User, role: s
     )
 
 
+def _child_values(item: dict, fields: tuple[str, ...]) -> dict:
+    values: dict = {}
+    for field in fields:
+        if field not in item or item[field] is None:
+            continue
+        value = item[field]
+        if field == "collected_at" and isinstance(value, str):
+            value = date.fromisoformat(value)
+        elif field in {"recorded_at", "discontinued_at"} and isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        values[field] = value
+    return values
+
+
 async def _replace_children(db: AsyncSession, patient: Patient, snap: dict) -> None:
     specs = (
-        ("allergies", Allergy, ("substance", "reaction", "severity")),
-        ("medications", Medication, ("name", "dose", "route", "frequency", "indication", "adherence")),
+        ("allergies", Allergy, ("substance", "reaction", "severity", "category")),
+        (
+            "medications",
+            Medication,
+            ("name", "dose", "route", "frequency", "indication", "adherence", "status", "prescribed", "discontinued_at"),
+        ),
         ("problems", Problem, ("code", "description", "since")),
         ("labs", LabResult, ("name", "value", "unit", "reference_range", "flag", "collected_at")),
-        ("vitals", Vital, ("label", "value")),
+        ("vitals", Vital, ("label", "value", "recorded_at")),
     )
     for key, model, fields in specs:
         getattr(patient, key).clear()
     await db.flush()
     for key, model, fields in specs:
         for item in snap.get(key, []):
-            values = {field: item.get(field) for field in fields}
-            if isinstance(values.get("collected_at"), str):
-                values["collected_at"] = date.fromisoformat(values["collected_at"])
-            getattr(patient, key).append(model(**values))
+            getattr(patient, key).append(model(**_child_values(item, fields)))
 
 
 def chart_snapshot(patient: Patient) -> dict:
@@ -200,6 +215,11 @@ def chart_snapshot(patient: Patient) -> dict:
         "family_history": patient.family_history,
         "surgical_history": patient.surgical_history,
         "social_history": patient.social_history,
+        "section_locks": patient.section_locks,
+        "prefill_sections": patient.prefill_sections,
+        "unit": patient.unit,
+        "room": patient.room,
+        "bed": patient.bed,
         "encounter": {
             "type": patient.encounter.type,
             "date": patient.encounter.date.isoformat(),
@@ -207,7 +227,13 @@ def chart_snapshot(patient: Patient) -> dict:
         if patient.encounter
         else None,
         "allergies": [
-            {"id": str(a.id), "substance": a.substance, "reaction": a.reaction, "severity": a.severity}
+            {
+                "id": str(a.id),
+                "substance": a.substance,
+                "reaction": a.reaction,
+                "severity": a.severity,
+                "category": a.category,
+            }
             for a in patient.allergies
         ],
         "medications": [
@@ -219,6 +245,9 @@ def chart_snapshot(patient: Patient) -> dict:
                 "frequency": m.frequency,
                 "indication": m.indication,
                 "adherence": m.adherence,
+                "status": m.status,
+                "prescribed": m.prescribed,
+                "discontinued_at": m.discontinued_at.isoformat() if m.discontinued_at else None,
             }
             for m in patient.medications
         ],
@@ -237,7 +266,15 @@ def chart_snapshot(patient: Patient) -> dict:
             }
             for lab in patient.labs
         ],
-        "vitals": [{"id": str(v.id), "label": v.label, "value": v.value} for v in patient.vitals],
+        "vitals": [
+            {
+                "id": str(v.id),
+                "label": v.label,
+                "value": v.value,
+                "recorded_at": v.recorded_at.isoformat() if v.recorded_at else None,
+            }
+            for v in patient.vitals
+        ],
     }
 
 
@@ -305,18 +342,26 @@ async def assign_case(
         emergency_contact_phone=source.emergency_contact_phone,
         emergency_contact_relationship=source.emergency_contact_relationship,
         is_training=True,
+        section_locks=dict(source.section_locks or {}),
+        prefill_sections=list(source.prefill_sections or []),
+        unit=source.unit,
+        room=source.room,
+        bed=source.bed,
         encounter=Encounter(
             type=source.encounter.type if source.encounter else "Office visit",
             date=date.today(),
         ),
     )
     for item in source.allergies:
-        clone.allergies.append(Allergy(substance=item.substance, reaction=item.reaction, severity=item.severity))
+        clone.allergies.append(
+            Allergy(substance=item.substance, reaction=item.reaction, severity=item.severity, category=item.category)
+        )
     for item in source.medications:
         clone.medications.append(
             Medication(
                 name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
-                indication=item.indication, adherence=item.adherence,
+                indication=item.indication, adherence=item.adherence, status=item.status,
+                prescribed=item.prescribed, discontinued_at=item.discontinued_at,
             )
         )
     for item in source.problems:
@@ -329,7 +374,7 @@ async def assign_case(
             )
         )
     for item in source.vitals:
-        clone.vitals.append(Vital(label=item.label, value=item.value))
+        clone.vitals.append(Vital(label=item.label, value=item.value, recorded_at=item.recorded_at))
     db.add(clone)
     await db.flush()
 

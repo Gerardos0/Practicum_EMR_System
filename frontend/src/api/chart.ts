@@ -1,0 +1,85 @@
+import type { Allergy, LabResult, Medication, Patient, Problem, Role, Vital } from "../types";
+import { request } from "./client";
+
+function chart(role: Role, patientId: string, path: string, method: string, json?: unknown) {
+  return request<Patient>(`/patients/${patientId}${path}`, { method, query: { role }, json });
+}
+
+export function recordPresence(role: Role, patientId: string): Promise<void> {
+  return request<void>(`/patients/${patientId}/presence`, { method: "POST", query: { role } });
+}
+
+export function addAllergy(role: Role, patientId: string, body: Omit<Allergy, "id">): Promise<Patient> {
+  return chart(role, patientId, "/allergies", "POST", body);
+}
+
+export function removeAllergy(role: Role, patientId: string, allergyId: string): Promise<Patient> {
+  return chart(role, patientId, `/allergies/${allergyId}`, "DELETE");
+}
+
+export function addMedication(role: Role, patientId: string, body: Omit<Medication, "id" | "status" | "discontinuedAt">): Promise<Patient> {
+  return chart(role, patientId, "/medications", "POST", body);
+}
+
+export function updateMedication(
+  role: Role, patientId: string, medicationId: string, body: Omit<Medication, "id" | "status" | "discontinuedAt">,
+): Promise<Patient> {
+  return chart(role, patientId, `/medications/${medicationId}`, "PATCH", body);
+}
+
+export function discontinueMedication(role: Role, patientId: string, medicationId: string): Promise<Patient> {
+  return chart(role, patientId, `/medications/${medicationId}/discontinue`, "POST");
+}
+
+export function deleteMedicationEnteredInError(role: Role, patientId: string, medicationId: string): Promise<Patient> {
+  return request<Patient>(`/patients/${patientId}/medications/${medicationId}`, {
+    method: "DELETE",
+    query: { role, reason: "entered_in_error" },
+  });
+}
+
+export function administerMedication(role: Role, patientId: string, medicationId: string, doseGiven: string): Promise<{ status: string }> {
+  return request(`/patients/${patientId}/medications/${medicationId}/administrations`, {
+    method: "POST",
+    query: { role },
+    json: { doseGiven },
+  });
+}
+
+export interface AdministrationRecord {
+  id: string;
+  medicationName: string;
+  doseGiven: string;
+  studentName: string;
+  administeredAt: string;
+  reviewStatus: string;
+  reviewComment?: string | null;
+}
+
+export function listAdministrations(role: Role, patientId: string): Promise<AdministrationRecord[]> {
+  return request<AdministrationRecord[]>(`/patients/${patientId}/administrations`, { query: { role } });
+}
+
+export function reviewAdministration(role: Role, administrationId: string, decision: "accepted" | "needs_follow_up", comment: string): Promise<void> {
+  return request<void>(`/patients/administrations/${administrationId}/review`, {
+    method: "POST",
+    query: { role },
+    json: { decision, comment },
+  });
+}
+
+export function addVital(role: Role, patientId: string, body: Pick<Vital, "label" | "value">): Promise<Patient> {
+  return chart(role, patientId, "/vitals", "POST", body);
+}
+
+export function addLab(role: Role, patientId: string, body: Omit<LabResult, "id">): Promise<Patient> {
+  return chart(role, patientId, "/labs", "POST", body);
+}
+
+export function addProblem(role: Role, patientId: string, body: Omit<Problem, "id">): Promise<Patient> {
+  return chart(role, patientId, "/problems", "POST", body);
+}
+
+export function updatePlacement(role: Role, patientId: string, body: { unit?: string; room?: string; bed?: string }): Promise<Patient> {
+  return chart(role, patientId, "/placement", "PATCH", body);
+}

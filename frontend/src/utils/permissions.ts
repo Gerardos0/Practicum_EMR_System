@@ -24,22 +24,27 @@ export type Action =
   | "course:manage_access"
   | "user:manage_access"
   | "report:run"
-  | "case:author";
+  | "report:export_teaching"
+  | "case:author"
+  | "instructor:manage"
+  | "portal:view";
+
+const teaching: Action[] = [
+  "patient:create", "patient:update_status", "patient:reset_practice",
+  "encounter:advance", "note:cosign", "referral:create", "audit:view", "case:author", "report:export_teaching",
+];
 
 const matrix: Record<Role, Action[]> = {
   student: ["encounter:advance", "note:author", "referral:create"],
-  instructor: [
-    "patient:create", "patient:update_status", "patient:reset_practice",
-    "encounter:advance", "note:cosign", "referral:create", "roster:import", "audit:view", "instructor:remove",
-    "case:author",
-  ],
+  instructor: teaching,
+  course_coordinator: [...teaching, "instructor:manage"],
   admin: [
-    "patient:create", "patient:update_status", "patient:reset_practice", "roster:import", "audit:view",
-    "instructor:remove", "course:create", "course:manage_status", "course:manage_access", "user:manage_access", "report:run",
-    "case:author",
+    "roster:import", "audit:view", "instructor:manage", "instructor:remove",
+    "course:create", "course:manage_status", "course:manage_access", "user:manage_access",
+    "report:run", "report:export_teaching",
   ],
-  front_desk: ["patient:create"],
-  patient: [],
+  front_desk: [],
+  patient: ["portal:view"],
 };
 
 export function can(role: Role, action: Action): boolean {
@@ -50,9 +55,12 @@ export function homePathFor(role: Role): string {
   switch (role) {
     case "student":
     case "instructor":
+    case "course_coordinator":
       return "/dashboard";
     case "admin":
       return "/admin/courses";
+    case "patient":
+      return "/portal";
     default:
       return "/patients";
   }

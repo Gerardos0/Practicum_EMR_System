@@ -14,7 +14,7 @@ from app.services.audit import log_event
 
 
 def can_read_answer_key(role: str) -> bool:
-    return can(role, "case:author") or can(role, "note:cosign")
+    return role == "admin" or can(role, "case:author") or can(role, "note:cosign")
 
 
 async def deny_answer_key(

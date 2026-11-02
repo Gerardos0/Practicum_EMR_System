@@ -5,7 +5,7 @@ export type Discipline =
   | "speech_language_pathology"
   | "nursing";
 
-export type Role = "student" | "instructor" | "admin" | "front_desk" | "patient";
+export type Role = "student" | "instructor" | "course_coordinator" | "admin" | "front_desk" | "patient";
 export type CourseStatus = "planned" | "active" | "ended" | "archived";
 
 export interface RoleAssignment {
@@ -21,6 +21,7 @@ export interface User {
   universityId?: string;
   phoneLast4?: string;
   isActive: boolean;
+  archivedAt?: string;
   roles: RoleAssignment[];
   rosterStatus?: "active" | "inactive";
   deactivatedAt?: string;
@@ -34,6 +35,24 @@ export interface Course {
   status: CourseStatus;
   instructorIds: string[];
   rubricFileName?: string;
+  gradingGuide?: GradingGuide | null;
+}
+
+export interface GradingCriterion {
+  id: string;
+  label: string;
+  detail: string;
+  max_points?: number | null;
+}
+
+export interface GradingGuide {
+  file_name?: string;
+  criteria: GradingCriterion[];
+}
+
+export interface RubricScores {
+  criteria: { id: string; score?: number | null; feedback?: string; max_points?: number | null }[];
+  overall_feedback?: string;
 }
 
 export type CaseMode = "practice" | "assessment" | "case";
@@ -50,10 +69,14 @@ export interface PatientStatus {
   program?: string;
 }
 
+export type AllergyCategory = "medication" | "food" | "environmental";
+
 export interface Allergy {
+  id?: string;
   substance: string;
   reaction?: string;
   severity?: "mild" | "moderate" | "severe";
+  category?: AllergyCategory;
 }
 
 export interface Medication {
@@ -64,6 +87,9 @@ export interface Medication {
   frequency: string;
   indication?: string;
   adherence?: string;
+  status?: "active" | "discontinued" | "entered_in_error";
+  prescribed?: boolean;
+  discontinuedAt?: string;
 }
 
 export interface LabResult {
@@ -77,11 +103,14 @@ export interface LabResult {
 }
 
 export interface Vital {
+  id?: string;
   label: string;
   value: string;
+  recordedAt?: string;
 }
 
 export interface Problem {
+  id?: string;
   code?: string;
   description: string;
   since?: string;
@@ -123,11 +152,23 @@ export interface Patient {
   surgicalHistory: string;
   socialHistory: string;
   encounter: Encounter;
+  sectionLocks?: Record<string, boolean>;
+  prefillSections?: string[];
+  unit?: string;
+  room?: string;
+  bed?: string;
 }
 
 export type NoteStatus = "draft" | "signed" | "pending_review" | "returned" | "cosigned";
 
-export type NoteTemplateId = "pharmacy_mtm" | "pt_daily_soap" | "general_soap";
+export type NoteTemplateId =
+  | "pharmacy_soap"
+  | "sbar"
+  | "phone_note"
+  | "telehealth_visit"
+  | "pharmacy_mtm"
+  | "pt_daily_soap"
+  | "general_soap";
 
 export interface IcdCode {
   code: string;
@@ -169,6 +210,9 @@ export interface ClinicalNote {
   version: number;
   content: Record<string, string>;
   diagnoses: IcdCode[];
+  cptCodes?: IcdCode[];
+  bodyLocked?: boolean;
+  rubricScores?: RubricScores | null;
   routedToId?: string;
   createdAt: string;
   updatedAt: string;

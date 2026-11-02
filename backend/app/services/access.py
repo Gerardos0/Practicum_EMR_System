@@ -8,36 +8,36 @@ from sqlalchemy.orm import selectinload
 from app.models.clinical import Course, CourseMembership
 from app.models.user import User
 
+TEACHING_PERMISSIONS = [
+    "patient:create",
+    "patient:update_status",
+    "patient:reset_practice",
+    "encounter:advance",
+    "note:cosign",
+    "referral:create",
+    "audit:view",
+    "case:author",
+    "report:export_teaching",
+]
+
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     "student": ["encounter:advance", "note:author", "referral:create"],
-    "instructor": [
-        "patient:create",
-        "patient:update_status",
-        "patient:reset_practice",
-        "encounter:advance",
-        "note:cosign",
-        "referral:create",
-        "roster:import",
-        "instructor:remove",
-        "audit:view",
-        "case:author",
-    ],
+    "instructor": list(TEACHING_PERMISSIONS),
+    "course_coordinator": [*TEACHING_PERMISSIONS, "instructor:manage"],
     "admin": [
-        "patient:create",
-        "patient:update_status",
-        "patient:reset_practice",
         "roster:import",
         "audit:view",
+        "instructor:manage",
         "instructor:remove",
         "course:create",
         "course:manage_status",
         "course:manage_access",
         "user:manage_access",
         "report:run",
-        "case:author",
+        "report:export_teaching",
     ],
-    "front_desk": ["patient:create"],
-    "patient": [],
+    "front_desk": [],
+    "patient": ["portal:view"],
 }
 
 CLINICAL_ROLES = set(ROLE_PERMISSIONS)
@@ -81,7 +81,7 @@ async def ensure_course_open(db: AsyncSession, course_id: uuid.UUID) -> Course:
 
 
 def holds_role(user: User, role: str, rows: list[CourseMembership]) -> bool:
-    if role == "admin" and any(item.code == "admin" for item in user.roles):
+    if role in {"admin", "patient"} and any(item.code == role for item in user.roles):
         return True
     return any(row.role.code == role for row in rows)
 

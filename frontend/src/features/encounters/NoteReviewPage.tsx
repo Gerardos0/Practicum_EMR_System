@@ -3,7 +3,7 @@ import {
   Alert, Box, Breadcrumbs, Button, Divider, LinearProgress, Link, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { commentOnNote, cosignNote, getNote, returnNote } from "../../api/notes";
+import { commentOnNote, cosignNote, getNote, instructorEditNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
 import { getCourse } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
@@ -21,6 +21,8 @@ import Addenda from "./components/Addenda";
 import CourseRubricPanel from "./components/CourseRubricPanel";
 import AnswerKeyPanel from "./components/AnswerKeyPanel";
 import { templateName } from "./noteTemplates";
+import ScoreForm from "./components/ScoreForm";
+import type { IcdCode } from "../../types";
 
 export default function NoteReviewPage() {
   const { noteId = "" } = useParams();
@@ -29,6 +31,9 @@ export default function NoteReviewPage() {
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftContent, setDraftContent] = useState<Record<string, string>>({});
+  const [draftDiagnoses, setDraftDiagnoses] = useState<IcdCode[]>([]);
 
   const load = useAsync(async () => {
     const note = await getNote(activeRole, noteId);
@@ -57,7 +62,7 @@ export default function NoteReviewPage() {
       load.setData({ note: updated, patient });
       setComment("");
       const flash = kind === "cosign"
-        ? `Co-signed ${note.authorName}'s note. Record the score in the course gradebook if needed.`
+        ? `Co-signed ${note.authorName}'s note.`
         : `Returned ${note.authorName}'s note for revision.`;
       navigate("/review", { replace: true, state: { flash } });
     } catch (e) {
@@ -94,15 +99,49 @@ export default function NoteReviewPage() {
               </Typography>
             </Box>
             <NoteStatusChip status={note.status} />
+            {pending && !note.bodyLocked && (
+              <Button size="small" variant="outlined" onClick={() => {
+                if (editing) {
+                  setEditing(false);
+                  return;
+                }
+                setDraftContent(note.content);
+                setDraftDiagnoses(note.diagnoses);
+                setEditing(true);
+              }}>{editing ? "Cancel edit" : "Edit note"}</Button>
+            )}
           </Box>
           <NoteFields
-            templateId={note.templateId} patient={patient} content={note.content} diagnoses={note.diagnoses} readOnly
+            templateId={note.templateId} patient={patient}
+            content={editing ? draftContent : note.content}
+            diagnoses={editing ? draftDiagnoses : note.diagnoses}
+            readOnly={!editing}
             comments={note.feedback}
-            onComment={pending ? async (sectionId, body) => {
+            onField={editing ? (id, next) => setDraftContent((current) => ({
+              ...current,
+              [id]: typeof next === "function" ? next(current[id] ?? "") : next,
+            })) : undefined}
+            onDiagnoses={editing ? setDraftDiagnoses : undefined}
+            onComment={pending && !editing ? async (sectionId, body) => {
               const updated = await commentOnNote(activeRole, note.id, { sectionId, body });
               load.setData({ note: updated, patient });
             } : undefined}
           />
+          {editing && (
+            <Button sx={{ mt: 2 }} variant="contained" disabled={busy} onClick={async () => {
+              setBusy(true);
+              setError("");
+              try {
+                const updated = await instructorEditNote(activeRole, note.id, { content: draftContent, diagnoses: draftDiagnoses });
+                load.setData({ note: updated, patient });
+                setEditing(false);
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}>Save instructor edit</Button>
+          )}
           {note.addenda.length > 0 && (<><Divider sx={{ my: 3 }} /><Addenda items={note.addenda} /></>)}
         </Paper>
 
@@ -115,7 +154,7 @@ export default function NoteReviewPage() {
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>Your review</Typography>
             <NoteProgress note={note} />
 
-            <CourseRubricPanel fileName={course.data?.rubricFileName} />
+            <CourseRubricPanel guide={course.data?.gradingGuide} fileName={course.data?.rubricFileName} />
 
             {note.feedback.length > 0 && (
               <Box sx={{ mt: 2 }}><FeedbackThread items={note.feedback} /></Box>
@@ -136,14 +175,19 @@ export default function NoteReviewPage() {
                   Return for revision
                 </Button>
                 <Typography variant="caption" color="text.secondary">
-                  Co-sign locks the note as final. Return unlocks it so the student can revise and resubmit.
+                  Return is the usual path and reopens the note. Co-sign locks the wording. Later corrections are addenda.
                 </Typography>
               </Stack>
             )}
-
-            <Alert severity="info" icon={false} sx={{ mt: 2 }}>
-              Record the score in the course gradebook (Blackboard). Grades aren't stored in the EMR, so students never see them here (FERPA).
-            </Alert>
+            {(pending || note.status === "cosigned") && (
+              <ScoreForm
+                key={(course.data?.gradingGuide?.criteria ?? []).map((item) => item.id).join()}
+                role={activeRole}
+                note={note}
+                guide={course.data?.gradingGuide}
+                onSaved={(updated) => load.setData({ note: updated, patient })}
+              />
+            )}
           </Paper>
 
           <Paper sx={{ overflow: "hidden" }}>

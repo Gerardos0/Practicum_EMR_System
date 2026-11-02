@@ -8,7 +8,9 @@ import type { Discipline, RosterRow, User } from "../../types";
 import { importRoster, listRoster, removeFromCourse, setRosterActive, type TempPassword } from "../../api/roster";
 import { getCourse, listInstructors } from "../../api/courses";
 import { setUserActive } from "../../api/users";
+import { archiveUser, purgeExpiredAccounts } from "../../api/users";
 import { useSession } from "../auth/AuthContext";
+import { can } from "../../utils/permissions";
 import { disciplineLabel } from "../../utils/labels";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
@@ -23,13 +25,14 @@ export default function RosterImportPage() {
   const [rows, setRows] = useState<RosterRow[]>();
   const [fileName, setFileName] = useState("");
   const [discipline, setDiscipline] = useState<Discipline>("pharmacy");
-  const [importRole, setImportRole] = useState<"student" | "instructor">("student");
+  const manageStudents = can(activeRole, "roster:import");
+  const [importRole, setImportRole] = useState<"student" | "instructor" | "course_coordinator">(manageStudents ? "student" : "instructor");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string }>();
   const [passwords, setPasswords] = useState<TempPassword[]>([]);
   const [removing, setRemoving] = useState<{ person: User; role: "student" | "instructor" }>();
 
   const course = useAsync(() => getCourse(courseId), [courseId]);
-  const roster = useAsync(() => listRoster(courseId), [courseId]);
+  const roster = useAsync(() => (manageStudents ? listRoster(courseId) : Promise.resolve([])), [courseId, manageStudents]);
   const instructors = useAsync(() => listInstructors(courseId), [courseId]);
 
   const problems = rows?.filter((r) => r.problem).length ?? 0;
@@ -96,10 +99,11 @@ export default function RosterImportPage() {
       <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6">Add people</Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" }, mt: 2 }}>
-          {activeRole === "admin" && (
-            <TextField select size="small" label="Add as" value={importRole} onChange={(e) => setImportRole(e.target.value as "student" | "instructor")} sx={{ minWidth: 160 }}>
+          {manageStudents && (
+            <TextField select size="small" label="Add as" value={importRole} onChange={(e) => setImportRole(e.target.value as "student" | "instructor" | "course_coordinator")} sx={{ minWidth: 200 }}>
               <MenuItem value="student">Student</MenuItem>
               <MenuItem value="instructor">Instructor</MenuItem>
+              <MenuItem value="course_coordinator">Course coordinator</MenuItem>
             </TextField>
           )}
           <TextField select size="small" label="Discipline" value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} sx={{ minWidth: 240 }}>
@@ -111,7 +115,7 @@ export default function RosterImportPage() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600 }}>Add one person</Typography>
             <AddPersonForm
-              role={activeRole === "admin" ? importRole : "student"}
+              role={importRole}
               discipline={discipline}
               onSubmit={(row) => doImport([row])}
             />
@@ -164,7 +168,7 @@ export default function RosterImportPage() {
           </Box>
       )}
 
-      <Paper sx={{ p: 2.5 }}>
+      {manageStudents && <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6">Enrolled students ({roster.data?.length ?? 0})</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           Deactivate keeps the student on the roster and keeps their charts and notes. They lose access until you reactivate them. Remove deletes the enrollment.
@@ -197,6 +201,17 @@ export default function RosterImportPage() {
                             setMessage({ kind: "error", text: (e as Error).message });
                           }
                         }}>{inactive ? "Reactivate" : "Deactivate"}</Button>
+                        {manageStudents && (
+                          <Button size="small" onClick={async () => {
+                            try {
+                              await archiveUser(u.id);
+                              roster.reload();
+                              setMessage({ kind: "success", text: `${u.fullName} was archived. The account is kept for two years, then an administrator can purge it.` });
+                            } catch (e) {
+                              setMessage({ kind: "error", text: (e as Error).message });
+                            }
+                          }}>Archive</Button>
+                        )}
                         {activeRole === "admin" && (
                           <Button size="small" disabled={u.id === user.id && u.isActive} onClick={async () => {
                             try {
@@ -216,7 +231,18 @@ export default function RosterImportPage() {
             </Table>
           </Box>
         )}
-      </Paper>
+      </Paper>}
+
+      {manageStudents && (
+        <Button variant="outlined" onClick={async () => {
+          try {
+            const result = await purgeExpiredAccounts();
+            setMessage({ kind: "success", text: `${result.purged} archived account${result.purged === 1 ? "" : "s"} passed the two-year mark and ${result.purged === 1 ? "was" : "were"} purged.` });
+          } catch (e) {
+            setMessage({ kind: "error", text: (e as Error).message });
+          }
+        }}>Purge accounts archived more than two years</Button>
+      )}
 
       <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6">Instructors ({instructors.data?.length ?? 0})</Typography>

@@ -4,8 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.clinical import ClinicalNote, CourseMembership, NoteAddendum, NoteComment, Patient
-from app.models.user import Discipline, Role, User
+from app.models.clinical import ClinicalNote, NoteAddendum, NoteComment, Patient
+from app.models.user import Discipline, User
 from app.services.access import can, require
 from app.services.audit import log_event
 from app.services.note_prefill import diagnoses_from_patient, prefill_from_patient
@@ -74,8 +74,8 @@ async def create_draft(
 async def save_draft(db, note: ClinicalNote, author: User, expected_version: int, patch: dict) -> ClinicalNote:
     if note.author_id != author.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the author can edit this note.")
-    if note.status not in EDITABLE:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead.")
+    if note.status not in EDITABLE or note.body_locked:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead of changing it.")
     _check_version(note, expected_version)
     if patch.get("template_id"):
         note.template_id = patch["template_id"]
@@ -83,6 +83,8 @@ async def save_draft(db, note: ClinicalNote, author: User, expected_version: int
         note.content = patch["content"]
     if patch.get("diagnoses") is not None:
         note.diagnoses = patch["diagnoses"]
+    if patch.get("cpt_codes") is not None:
+        note.cpt_codes = patch["cpt_codes"]
     if "routed_to_id" in patch and patch["routed_to_id"] is not None:
         note.routed_to_id = patch["routed_to_id"]
     note.version += 1
@@ -96,17 +98,11 @@ async def sign_note(db, note: ClinicalNote, author: User, expected_version: int,
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the author can sign this note.")
     if note.status not in EDITABLE:
         raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead.")
+    if note.body_locked:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead of changing it.")
     _check_version(note, expected_version)
     if note.mode == "assessment" and note.routed_to_id is None:
-        instructor_id = await db.scalar(
-            select(CourseMembership.user_id)
-            .join(Role, Role.id == CourseMembership.role_id)
-            .where(CourseMembership.course_id == course_id, Role.code == "instructor")
-            .limit(1)
-        )
-        if instructor_id is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose an instructor to review this note.")
-        note.routed_to_id = instructor_id
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose an instructor to review this note.")
     note.status = "pending_review" if note.mode == "assessment" else "signed"
     note.signed_at = utcnow()
     note.updated_at = note.signed_at
@@ -141,6 +137,7 @@ async def cosign_note(db, note: ClinicalNote, reviewer: User, role: str, comment
     if note.status != "pending_review":
         raise HTTPException(status.HTTP_409_CONFLICT, "Only notes pending review can be co-signed.")
     note.status = "cosigned"
+    note.body_locked = True
     note.cosigned_at = utcnow()
     note.cosigned_by_id = reviewer.id
     note.updated_at = note.cosigned_at
@@ -242,13 +239,61 @@ async def add_section_comment(
     )
 
 
+async def instructor_edit_note(db, note: ClinicalNote, reviewer: User, role: str, patch: dict, ip: str | None, course_id) -> None:
+    require(role, "note:cosign", "Your role can't edit a student note.")
+    if note.body_locked:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This note is already signed. Return it or review the addendum.")
+    if note.status != "pending_review":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Edit a note while it is pending review, or return it to the student.")
+    if patch.get("content") is not None:
+        note.content = patch["content"]
+    if patch.get("diagnoses") is not None:
+        note.diagnoses = patch["diagnoses"]
+    if patch.get("cpt_codes") is not None:
+        note.cpt_codes = patch["cpt_codes"]
+    note.version += 1
+    note.updated_at = utcnow()
+    await log_event(
+        db,
+        action="note.instructor_edit",
+        entity_type="note",
+        entity_id=str(note.id),
+        actor_user_id=reviewer.id,
+        course_id=course_id,
+        ip_address=ip,
+    )
+
+
+async def save_scores(db, note: ClinicalNote, reviewer: User, role: str, scores: dict, ip: str | None, course_id) -> None:
+    require(role, "note:cosign", "Your role can't grade notes.")
+    if note.status not in {"pending_review", "cosigned"}:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Score a note while it is in review or after co-signature.")
+    note.rubric_scores = scores
+    note.updated_at = utcnow()
+    await log_event(
+        db,
+        action="note.score",
+        entity_type="note",
+        entity_id=str(note.id),
+        actor_user_id=reviewer.id,
+        course_id=course_id,
+        ip_address=ip,
+    )
+
+
 async def add_addendum(db, note: ClinicalNote, author: User, body: str, ip: str | None, course_id) -> None:
-    if note.status not in {"signed", "cosigned"}:
+    if note.author_id != author.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the author can add an addendum.")
+    revisable = note.status in {"signed", "cosigned"} or (note.status == "returned" and note.body_locked)
+    if not revisable:
         raise HTTPException(status.HTTP_409_CONFLICT, "Addenda are for signed notes. Edit the draft instead.")
     now = utcnow()
     db.add(NoteAddendum(note_id=note.id, author_id=author.id, body=body.strip(), created_at=now))
     note.updated_at = now
     note.version += 1
+    if note.mode == "assessment":
+        note.status = "pending_review"
+        note.body_locked = True
     await log_event(
         db,
         action="note.addendum",

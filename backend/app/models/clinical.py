@@ -6,6 +6,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Tex
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.clinical_sections import DEFAULT_SECTION_LOCKS
 from app.db.base import Base
 from app.models.mixins import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.user import User
@@ -20,6 +21,7 @@ class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     term: Mapped[str] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
     rubric_file_name: Mapped[str | None] = mapped_column(String(255))
+    grading_guide: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class CourseMembership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -76,6 +78,11 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     is_training: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     answer_key_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    section_locks: Mapped[dict[str, Any]] = mapped_column(JSONB, default=lambda: dict(DEFAULT_SECTION_LOCKS))
+    prefill_sections: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    unit: Mapped[str | None] = mapped_column(String(80))
+    room: Mapped[str | None] = mapped_column(String(40))
+    bed: Mapped[str | None] = mapped_column(String(40))
 
     owner: Mapped[User | None] = relationship(foreign_keys=[owner_id], lazy="selectin")
     created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id], lazy="selectin")
@@ -96,6 +103,7 @@ class Allergy(UUIDPrimaryKeyMixin, Base):
     substance: Mapped[str] = mapped_column(String(120))
     reaction: Mapped[str | None] = mapped_column(String(120))
     severity: Mapped[str | None] = mapped_column(String(20))
+    category: Mapped[str] = mapped_column(String(20), default="medication", server_default="medication")
 
 
 class Medication(UUIDPrimaryKeyMixin, Base):
@@ -108,6 +116,9 @@ class Medication(UUIDPrimaryKeyMixin, Base):
     frequency: Mapped[str] = mapped_column(String(80))
     indication: Mapped[str | None] = mapped_column(String(120))
     adherence: Mapped[str | None] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
+    discontinued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    prescribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class Problem(UUIDPrimaryKeyMixin, Base):
@@ -137,6 +148,7 @@ class Vital(UUIDPrimaryKeyMixin, Base):
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
     label: Mapped[str] = mapped_column(String(40))
     value: Mapped[str] = mapped_column(String(40))
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Encounter(UUIDPrimaryKeyMixin, Base):
@@ -161,6 +173,9 @@ class ClinicalNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     diagnoses: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     routed_to_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    cpt_codes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    rubric_scores: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    body_locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cosigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cosigned_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
@@ -232,3 +247,31 @@ class Referral(UUIDPrimaryKeyMixin, Base):
 
     to_discipline: Mapped["Discipline"] = relationship(lazy="selectin")
     created_by: Mapped[User] = relationship(lazy="selectin")
+
+
+class ChartSession(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "chart_sessions"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MedicationAdministration(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "medication_administrations"
+
+    medication_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("medications.id", ondelete="CASCADE"), index=True)
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    dose_given: Mapped[str] = mapped_column(String(80))
+    administered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    review_status: Mapped[str] = mapped_column(String(20), default="pending_review", server_default="pending_review")
+    review_comment: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    medication: Mapped[Medication] = relationship(lazy="selectin")
+    student: Mapped[User] = relationship(foreign_keys=[student_id], lazy="selectin")
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id], lazy="selectin")

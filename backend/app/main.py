@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes import audit, auth, cases, courses, notes, patients, reports, scheduling, users
+from app.api.routes import audit, auth, cases, courses, notes, patients, portal, reference, reports, scheduling, users
 from app.core.config import settings
 from app.db.session import get_db
 
@@ -28,6 +28,8 @@ app.include_router(scheduling.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reference.router, prefix=settings.API_V1_PREFIX)
+app.include_router(portal.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():

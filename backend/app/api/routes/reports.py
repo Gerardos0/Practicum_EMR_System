@@ -8,8 +8,9 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from app.api.deps import CurrentUser, DbSession
 from app.models.clinical import Course
 from app.schemas.reports import CourseReportOut
-from app.services.access import memberships_for, require, require_held_role
+from app.services.access import can, memberships_for, require, require_course, require_held_role
 from app.services.reports import course_report
+from app.services.teaching_exports import activity_workbook, grade_workbook
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -41,4 +42,48 @@ async def get_course_report(
         output.getvalue(),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="course-{course_id}-report.csv"'},
+    )
+
+
+async def _teaching(db, user, course_id, role: str) -> None:
+    rows = await memberships_for(db, user.id)
+    require_course(role, course_id, user, rows)
+    if not can(role, "report:export_teaching"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't export teaching reports.")
+
+
+@router.get("/courses/{course_id}/grades.xlsx")
+async def export_grades(
+    course_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    role: Annotated[str, Query()],
+    case_key: Annotated[str, Query()],
+):
+    await _teaching(db, user, course_id, role)
+    if await db.get(Course, course_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found.")
+    payload = await grade_workbook(db, course_id, case_key)
+    return Response(
+        payload,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="case-grades.xlsx"'},
+    )
+
+
+@router.get("/courses/{course_id}/activity.xlsx")
+async def export_activity(
+    course_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    role: Annotated[str, Query()],
+):
+    await _teaching(db, user, course_id, role)
+    if await db.get(Course, course_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found.")
+    payload = await activity_workbook(db, course_id)
+    return Response(
+        payload,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="chart-time.xlsx"'},
     )

@@ -4,9 +4,10 @@ import uuid
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.clinical_sections import locks_or_default, prefill_or_default
 from app.models.clinical import Encounter, Patient
 from app.models.user import User
 from app.schemas.clinical import CaseIn
@@ -74,6 +75,11 @@ async def create_case(
         care_setting=body.care_setting,
         program=(body.program or "").strip() or None,
         is_training=True,
+        section_locks=locks_or_default(body.section_locks),
+        prefill_sections=prefill_or_default(body.prefill_sections),
+        unit=(body.unit or "").strip() or None,
+        room=(body.room or "").strip() or None,
+        bed=(body.bed or "").strip() or None,
         encounter=Encounter(type=body.encounter_type.strip() or "Office visit", date=date.today()),
     )
     db.add(patient)
@@ -125,7 +131,27 @@ async def update_case(
         patient.encounter = Encounter(type=body.encounter_type.strip() or "Office visit", date=date.today())
     else:
         patient.encounter.type = body.encounter_type.strip() or "Office visit"
+    if body.section_locks is not None:
+        patient.section_locks = locks_or_default(body.section_locks)
+    if body.prefill_sections is not None:
+        patient.prefill_sections = prefill_or_default(body.prefill_sections)
+    if "unit" in body.model_fields_set:
+        patient.unit = (body.unit or "").strip() or None
+    if "room" in body.model_fields_set:
+        patient.room = (body.room or "").strip() or None
+    if "bed" in body.model_fields_set:
+        patient.bed = (body.bed or "").strip() or None
     await _replace_children(db, patient, _children(body))
+    if body.section_locks is not None or body.prefill_sections is not None:
+        await db.execute(
+            update(Patient)
+            .where(
+                Patient.case_key == patient.case_key,
+                Patient.id != patient.id,
+                Patient.deleted_at.is_(None),
+            )
+            .values(section_locks=patient.section_locks, prefill_sections=patient.prefill_sections)
+        )
     patient.updated_at = utcnow()
     await log_event(
         db,
@@ -159,7 +185,12 @@ def _validate(body: CaseIn) -> None:
 def _children(body: CaseIn) -> dict:
     return {
         "allergies": [
-            {"substance": row.substance.strip(), "reaction": _blank(row.reaction), "severity": _blank(row.severity)}
+            {
+                "substance": row.substance.strip(),
+                "reaction": _blank(row.reaction),
+                "severity": _blank(row.severity),
+                "category": row.category if row.category in {"medication", "food", "environmental"} else "medication",
+            }
             for row in body.allergies
             if row.substance.strip()
         ],
@@ -171,6 +202,8 @@ def _children(body: CaseIn) -> dict:
                 "frequency": row.frequency.strip(),
                 "indication": _blank(row.indication),
                 "adherence": _blank(row.adherence),
+                "prescribed": row.prescribed,
+                "status": "active",
             }
             for row in body.medications
             if row.name.strip()

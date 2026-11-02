@@ -9,7 +9,8 @@ import { getPatient } from "../../api/patients";
 import { addAddendum, createDraft, getNote, listNotesForPatient, saveDraft, signNote } from "../../api/notes";
 import { getCourse, listInstructors } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
-import { formatTime } from "../../utils/format";
+import { formatDate, formatTime } from "../../utils/format";
+import { listCpt } from "../../api/reference";
 import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import PageError from "../../components/PageError";
@@ -20,7 +21,7 @@ import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
 import CourseRubricPanel from "./components/CourseRubricPanel";
-import { TEMPLATES, defaultTemplateFor, diagnosesFromPatient, missingRequired, prefillFromPatient, templatesFor } from "./noteTemplates";
+import { TEMPLATES, defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templatesFor } from "./noteTemplates";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -40,6 +41,8 @@ export default function NoteEditorPage() {
   const [templateId, setTemplateId] = useState<NoteTemplateId>(defaultTemplateFor(discipline));
   const [content, setContent] = useState<Record<string, string>>({});
   const [diagnoses, setDiagnoses] = useState<IcdCode[]>([]);
+  const [cptCodes, setCptCodes] = useState<IcdCode[]>([]);
+  const [cptOptions, setCptOptions] = useState<IcdCode[]>([]);
   const [routedToId, setRoutedToId] = useState("");
 
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -78,7 +81,7 @@ export default function NoteEditorPage() {
         }
         const n = await getNote(activeRole, noteId);
         if (!alive) return;
-        hydrate(n, people);
+        hydrate(n);
       } catch (e) {
         if (alive) setLoadError(e as Error);
       }
@@ -88,22 +91,25 @@ export default function NoteEditorPage() {
   }, [patientId, noteId]);
 
   const version = useRef(0);
-  const hydrate = (n: ClinicalNote, people: User[] = instructors) => {
+  const hydrate = (n: ClinicalNote) => {
     setNote(n);
     version.current = n.version;
     setTemplateId(n.templateId);
     setContent(n.content);
     setDiagnoses(n.diagnoses);
-    setRoutedToId(n.routedToId ?? (n.mode === "assessment" ? people[0]?.id ?? "" : ""));
+    setCptCodes(n.cptCodes ?? []);
+    setRoutedToId(n.routedToId ?? "");
   };
 
-  const latest = useRef({ templateId, content, diagnoses, routedToId });
-  latest.current = { templateId, content, diagnoses, routedToId };
+  const latest = useRef({ templateId, content, diagnoses, cptCodes, routedToId });
+  latest.current = { templateId, content, diagnoses, cptCodes, routedToId };
   const changeSeq = useRef(0);
   const savedSeq = useRef(0);
   const saving = useRef(false);
 
-  const editable = Boolean(note && note.authorId === user.id && (note.status === "draft" || note.status === "returned"));
+  const editable = Boolean(
+    note && note.authorId === user.id && !note.bodyLocked && (note.status === "draft" || note.status === "returned"),
+  );
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!note || saving.current) return false;
@@ -144,7 +150,7 @@ export default function NoteEditorPage() {
     if (!editable || changeSeq.current === savedSeq.current) return;
     const t = setTimeout(save, 1200);
     return () => clearTimeout(t);
-  }, [content, diagnoses, templateId, routedToId, editable, save]);
+  }, [content, diagnoses, cptCodes, templateId, routedToId, editable, save]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -159,14 +165,16 @@ export default function NoteEditorPage() {
     setContent((c) => ({ ...c, [id]: typeof next === "function" ? next(c[id] ?? "") : next }));
   };
 
-  const missing = missingRequired(templateId, content, diagnoses.length);
   const needsRoute = note?.mode === "assessment" && !routedToId;
+
+  useEffect(() => {
+    listCpt().then(setCptOptions).catch(() => setCptOptions([]));
+  }, []);
 
   const trySign = () => {
     setShowErrors(true);
-    if (missing.length || needsRoute) {
-      const first = missing[0] ? `field-${missing[0]}` : "route-select";
-      document.getElementById(first)?.focus();
+    if (needsRoute) {
+      document.getElementById("route-select")?.focus();
       return;
     }
     setConfirmOpen(true);
@@ -191,7 +199,7 @@ export default function NoteEditorPage() {
 
   const isAssessment = note.mode === "assessment";
   const reviewer = instructors.find((i) => i.id === (note.routedToId ?? routedToId));
-  const errorSet = showErrors ? new Set(missing) : undefined;
+  const errorSet = undefined;
   const choices = templatesFor(discipline);
 
   return (
@@ -253,14 +261,19 @@ export default function NoteEditorPage() {
           {note.status === "cosigned" && note.feedback.some((item) => !item.sectionId) && (
             <Alert severity="success" sx={{ mb: 2.5 }}><FeedbackThread items={note.feedback.filter((item) => !item.sectionId)} /></Alert>
           )}
-          {editable && note.status === "draft" && (
-            content.reason || content.cc || content.hpi || content.subjective || content.objective || content.exam || content.measures || content.history || diagnoses.length > 0
-          ) && (
+          {editable && note.status === "draft" && (patient.prefillSections ?? []).length > 0 && (
             <Alert severity="info" icon={false} sx={{ mb: 2.5 }}>
-              We prefilled what we could from the chart (complaint, vitals/labs, history, and any coded diagnoses). Review and complete the rest before you sign.
+              Sections your instructor turned on were copied into this note. Name, date of birth, and MRN stay in the header.
             </Alert>
           )}
           {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2.5 }}>{error}</Alert>}
+
+          <Box sx={{ mb: 2.5, p: 1.5, borderRadius: 1, bgcolor: "rgba(14,34,80,0.04)" }}>
+            <Typography variant="subtitle2">{patient.lastName}, {patient.firstName}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              DOB {formatDate(patient.dob)} · MRN {patient.mrn}
+            </Typography>
+          </Box>
 
           <NoteFields
             templateId={templateId} patient={patient} content={content} diagnoses={diagnoses}
@@ -269,7 +282,21 @@ export default function NoteEditorPage() {
             onField={setField} onDiagnoses={(d) => { markDirty(); setDiagnoses(d); }}
           />
 
-          {(note.status === "signed" || note.status === "cosigned") && (
+          <TextField
+            select label="Billing codes (CPT)" value={cptCodes.map((item) => item.code)}
+            disabled={!editable} sx={{ mt: 2 }}
+            helperText="Office and related E/M codes only. This chart does not calculate charges."
+            slotProps={{ select: { multiple: true } }}
+            onChange={(event) => {
+              const selected = event.target.value as unknown as string[];
+              markDirty();
+              setCptCodes(cptOptions.filter((item) => selected.includes(item.code)));
+            }}
+          >
+            {cptOptions.map((item) => <MenuItem key={item.code} value={item.code}>{item.code} {item.label}</MenuItem>)}
+          </TextField>
+
+          {(note.status === "signed" || note.status === "cosigned" || (note.status === "returned" && note.bodyLocked)) && (
             <>
               <Divider sx={{ my: 3 }} />
               <Addenda
@@ -285,7 +312,7 @@ export default function NoteEditorPage() {
           <Paper sx={{ p: 2.5 }}>
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isAssessment ? "Submission" : "Practice note"}</Typography>
             <NoteProgress note={note} />
-            <CourseRubricPanel fileName={course.data?.rubricFileName} />
+            <CourseRubricPanel guide={course.data?.gradingGuide} fileName={course.data?.rubricFileName} />
 
             {editable && (
               <Stack spacing={1.5} sx={{ mt: 2 }}>
@@ -297,9 +324,6 @@ export default function NoteEditorPage() {
                   >
                     {instructors.map((i) => <MenuItem key={i.id} value={i.id}>{i.fullName}</MenuItem>)}
                   </TextField>
-                )}
-                {showErrors && missing.length > 0 && (
-                  <Alert severity="warning">Complete {missing.length} required {missing.length === 1 ? "field" : "fields"} before signing.</Alert>
                 )}
                 <Button variant="contained" size="large" onClick={trySign}>
                   {!isAssessment ? "Sign note" : note.status === "returned" ? "Sign and resubmit" : "Submit for signature"}

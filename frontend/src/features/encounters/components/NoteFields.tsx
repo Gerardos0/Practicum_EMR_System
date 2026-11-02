@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Autocomplete, Box, Button, Chip, InputAdornment, Stack, TextField, Typography } from "@mui/material";
 import type { IcdCode, NoteComment, NoteTemplateId, Patient } from "../../../types";
+import { searchIcd10 } from "../../../api/reference";
 import { TEMPLATES, type TemplateField } from "../noteTemplates";
-import { ICD10 } from "../icd10";
 import DictationButton from "../../../components/DictationButton";
 import MedRecTable, { parseMedRec } from "./MedRecTable";
 import FeedbackThread from "./FeedbackThread";
@@ -109,7 +109,7 @@ function Field({
   field: TemplateField; patient: Patient; value: string; diagnoses: IcdCode[];
   readOnly?: boolean; error?: boolean; onField?: Setter; onDiagnoses?: (d: IcdCode[]) => void;
 }) {
-  const label = f.required && !readOnly ? `${f.label} *` : f.label;
+  const label = f.label;
 
   if (f.kind === "medrec") {
     return (
@@ -129,23 +129,9 @@ function Field({
       );
     }
     return (
-      <Autocomplete
-        multiple options={ICD10} value={diagnoses}
-        getOptionLabel={(o) => `${o.code} ${o.label}`}
-        isOptionEqualToValue={(a, b) => a.code === b.code}
-        onChange={(_, v) => onDiagnoses?.(v)}
-        renderValue={(v, getItemProps) =>
-          v.map((o, i) => {
-            const { key, ...rest } = getItemProps({ index: i });
-            return <Chip key={key} {...rest} size="small" label={`${o.code} ${o.label}`} />;
-          })
-        }
-        renderInput={(params) => (
-          <TextField
-            {...params} id={`field-${f.id}`} label={label} placeholder={diagnoses.length ? "" : "Search by code or condition"}
-            error={error} helperText={error ? "Add at least one diagnosis." : "Primary diagnosis first."}
-          />
-        )}
+      <IcdSearch
+        id={`field-${f.id}`} label={label} value={diagnoses} error={error}
+        onChange={(next) => onDiagnoses?.(next)}
       />
     );
   }
@@ -158,7 +144,7 @@ function Field({
     <TextField
       id={`field-${f.id}`} label={label} placeholder={f.placeholder} fullWidth
       multiline={f.kind === "textarea"} minRows={f.kind === "textarea" ? f.rows ?? 3 : undefined}
-      value={value} error={error} helperText={error ? "Required before you sign." : undefined}
+      value={value} error={error}
       onChange={(e) => onField?.(f.id, e.target.value)}
       slotProps={f.kind === "textarea" ? { input: {
         endAdornment: (
@@ -167,6 +153,57 @@ function Field({
           </InputAdornment>
         ),
       } } : undefined}
+    />
+  );
+}
+
+function IcdSearch({
+  id, label, value, error, onChange,
+}: {
+  id: string; label: string; value: IcdCode[]; error?: boolean; onChange: (next: IcdCode[]) => void;
+}) {
+  const [options, setOptions] = useState<IcdCode[]>([]);
+  const [query, setQuery] = useState("");
+  const [lookupError, setLookupError] = useState("");
+
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setOptions([]);
+      setLookupError("");
+      return;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      searchIcd10(term)
+        .then((rows) => { if (alive) { setOptions(rows); setLookupError(""); } })
+        .catch((e: Error) => { if (alive) { setOptions([]); setLookupError(e.message); } });
+    }, 250);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [query]);
+
+  return (
+    <Autocomplete
+      multiple options={options} value={value} filterOptions={(rows) => rows}
+      getOptionLabel={(option) => `${option.code} ${option.label}`}
+      isOptionEqualToValue={(a, b) => a.code === b.code}
+      onChange={(_, next) => onChange(next)}
+      onInputChange={(_, next) => setQuery(next)}
+      noOptionsText={query.trim().length < 2 ? "Type at least 2 characters" : "No matching ICD-10 codes"}
+      renderValue={(selected, getItemProps) =>
+        selected.map((option, index) => {
+          const { key, ...rest } = getItemProps({ index });
+          return <Chip key={key} {...rest} size="small" label={`${option.code} ${option.label}`} />;
+        })
+      }
+      renderInput={(params) => (
+        <TextField
+          {...params} id={id} label={label}
+          placeholder={value.length ? "" : "Search the ICD-10 catalog"}
+          error={error || Boolean(lookupError)}
+          helperText={lookupError || "Codes come from the NLM ICD-10-CM search. Primary diagnosis first."}
+        />
+      )}
     />
   );
 }

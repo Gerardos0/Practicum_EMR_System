@@ -9,7 +9,7 @@ export default function DashboardPage() {
   usePageHeading("Dashboard");
 
   if (activeRole === "student") return <StudentDashboard />;
-  if (activeRole === "instructor") return <InstructorDashboard />;
+  if (activeRole === "instructor" || activeRole === "course_coordinator") return <InstructorDashboard />;
 
   return (
     <Box>

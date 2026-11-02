@@ -57,6 +57,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    portal_patient_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("patients.id"))
 
     discipline_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("disciplines.id"))
 

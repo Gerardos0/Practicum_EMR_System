@@ -23,6 +23,7 @@ export interface DraftPatch {
   templateId?: NoteTemplateId;
   content?: Record<string, string>;
   diagnoses?: IcdCode[];
+  cptCodes?: IcdCode[];
   routedToId?: string;
 }
 
@@ -62,6 +63,18 @@ export async function commentOnNote(
   role: Role, id: string, body: { sectionId?: string; body: string },
 ): Promise<ClinicalNote> {
   return request<ClinicalNote>(`/notes/${id}/comments`, { method: "POST", query: { role }, json: body });
+}
+
+export async function instructorEditNote(role: Role, id: string, patch: DraftPatch): Promise<ClinicalNote> {
+  return request<ClinicalNote>(`/notes/${id}/instructor-edit`, { method: "PATCH", query: { role }, json: patch });
+}
+
+export async function saveScores(
+  role: Role,
+  id: string,
+  scores: { criteria: { id: string; score?: number | null; feedback: string; maxPoints?: number | null }[]; overallFeedback: string },
+): Promise<ClinicalNote> {
+  return request<ClinicalNote>(`/notes/${id}/scores`, { method: "PUT", query: { role }, json: scores });
 }
 
 export async function addAddendum(id: string, body: string, role: Role): Promise<ClinicalNote> {

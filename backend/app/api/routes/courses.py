@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -23,6 +23,7 @@ from app.schemas.clinical import (
 )
 from app.services.access import can, ensure_course_open, memberships_for, require, require_course, require_held_role
 from app.services.audit import log_event
+from app.services.rubric_import import guide_from_upload
 from app.services.serialize import course_out, user_out
 
 router = APIRouter(prefix="/courses", tags=["courses"])
@@ -82,7 +83,7 @@ async def _instructors(db, course_id: uuid.UUID) -> list[User]:
     seen: set[uuid.UUID] = set()
     for row in rows:
         role = await db.get(Role, row.role_id)
-        if role and role.code == "instructor" and row.user_id not in seen:
+        if role and role.code in {"instructor", "course_coordinator"} and row.user_id not in seen:
             user = await db.get(User, row.user_id)
             if user:
                 found.append(user)
@@ -153,9 +154,15 @@ async def import_roster(
 ):
     rows = await memberships_for(db, user.id)
     role = _staff_role(user, rows, course_id)
-    require(role, "roster:import", "Your role can't import a roster.")
-    if body.role == "instructor":
-        require(role, "course:manage_access", "Only admins can add instructors.")
+    if body.role == "student":
+        require(role, "roster:import", "Your role can't import a roster.")
+    elif body.role == "course_coordinator":
+        require(role, "course:manage_access", "Only an administrator can add a course coordinator.")
+    elif body.role == "instructor":
+        if not (can(role, "instructor:manage") or can(role, "course:manage_access")):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a course coordinator or administrator can add instructors.")
+    else:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't import a roster.")
     if any(row.problem for row in body.rows):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Fix the flagged rows before importing.")
     course = await db.get(Course, course_id)
@@ -251,15 +258,15 @@ async def remove_from_course(
     db: DbSession,
     user: CurrentUser,
     request: Request,
-    role: Annotated[Literal["student", "instructor"], Query()] = "student",
+    role: Annotated[Literal["student", "instructor", "course_coordinator"], Query()] = "student",
 ):
     rows = await memberships_for(db, user.id)
     staff_role = _staff_role(user, rows, course_id)
-    require(staff_role, "roster:import", "Your role can't edit the roster.")
-    if role == "instructor":
-        require(staff_role, "instructor:remove", "Your role can't remove instructors.")
-        if user_id == user.id:
-            raise HTTPException(status.HTTP_409_CONFLICT, "You can't remove yourself from the course.")
+    if role == "student":
+        require(staff_role, "roster:import", "Your role can't edit the roster.")
+    else:
+        if not (can(staff_role, "instructor:manage") or can(staff_role, "instructor:remove") or can(staff_role, "course:manage_access")):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't remove instructors.")
     target_role = await db.scalar(select(Role).where(Role.code == role))
     if target_role is None:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Roles are not seeded.")
@@ -279,6 +286,8 @@ async def remove_from_course(
         )
         if instructor_count <= 1:
             raise HTTPException(status.HTTP_409_CONFLICT, "A course must have at least one instructor.")
+    if role != "student" and user_id == user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You can't remove yourself from the course.")
     if membership:
         await db.delete(membership)
     await log_event(
@@ -396,12 +405,47 @@ async def _set_roster_active(course_id, user_id, db, user: User, request: Reques
     return await _roster_member(db, membership, person)
 
 
+@router.post("/{course_id}/grading-guide", response_model=CourseOut, response_model_exclude_none=True)
+async def upload_grading_guide(
+    course_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    file: UploadFile = File(...),
+):
+    rows = await memberships_for(db, user.id)
+    role = _staff_role(user, rows, course_id)
+    if not (can(role, "case:author") or can(role, "course:manage_access")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't upload a rubric.")
+    course = await ensure_course_open(db, course_id)
+    payload = await file.read()
+    if len(payload) > 8_000_000:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Rubric files must be 8 MB or smaller.")
+    course.grading_guide = guide_from_upload(file.filename or "rubric.pdf", payload)
+    course.rubric_file_name = course.grading_guide["file_name"]
+    await log_event(
+        db,
+        action="course.grading_guide",
+        entity_type="course",
+        entity_id=str(course.id),
+        actor_user_id=user.id,
+        course_id=course.id,
+        ip_address=_ip(request),
+        detail=course.rubric_file_name,
+    )
+    await db.commit()
+    return course_out(course, [str(person.id) for person in await _instructors(db, course.id)])
+
+
 def _staff_role(user: User, rows, course_id: uuid.UUID) -> str:
+    if any(item.code == "admin" for item in user.roles):
+        return "admin"
+    if any(row.role.code == "course_coordinator" and row.course_id == course_id for row in rows):
+        require_course("course_coordinator", course_id, user, rows)
+        return "course_coordinator"
     if any(row.role.code == "instructor" and row.course_id == course_id for row in rows):
         require_course("instructor", course_id, user, rows)
         return "instructor"
-    if any(item.code == "admin" for item in user.roles):
-        return "admin"
     raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't view the roster.")
 
 
