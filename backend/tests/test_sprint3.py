@@ -370,7 +370,7 @@ async def test_seeded_answer_keys_are_not_duplicated(client, db_session):
 
 @pytest.mark.asyncio
 async def test_section_comment_leaves_the_student_note_unchanged(client, db_session):
-    instructor, _ = await login(client, "gerardo.sillas@utep.edu")
+    instructor, instructor_session = await login(client, "gerardo.sillas@utep.edu")
     student, me = await login(client, "daniel.reyes@miners.utep.edu")
     course = await course_id(client, instructor, "PHAR 5320")
     masters = await client.get("/api/v1/cases", headers=instructor, params={"course_id": course, "role": "instructor"})
@@ -391,11 +391,18 @@ async def test_section_comment_leaves_the_student_note_unchanged(client, db_sess
     )
     assert created.status_code == 200, created.text
     note_id = created.json()["id"]
+    routed = await client.patch(
+        f"/api/v1/notes/{note_id}",
+        headers=student,
+        params={"role": "student"},
+        json={"expectedVersion": created.json()["version"], "routedToId": instructor_session["user"]["id"]},
+    )
+    assert routed.status_code == 200, routed.text
     signed = await client.post(
         f"/api/v1/notes/{note_id}/sign",
         headers=student,
         params={"role": "student"},
-        json={"expectedVersion": created.json()["version"]},
+        json={"expectedVersion": routed.json()["version"]},
     )
     assert signed.status_code == 200, signed.text
     assert signed.json()["status"] == "pending_review"

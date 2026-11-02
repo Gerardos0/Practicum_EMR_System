@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, Breadcrumbs, Button, LinearProgress, Link, Paper, Typography } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
+import { recordPresence, updatePlacement } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/AuthContext";
 import { can } from "../../utils/permissions";
@@ -19,10 +20,11 @@ import SchedulingTab from "../scheduling/SchedulingTab";
 
 const TABS = [
   { id: "summary", label: "Overview" },
-  { id: "notes", label: "Notes" },
-  { id: "medications", label: "Medications" },
   { id: "labs", label: "Labs" },
-  { id: "scheduling", label: "Appointments & Referrals" },
+  { id: "medications", label: "Medications" },
+  { id: "notes", label: "Notes" },
+  { id: "appointments", label: "Appointments" },
+  { id: "referrals", label: "Referrals" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -33,6 +35,7 @@ export default function PatientChartPage() {
   const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "summary") as TabId;
   const { user, activeRole } = useSession();
   const [statusOpen, setStatusOpen] = useState(false);
+  const [placement, setPlacement] = useState({ unit: "", room: "", bed: "" });
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
   const notes = useAsync(() => listNotesForPatient(activeRole, patientId), [patientId, activeRole]);
@@ -40,6 +43,14 @@ export default function PatientChartPage() {
     ? `${patient.data.lastName}, ${patient.data.firstName}`
     : "Patient chart";
   usePageHeading(heading);
+
+  useEffect(() => {
+    if (!patient.data) return;
+    const beat = () => { recordPresence(activeRole, patientId).catch(() => undefined); };
+    beat();
+    const timer = window.setInterval(beat, 25_000);
+    return () => window.clearInterval(timer);
+  }, [patient.data?.id, patientId, activeRole]);
 
   if (patient.error) return <PageError error={patient.error} />;
   if (!patient.data) return <LinearProgress aria-label="Loading chart" />;
@@ -72,10 +83,21 @@ export default function PatientChartPage() {
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
 
+      {can(activeRole, "patient:update_status") && (
+        <Paper sx={{ p: 2, my: 2, display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+          <Typography variant="subtitle2" sx={{ mr: 1 }}>Bed assignment</Typography>
+          <input aria-label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} />
+          <input aria-label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} />
+          <input aria-label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} />
+          <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save placement</Button>
+        </Paper>
+      )}
+
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "180px minmax(0, 1fr)" }, alignItems: "start" }}>
       <Box
         role="tablist"
         aria-label="Chart sections"
-        sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", my: 2 }}
+        sx={{ display: "flex", gap: 0.75, flexDirection: { xs: "row", md: "column" }, flexWrap: "wrap" }}
       >
         {TABS.map((t) => {
           const selected = tab === t.id;
@@ -114,6 +136,7 @@ export default function PatientChartPage() {
           <SummaryTab
             patient={p}
             notes={notes.data ?? []}
+            onChange={patient.setData}
             onAdvance={async (next) => {
               patient.setData(await updatePatientStatus(activeRole, p.id, { encounter: next }));
             }}
@@ -133,9 +156,11 @@ export default function PatientChartPage() {
             )}
           </Paper>
         )}
-        {tab === "medications" && <MedicationsTab patient={p} />}
-        {tab === "labs" && <LabsTab patient={p} />}
-        {tab === "scheduling" && <SchedulingTab patient={p} />}
+        {tab === "medications" && <MedicationsTab patient={p} onChange={patient.setData} />}
+        {tab === "labs" && <LabsTab patient={p} onChange={patient.setData} />}
+        {tab === "appointments" && <SchedulingTab patient={p} section="appointments" />}
+        {tab === "referrals" && <SchedulingTab patient={p} section="referrals" />}
+      </Box>
       </Box>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>

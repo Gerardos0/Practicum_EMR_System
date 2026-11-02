@@ -4,7 +4,7 @@ import type { Discipline, RosterRow } from "../../types";
 import { validateRosterRow } from "./parseRoster";
 
 interface AddPersonFormProps {
-  role: "student" | "instructor";
+  role: "student" | "instructor" | "course_coordinator";
   discipline: Discipline;
   onSubmit: (row: Pick<RosterRow, "fullName" | "email" | "universityId">) => Promise<boolean>;
 }
@@ -74,7 +74,7 @@ export default function AddPersonForm({ role, onSubmit }: AddPersonFormProps) {
         helperText={problems.universityId}
       />
       <Button type="submit" variant="contained" disabled={busy} sx={{ alignSelf: "flex-start" }}>
-        {busy ? "Adding..." : role === "instructor" ? "Add instructor" : "Add student"}
+        {busy ? "Adding..." : role === "instructor" ? "Add instructor" : role === "course_coordinator" ? "Add course coordinator" : "Add student"}
       </Button>
     </Stack>
   );

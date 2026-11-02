@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import {
-  Alert, Box, Breadcrumbs, Button, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
+  Alert, Box, Breadcrumbs, Button, Checkbox, FormControlLabel, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { createCase, getCase, updateCase, type CaseInput } from "../../api/cases";
@@ -39,7 +39,38 @@ interface Draft {
   problems: Record<string, string>[];
   labs: Record<string, string>[];
   vitals: Record<string, string>[];
+  sectionLocks: Record<string, boolean>;
+  prefillSections: string[];
+  unit: string;
+  room: string;
+  bed: string;
 }
+
+const STUDENT_SECTIONS = [
+  ["medications", "Medications"],
+  ["allergies", "Allergies"],
+  ["vitals", "Vitals"],
+  ["labs", "Labs"],
+  ["diagnoses", "Diagnoses"],
+  ["medical_history", "Past medical history"],
+  ["surgical_history", "Surgical history"],
+  ["chief_complaint", "Chief complaint"],
+] as const;
+
+const PREFILL = [
+  ["chief_complaint", "Chief complaint"],
+  ["hpi", "HPI"],
+  ["vitals", "Vitals"],
+  ["labs", "Labs"],
+  ["history", "History"],
+  ["medications", "Medications"],
+  ["diagnoses", "Diagnoses"],
+] as const;
+
+const DEFAULT_LOCKS: Record<string, boolean> = {
+  medications: false, allergies: false, vitals: false, labs: false,
+  diagnoses: true, medical_history: true, surgical_history: true, chief_complaint: true,
+};
 
 function emptyDraft(): Draft {
   return {
@@ -47,6 +78,7 @@ function emptyDraft(): Draft {
     chiefComplaint: "", hpi: "", pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "",
     encounterType: "Office visit", careSetting: "Outpatient", lifecycle: "Active", encounterStatus: "Scheduled",
     program: "", allergies: [], medications: [], problems: [], labs: [], vitals: [],
+    sectionLocks: { ...DEFAULT_LOCKS }, prefillSections: [], unit: "", room: "", bed: "",
   };
 }
 
@@ -75,7 +107,7 @@ function draftFrom(item: AuthoredCase): Draft {
     lifecycle: item.status.lifecycle,
     encounterStatus: item.status.encounter,
     program: item.status.program ?? "",
-    allergies: item.allergies.map((a) => row({ substance: a.substance, reaction: a.reaction, severity: a.severity })),
+    allergies: item.allergies.map((a) => row({ substance: a.substance, reaction: a.reaction, severity: a.severity, category: a.category ?? "medication" })),
     medications: item.medications.map((m) => row({
       name: m.name, dose: m.dose, route: m.route, frequency: m.frequency, indication: m.indication, adherence: m.adherence,
     })),
@@ -84,6 +116,11 @@ function draftFrom(item: AuthoredCase): Draft {
       name: l.name, value: l.value, unit: l.unit, referenceRange: l.referenceRange, flag: l.flag, collectedAt: l.collectedAt.slice(0, 10),
     })),
     vitals: item.vitals.map((v) => row({ label: v.label, value: v.value })),
+    sectionLocks: { ...DEFAULT_LOCKS, ...(item.sectionLocks ?? {}) },
+    prefillSections: item.prefillSections ?? [],
+    unit: item.unit ?? "",
+    room: item.room ?? "",
+    bed: item.bed ?? "",
   };
 }
 
@@ -132,7 +169,8 @@ export default function CaseEditorPage() {
       encounterStatus: draft.encounterStatus,
       program: draft.program.trim() || undefined,
       allergies: draft.allergies.filter((r) => r.substance.trim()).map((r) => ({
-        substance: r.substance, reaction: r.reaction || undefined, severity: (r.severity || undefined) as CaseInput["allergies"][number]["severity"],
+        substance: r.substance, reaction: r.reaction || undefined, category: (r.category || "medication") as "medication" | "food" | "environmental",
+        severity: (r.severity || undefined) as CaseInput["allergies"][number]["severity"],
       })),
       medications: draft.medications.filter((r) => r.name.trim()).map((r) => ({
         name: r.name, dose: r.dose, route: r.route, frequency: r.frequency, indication: r.indication || undefined, adherence: r.adherence || undefined,
@@ -146,6 +184,11 @@ export default function CaseEditorPage() {
         collectedAt: r.collectedAt,
       })),
       vitals: draft.vitals.filter((r) => r.label.trim()).map((r) => ({ label: r.label, value: r.value })),
+      sectionLocks: draft.sectionLocks,
+      prefillSections: draft.prefillSections,
+      unit: draft.unit || undefined,
+      room: draft.room || undefined,
+      bed: draft.bed || undefined,
     };
     setBusy(true);
     setError("");
@@ -221,12 +264,46 @@ export default function CaseEditorPage() {
         </Box>
       </Paper>
 
+      <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Typography component="h2" variant="h6">What students can change</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Checked sections stay open on assigned copies. Name, date of birth, and MRN always appear in the note header. Other note text is copied only for the sections you check below.
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap" }}>
+          {STUDENT_SECTIONS.map(([id, label]) => (
+            <FormControlLabel
+              key={id}
+              label={label}
+              control={<Checkbox checked={!draft.sectionLocks[id]} onChange={(e) => set({ sectionLocks: { ...draft.sectionLocks, [id]: !e.target.checked } })} />}
+            />
+          ))}
+        </Box>
+        <Typography variant="subtitle2" sx={{ mt: 1 }}>Copy into a new note</Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap" }}>
+          {PREFILL.map(([id, label]) => (
+            <FormControlLabel
+              key={id}
+              label={label}
+              control={<Checkbox checked={draft.prefillSections.includes(id)} onChange={(e) => set({
+                prefillSections: e.target.checked ? [...draft.prefillSections, id] : draft.prefillSections.filter((item) => item !== id),
+              })} />}
+            />
+          ))}
+        </Box>
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { sm: "1fr 1fr 1fr" }, mt: 1 }}>
+          <TextField label="Unit" value={draft.unit} onChange={(e) => set({ unit: e.target.value })} />
+          <TextField label="Room" value={draft.room} onChange={(e) => set({ room: e.target.value })} />
+          <TextField label="Bed" value={draft.bed} onChange={(e) => set({ bed: e.target.value })} />
+        </Box>
+      </Paper>
+
       <Paper sx={{ p: { xs: 2, md: 2.5 }, overflowX: "auto" }}>
         <EditableTable
           label="Allergies" addLabel="allergy" rows={draft.allergies} onChange={(allergies) => set({ allergies })}
-          blank={{ substance: "", reaction: "", severity: "" }}
+          blank={{ substance: "", reaction: "", severity: "", category: "medication" }}
           columns={[
             { key: "substance", label: "Substance" },
+            { key: "category", label: "Category", type: "select", options: ["medication", "food", "environmental"] },
             { key: "reaction", label: "Reaction" },
             { key: "severity", label: "Severity", type: "select", options: ["mild", "moderate", "severe"] },
           ]}

@@ -68,6 +68,9 @@ PERMISSIONS = {
     "report:run": "Run course reports",
     "audit:view": "Review the audit trail",
     "case:author": "Create and edit case masters",
+    "instructor:manage": "Add or remove instructors on a course",
+    "report:export_teaching": "Export grade bands and chart time",
+    "portal:view": "View the patient portal",
 }
 
 
@@ -123,6 +126,7 @@ async def _upsert_roles(db, permissions: dict[str, Permission]) -> dict[str, Rol
         "student": "Student",
         "instructor": "Instructor",
         "admin": "Administrator",
+        "course_coordinator": "Course Coordinator",
         "front_desk": "Front Desk",
         "patient": "Patient",
     }

@@ -18,6 +18,8 @@ import AuditLogPage from "./features/admin/AuditLogPage";
 import CourseAdminPage from "./features/admin/CourseAdminPage";
 import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
+import PatientPortalPage from "./features/portal/PatientPortalPage";
+import TeachingPage from "./features/teaching/TeachingPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { homePathFor } from "./utils/permissions";
 
@@ -25,6 +27,7 @@ function LoginRoute() {
   const { session } = useAuth();
   if (!session) return <LoginPage />;
   if (session.mustChangePassword) return <Navigate to="/change-password" replace />;
+  if (session.activeRole === "patient") return <Navigate to="/portal" replace />;
   if (session.activeRole === "admin" && !session.courseId) return <Navigate to="/admin/courses" replace />;
   if (session.courseId) return <Navigate to={homePathFor(session.activeRole)} replace />;
   return <Navigate to="/select-course" replace />;
@@ -50,8 +53,12 @@ export default function App() {
                   <Route path="/admin/reports" element={<ReportsPage />} />
                 </Route>
 
+                <Route element={<RequireAuth roles={["patient"]} needsCourse={false} />}>
+                  <Route path="/portal" element={<PatientPortalPage />} />
+                </Route>
+
                 <Route element={<RequireAuth />}>
-                  <Route element={<RequireAuth roles={["student", "instructor"]} />}>
+                  <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator"]} />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
                   </Route>
                   <Route path="/patients" element={<PatientListPage />} />
@@ -61,14 +68,21 @@ export default function App() {
                     <Route path="/patients/:patientId/notes/:noteId" element={<NoteEditorPage />} />
                   </Route>
 
-                  <Route element={<RequireAuth roles={["instructor"]} />}>
+                  <Route element={<RequireAuth roles={["instructor", "course_coordinator"]} />}>
                     <Route path="/review" element={<ReviewQueuePage />} />
                     <Route path="/review/:noteId" element={<NoteReviewPage />} />
                   </Route>
 
-                  <Route element={<RequireAuth roles={["instructor", "admin"]} />}>
-                    <Route path="/admin/roster" element={<RosterImportPage />} />
+                  <Route element={<RequireAuth roles={["instructor", "course_coordinator", "admin"]} />}>
+                    <Route path="/teaching" element={<TeachingPage />} />
                     <Route path="/audit" element={<AuditLogPage />} />
+                  </Route>
+
+                  <Route element={<RequireAuth roles={["course_coordinator", "admin"]} />}>
+                    <Route path="/admin/roster" element={<RosterImportPage />} />
+                  </Route>
+
+                  <Route element={<RequireAuth roles={["instructor", "course_coordinator"]} />}>
                     <Route path="/cases" element={<CaseListPage />} />
                     <Route path="/cases/new" element={<CaseEditorPage />} />
                     <Route path="/cases/:caseId" element={<CaseEditorPage />} />

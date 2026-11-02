@@ -1,5 +1,6 @@
 from datetime import date
 
+from app.clinical_sections import locks_or_default, prefill_or_default
 from app.models.clinical import (
     Appointment,
     ClinicalNote,
@@ -25,6 +26,7 @@ def course_out(course: Course, instructor_ids: list[str]) -> dict:
         "status": course.status,
         "instructor_ids": instructor_ids,
         "rubric_file_name": course.rubric_file_name,
+        "grading_guide": course.grading_guide,
     }
 
 
@@ -58,7 +60,14 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
             "program": patient.program,
         },
         "allergies": [
-            {"substance": a.substance, "reaction": a.reaction, "severity": a.severity} for a in patient.allergies
+            {
+                "id": str(a.id),
+                "substance": a.substance,
+                "reaction": a.reaction,
+                "severity": a.severity,
+                "category": a.category,
+            }
+            for a in patient.allergies
         ],
         "medications": [
             {
@@ -69,10 +78,16 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
                 "frequency": m.frequency,
                 "indication": m.indication,
                 "adherence": m.adherence,
+                "status": m.status,
+                "prescribed": m.prescribed,
+                "discontinued_at": m.discontinued_at,
             }
             for m in patient.medications
+            if m.status != "entered_in_error"
         ],
-        "problems": [{"code": p.code, "description": p.description, "since": p.since} for p in patient.problems],
+        "problems": [
+            {"id": str(p.id), "code": p.code, "description": p.description, "since": p.since} for p in patient.problems
+        ],
         "labs": [
             {
                 "id": str(lab.id),
@@ -85,7 +100,14 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
             }
             for lab in patient.labs
         ],
-        "vitals": [{"label": v.label, "value": v.value} for v in patient.vitals],
+        "vitals": [
+            {"id": str(v.id), "label": v.label, "value": v.value, "recorded_at": v.recorded_at} for v in patient.vitals
+        ],
+        "section_locks": locks_or_default(patient.section_locks),
+        "prefill_sections": prefill_or_default(patient.prefill_sections),
+        "unit": patient.unit,
+        "room": patient.room,
+        "bed": patient.bed,
         "family_history": patient.family_history,
         "surgical_history": patient.surgical_history,
         "social_history": patient.social_history,
@@ -110,8 +132,8 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
     return payload
 
 
-def note_out(note: ClinicalNote) -> dict:
-    return {
+def note_out(note: ClinicalNote, *, include_scores: bool = False) -> dict:
+    payload = {
         "id": str(note.id),
         "patient_id": str(note.patient_id),
         "encounter_id": str(note.encounter_id),
@@ -124,6 +146,8 @@ def note_out(note: ClinicalNote) -> dict:
         "version": note.version,
         "content": note.content or {},
         "diagnoses": note.diagnoses or [],
+        "cpt_codes": note.cpt_codes or [],
+        "body_locked": bool(note.body_locked),
         "routed_to_id": str(note.routed_to_id) if note.routed_to_id else None,
         "created_at": note.created_at,
         "updated_at": note.updated_at,
@@ -152,6 +176,9 @@ def note_out(note: ClinicalNote) -> dict:
             for item in sorted(note.addenda, key=lambda item: item.created_at)
         ],
     }
+    if include_scores:
+        payload["rubric_scores"] = note.rubric_scores
+    return payload
 
 
 def authored_case_out(patient: Patient) -> dict:
@@ -188,6 +215,8 @@ async def user_out(db, user: User) -> dict:
         for (role, discipline), course_ids in sorted(grouped.items(), key=lambda item: (item[0][0], item[0][1] or ""))
     ]
     await db.refresh(user, attribute_names=["roles"])
+    if any(item.code == "patient" for item in user.roles) and not any(item["role"] == "patient" for item in roles):
+        roles.append({"role": "patient", "discipline": None, "course_ids": []})
     if any(item.code == "admin" for item in user.roles) and not any(item["role"] == "admin" for item in roles):
         from sqlalchemy import select
 
@@ -203,5 +232,6 @@ async def user_out(db, user: User) -> dict:
         "phone_last4": user.phone_last4,
         "must_change_password": user.must_change_password,
         "is_active": user.is_active,
+        "archived_at": user.archived_at,
         "roles": roles,
     }

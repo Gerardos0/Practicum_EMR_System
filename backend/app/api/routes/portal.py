@@ -1,0 +1,74 @@
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import select
+
+from app.api.deps import CurrentUser, DbSession
+from app.models.clinical import ClinicalNote
+from app.services.access import memberships_for, require, require_held_role
+from app.services.charts import load_patient
+
+router = APIRouter(prefix="/portal", tags=["portal"])
+
+
+@router.get("")
+async def portal_chart(
+    db: DbSession,
+    user: CurrentUser,
+    role: Annotated[str, Query()] = "patient",
+):
+    rows = await memberships_for(db, user.id)
+    require_held_role(user, "patient", rows)
+    require(role, "portal:view", "The portal is view-only for patient accounts.")
+    if user.portal_patient_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This login is not linked to a chart.")
+    patient = await load_patient(db, user.portal_patient_id)
+    note = await db.scalar(
+        select(ClinicalNote)
+        .where(
+            ClinicalNote.patient_id == patient.id,
+            ClinicalNote.archived.is_(False),
+            ClinicalNote.status.in_(("signed", "cosigned")),
+        )
+        .order_by(ClinicalNote.signed_at.desc())
+    )
+    summary = None
+    if note is not None:
+        parts = [f"{key}: {value}" for key, value in (note.content or {}).items() if str(value).strip()]
+        summary = "\n".join(parts) if parts else None
+    medications = [
+        {
+            "name": item.name,
+            "dose": item.dose,
+            "route": item.route,
+            "frequency": item.frequency,
+            "prescribed": item.prescribed,
+        }
+        for item in patient.medications
+        if item.status == "active"
+    ]
+    return {
+        "patient": {
+            "name": f"{patient.first_name} {patient.last_name}",
+            "dob": patient.dob,
+            "mrn": patient.mrn,
+        },
+        "labs": [
+            {
+                "name": lab.name,
+                "value": lab.value,
+                "unit": lab.unit,
+                "reference_range": lab.reference_range,
+                "flag": lab.flag,
+                "collected_at": lab.collected_at,
+            }
+            for lab in patient.labs
+        ],
+        "last_visit": {
+            "date": patient.encounter.date if patient.encounter else None,
+            "type": patient.encounter.type if patient.encounter else None,
+            "summary": summary,
+        },
+        "prescribed_medications": [item for item in medications if item["prescribed"]],
+        "medication_list": medications,
+    }

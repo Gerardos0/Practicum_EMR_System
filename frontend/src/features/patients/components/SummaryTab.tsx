@@ -1,15 +1,15 @@
-import { Alert, Box, Button, Chip, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
+import { useState } from "react";
+import { Alert, Box, Button, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableRow, TextField, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import type { ClinicalNote, EncounterStatus, Patient } from "../../../types";
-import { listAppointments, listReferrals } from "../../../api/scheduling";
+import type { AllergyCategory, ClinicalNote, EncounterStatus, Patient } from "../../../types";
+import { listAppointments } from "../../../api/scheduling";
+import { addAllergy, addVital, removeAllergy } from "../../../api/chart";
 import { useSession } from "../../auth/AuthContext";
 import { can } from "../../../utils/permissions";
+import { canEditSection } from "../../chart/access";
 import { formatDate, formatDateTime } from "../../../utils/format";
-import { disciplineLabel } from "../../../utils/labels";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";
-import NotesList from "../../encounters/components/NotesList";
-import VitalsChart from "./VitalsChart";
 
 const FLOW: EncounterStatus[] = ["Scheduled", "Checked in", "In progress", "Checked out"];
 const ADVANCE_LABEL: Partial<Record<EncounterStatus, string>> = {
@@ -22,17 +22,26 @@ interface Props {
   patient: Patient;
   notes: ClinicalNote[];
   onAdvance: (next: EncounterStatus) => Promise<void>;
+  onChange: (patient: Patient) => void;
 }
 
 const card = { p: 2.5, borderRadius: "16px" } as const;
 const titleSx = { color: utep.navy, fontSize: 18, mb: 1.5 } as const;
 
-export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
+const CATEGORIES: { id: AllergyCategory; label: string }[] = [
+  { id: "medication", label: "Medication" },
+  { id: "food", label: "Food" },
+  { id: "environmental", label: "Environmental" },
+];
+
+export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: Props) {
   const navigate = useNavigate();
   const { user, activeRole } = useSession();
   const isAuthor = can(activeRole, "note:author");
   const appts = useAsync(() => listAppointments(p.id, activeRole), [p.id, activeRole]);
-  const refs = useAsync(() => listReferrals(p.id, activeRole), [p.id, activeRole]);
+  const [allergy, setAllergy] = useState({ substance: "", category: "medication" as AllergyCategory, reaction: "" });
+  const [vital, setVital] = useState({ label: "", value: "" });
+  const [error, setError] = useState("");
 
   const idx = FLOW.indexOf(p.status.encounter);
   const next = idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : undefined;
@@ -97,6 +106,9 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
     return null;
   })();
 
+  const upcoming = [...(appts.data ?? [])].sort((a, b) => a.when.localeCompare(b.when));
+  const nextAppointment = upcoming.find((item) => new Date(item.when).getTime() >= Date.now()) ?? upcoming[0];
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
       {nextStep && (
@@ -129,15 +141,85 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
           {!nextStep?.action && noteButton}
         </Box>
         <Typography variant="subtitle2">Chief complaint</Typography>
-        <Typography variant="body2" sx={{ mb: 1.5 }}>{p.chiefComplaint}</Typography>
-        <Typography variant="subtitle2">History of present illness</Typography>
-        <Typography variant="body2" sx={{ maxWidth: "75ch" }}>{p.hpi}</Typography>
+        <Typography variant="body2">{p.chiefComplaint || "Not documented"}</Typography>
       </Paper>
+
+      {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
+
+      <Paper sx={card}>
+        <Typography component="h2" variant="h6" sx={titleSx}>Demographics</Typography>
+        <Typography variant="body2">
+          {p.lastName}, {p.firstName} · {p.ageYears} y · {p.sexAtBirth} · DOB {formatDate(p.dob)} · MRN {p.mrn}
+          {(p.unit || p.room || p.bed) ? ` · ${[p.unit, p.room && `Room ${p.room}`, p.bed && `Bed ${p.bed}`].filter(Boolean).join(", ")}` : ""}
+        </Typography>
+      </Paper>
+
+      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
+        <Paper sx={card}>
+          <Typography component="h2" variant="h6" sx={titleSx}>Allergies</Typography>
+          {CATEGORIES.map((category) => {
+            const rows = p.allergies.filter((item) => (item.category ?? "medication") === category.id);
+            return (
+              <Box key={category.id} sx={{ mb: 1.5 }}>
+                <Typography variant="subtitle2">{category.label}</Typography>
+                <Typography variant="body2">{rows.length ? rows.map((item) => item.substance).join(", ") : "None documented"}</Typography>
+                {canEditSection(activeRole, p, "allergies") && rows.map((item) => item.id && (
+                  <Button key={item.id} size="small" color="error" onClick={async () => {
+                    try { onChange(await removeAllergy(activeRole, p.id, item.id!)); } catch (e) { setError((e as Error).message); }
+                  }}>Remove {item.substance}</Button>
+                ))}
+              </Box>
+            );
+          })}
+          {canEditSection(activeRole, p, "allergies") && (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <TextField size="small" label="Substance" value={allergy.substance} onChange={(e) => setAllergy({ ...allergy, substance: e.target.value })} />
+              <TextField select size="small" label="Category" value={allergy.category} onChange={(e) => setAllergy({ ...allergy, category: e.target.value as AllergyCategory })}>
+                {CATEGORIES.map((item) => <MenuItem key={item.id} value={item.id}>{item.label}</MenuItem>)}
+              </TextField>
+              <Button variant="outlined" onClick={async () => {
+                try {
+                  onChange(await addAllergy(activeRole, p.id, allergy));
+                  setAllergy({ substance: "", category: "medication", reaction: "" });
+                } catch (e) { setError((e as Error).message); }
+              }}>Add</Button>
+            </Stack>
+          )}
+        </Paper>
+        <Paper sx={card}>
+          <Typography component="h2" variant="h6" sx={titleSx}>Current vitals</Typography>
+          <LatestVitals patient={p} />
+          {canEditSection(activeRole, p, "vitals") && (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
+              <TextField size="small" label="Label" value={vital.label} onChange={(e) => setVital({ ...vital, label: e.target.value })} />
+              <TextField size="small" label="Value" value={vital.value} onChange={(e) => setVital({ ...vital, value: e.target.value })} />
+              <Button variant="outlined" onClick={async () => {
+                try {
+                  onChange(await addVital(activeRole, p.id, vital));
+                  setVital({ label: "", value: "" });
+                } catch (e) { setError((e as Error).message); }
+              }}>Add</Button>
+            </Stack>
+          )}
+        </Paper>
+      </Box>
 
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.7fr) minmax(280px, 1fr)" }, alignItems: "stretch" }}>
         <Paper sx={card}>
-          <Typography component="h2" variant="h6" sx={titleSx}>Vitals</Typography>
-          <VitalsChart patient={p} />
+          <Typography component="h2" variant="h6" sx={titleSx}>Recent labs</Typography>
+          {p.labs.length === 0 ? <Typography variant="body2" color="text.secondary">None on file</Typography> : (
+            <Table size="small">
+              <TableBody>
+                {[...p.labs].slice(-5).reverse().map((lab) => (
+                  <TableRow key={lab.id}>
+                    <TableCell>{lab.name}</TableCell>
+                    <TableCell>{lab.value} {lab.unit}</TableCell>
+                    <TableCell>{formatDate(lab.collectedAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </Paper>
         <Paper sx={card}>
           <Typography component="h2" variant="h6" sx={titleSx}>Diagnoses</Typography>
@@ -157,124 +239,34 @@ export default function SummaryTab({ patient: p, notes, onAdvance }: Props) {
         </Paper>
       </Box>
 
-      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
-        <Paper sx={card}>
-          <Typography component="h2" variant="h6" sx={titleSx}>Medications</Typography>
-          {p.medications.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">No active medications.</Typography>
-          ) : (
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Dose</TableCell>
-                    <TableCell>Route</TableCell>
-                    <TableCell>Frequency</TableCell>
-                    <TableCell>Indication</TableCell>
-                    <TableCell>Adherence</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {p.medications.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell sx={{ fontWeight: 600 }}>{m.name}</TableCell>
-                      <TableCell>{m.dose}</TableCell>
-                      <TableCell>{m.route}</TableCell>
-                      <TableCell>{m.frequency}</TableCell>
-                      <TableCell>{m.indication ?? "—"}</TableCell>
-                      <TableCell>{m.adherence ?? "Not documented"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          )}
-        </Paper>
-
-        <Paper sx={card}>
-          <Typography component="h2" variant="h6" sx={titleSx}>Labs</Typography>
-          {p.labs.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">None on file</Typography>
-          ) : (
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Test</TableCell>
-                    <TableCell align="right">Result</TableCell>
-                    <TableCell>Range</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {p.labs.map((l) => (
-                    <TableRow key={l.id} sx={l.flag ? { bgcolor: utep.alertSoft } : undefined}>
-                      <TableCell>{l.name}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: l.flag ? 700 : 400, color: l.flag ? "error.main" : undefined }}>
-                        {l.value} {l.unit}{l.flag ? ` ${l.flag}` : ""}
-                      </TableCell>
-                      <TableCell>{l.referenceRange}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          )}
-        </Paper>
-      </Box>
-
       <Paper sx={card}>
-        <Typography component="h2" variant="h6" sx={titleSx}>History</Typography>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { md: "1fr 1fr" } }}>
-          <Detail label="Past medical history" value={p.pastMedicalHistory} />
-          <Detail label="Family history" value={p.familyHistory} />
-          <Detail label="Surgical history" value={p.surgicalHistory} />
-          <Detail label="Social history" value={p.socialHistory} />
-        </Box>
-      </Paper>
-
-      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { md: "1fr 1fr" }, alignItems: "start" }}>
-        <Paper sx={card}>
-          <Typography component="h2" variant="h6" sx={titleSx}>Upcoming appointments</Typography>
-          {(appts.data ?? []).length === 0 && <Typography variant="body2" color="text.secondary">None scheduled.</Typography>}
-          {(appts.data ?? []).map((a) => (
-            <Box key={a.id} sx={{ mb: 1.25 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatDateTime(a.when)}</Typography>
-              <Typography variant="body2">{a.kind}, {a.withWhom}</Typography>
-            </Box>
-          ))}
-        </Paper>
-        <Paper sx={card}>
-          <Typography component="h2" variant="h6" sx={titleSx}>Referrals</Typography>
-          {(refs.data ?? []).length === 0 && <Typography variant="body2" color="text.secondary">No referrals yet.</Typography>}
-          {(refs.data ?? []).map((r) => (
-            <Box key={r.id} sx={{ mb: 1.25 }}>
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>To {disciplineLabel[r.toDiscipline]}</Typography>
-                {r.urgency === "urgent" && <Chip size="small" color="error" label="Urgent" />}
-              </Box>
-              <Typography variant="body2">{r.reason}</Typography>
-            </Box>
-          ))}
-        </Paper>
-      </Box>
-
-      <Paper sx={card}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", mb: 1.5 }}>
-          <Typography component="h2" variant="h6" sx={{ ...titleSx, mb: 0, flex: 1 }}>Notes on this encounter</Typography>
-          {noteButton}
-        </Box>
-        <NotesList notes={notes} patientId={p.id} reviewer={!isAuthor} emptyAction={!notes.length ? noteButton : undefined} />
+        <Typography component="h2" variant="h6" sx={titleSx}>Next appointment</Typography>
+        {nextAppointment ? (
+          <>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatDateTime(nextAppointment.when)}</Typography>
+            <Typography variant="body2">{nextAppointment.kind}, {nextAppointment.withWhom}</Typography>
+          </>
+        ) : <Typography variant="body2" color="text.secondary">None scheduled.</Typography>}
       </Paper>
     </Box>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function LatestVitals({ patient }: { patient: Patient }) {
+  const latest = new Map<string, (typeof patient.vitals)[number]>();
+  for (const item of patient.vitals) {
+    const current = latest.get(item.label);
+    const stamp = item.recordedAt ?? "";
+    if (!current || stamp >= (current.recordedAt ?? "")) latest.set(item.label, item);
+  }
+  const rows = [...latest.values()];
+  if (rows.length === 0) return <Typography variant="body2" color="text.secondary">No vitals recorded.</Typography>;
   return (
-    <Box>
-      <Typography variant="subtitle2">{label}</Typography>
-      <Typography variant="body2">{value}</Typography>
-    </Box>
+    <Stack spacing={0.5}>
+      {rows.map((item) => (
+        <Typography key={item.label} variant="body2"><b>{item.label}:</b> {item.value}</Typography>
+      ))}
+    </Stack>
   );
 }
+

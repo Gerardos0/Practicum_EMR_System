@@ -10,6 +10,8 @@ from app.schemas.clinical import (
     AddendumBody,
     CommentBody,
     DraftCreate,
+    InstructorEdit,
+    ScoreWrite,
     SectionCommentIn,
     DraftPatch,
     NoteOut,
@@ -24,6 +26,8 @@ from app.services.notes import (
     add_section_comment,
     cosign_note,
     create_draft,
+    instructor_edit_note,
+    save_scores,
     ensure_can_read,
     load_note,
     return_note,
@@ -69,7 +73,7 @@ async def list_notes(
     notes = (await db.scalars(query.order_by(ClinicalNote.updated_at.desc()))).all()
     payload = []
     for note in notes:
-        payload.append(note_out(await _reload(db, note)))
+        payload.append(note_out(await _reload(db, note), include_scores=role != "student"))
     return payload
 
 
@@ -96,7 +100,7 @@ async def create_note(
         ip=_ip(request),
     )
     await db.commit()
-    return note_out(await _reload(db, note))
+    return note_out(await _reload(db, note), include_scores=role != "student")
 
 
 @router.get("/notes/{note_id}", response_model=NoteOut, response_model_exclude_none=True)
@@ -139,7 +143,7 @@ async def get_note(
         ip_address=_ip(request),
     )
     await db.commit()
-    return note_out(await _reload(db, note))
+    return note_out(await _reload(db, note), include_scores=role != "student")
 
 
 @router.patch("/notes/{note_id}", response_model=NoteOut, response_model_exclude_none=True)
@@ -159,7 +163,7 @@ async def patch_note(
     data = body.model_dump(exclude_unset=True)
     saved = await save_draft(db, note, user, body.expected_version, data)
     await db.commit()
-    return note_out(await _reload(db, saved))
+    return note_out(await _reload(db, saved), include_scores=role != "student")
 
 
 @router.post("/notes/{note_id}/sign", response_model=NoteOut, response_model_exclude_none=True)
@@ -178,7 +182,7 @@ async def sign(
     await ensure_course_open(db, patient.course_id)
     signed = await sign_note(db, note, user, body.expected_version, _ip(request), patient.course_id)
     await db.commit()
-    return note_out(await _reload(db, signed))
+    return note_out(await _reload(db, signed), include_scores=role != "student")
 
 
 @router.post("/notes/{note_id}/cosign", response_model=NoteOut, response_model_exclude_none=True)
@@ -195,7 +199,7 @@ async def cosign(
     await ensure_course_open(db, patient.course_id)
     await cosign_note(db, note, user, role, body.comment, _ip(request), patient.course_id)
     await db.commit()
-    return note_out(await _reload(db, note))
+    return note_out(await _reload(db, note), include_scores=role != "student")
 
 
 @router.post("/notes/{note_id}/return", response_model=NoteOut, response_model_exclude_none=True)
@@ -212,7 +216,7 @@ async def return_for_revision(
     await ensure_course_open(db, patient.course_id)
     await return_note(db, note, user, role, body.comment, _ip(request), patient.course_id)
     await db.commit()
-    return note_out(await _reload(db, note))
+    return note_out(await _reload(db, note), include_scores=role != "student")
 
 
 @router.post("/notes/{note_id}/comments", response_model=NoteOut, response_model_exclude_none=True)
@@ -229,7 +233,7 @@ async def comment(
     await ensure_course_open(db, patient.course_id)
     await add_section_comment(db, note, user, role, body.section_id, body.body, _ip(request), patient.course_id)
     await db.commit()
-    return note_out(await _reload(db, note))
+    return note_out(await _reload(db, note), include_scores=role != "student")
 
 
 @router.post("/notes/{note_id}/addenda", response_model=NoteOut, response_model_exclude_none=True)
@@ -250,7 +254,41 @@ async def addendum(
     await ensure_course_open(db, patient.course_id)
     await add_addendum(db, note, user, body.body, _ip(request), patient.course_id)
     await db.commit()
-    return note_out(await _reload(db, note))
+    return note_out(await _reload(db, note), include_scores=role != "student")
+
+
+@router.patch("/notes/{note_id}/instructor-edit", response_model=NoteOut, response_model_exclude_none=True)
+async def instructor_edit(
+    note_id: uuid.UUID,
+    body: InstructorEdit,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    note = await _reviewable(db, user, role, note_id, request)
+    patient = await load_patient(db, note.patient_id)
+    await ensure_course_open(db, patient.course_id)
+    await instructor_edit_note(db, note, user, role, body.model_dump(exclude_unset=True), _ip(request), patient.course_id)
+    await db.commit()
+    return note_out(await _reload(db, note), include_scores=True)
+
+
+@router.put("/notes/{note_id}/scores", response_model=NoteOut, response_model_exclude_none=True)
+async def put_scores(
+    note_id: uuid.UUID,
+    body: ScoreWrite,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    note = await _reviewable(db, user, role, note_id, request)
+    patient = await load_patient(db, note.patient_id)
+    await ensure_course_open(db, patient.course_id)
+    await save_scores(db, note, user, role, body.model_dump(), _ip(request), patient.course_id)
+    await db.commit()
+    return note_out(await _reload(db, note), include_scores=True)
 
 
 @router.get("/review-queue", response_model=list[QueueItemOut], response_model_exclude_none=True)
@@ -283,7 +321,7 @@ async def review_queue(
     for note in notes:
         patient = await load_patient(db, note.patient_id)
         owner = f"{patient.owner.first_name} {patient.owner.last_name}" if patient.owner else None
-        items.append({"note": note_out(await _reload(db, note)), "patient": patient_out(patient, owner_name=owner)})
+        items.append({"note": note_out(await _reload(db, note), include_scores=role != "student"), "patient": patient_out(patient, owner_name=owner)})
     return items
 
 

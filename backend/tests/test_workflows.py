@@ -218,31 +218,37 @@ async def test_admin_can_import_single_instructor_and_student(client):
 
 @pytest.mark.asyncio
 async def test_instructor_removal_guards(client):
-    admin_headers, _ = await login(client, "gerardo.sillas@utep.edu")
+    admin_headers, admin = await login(client, "gerardo.sillas@utep.edu")
     course = await course_id(client, admin_headers, "PHAR 5320")
     instructor_list = await client.get(f"/api/v1/courses/{course}/instructors", headers=admin_headers)
     instructor_ids = [person["id"] for person in instructor_list.json()]
     assert len(instructor_ids) >= 2
 
     instructor_headers, instructor = await login(client, "joe.mota@utep.edu")
-    target_user_id = next(user_id for user_id in instructor_ids if user_id != instructor["user"]["id"])
-    other_instructor_removed = await client.delete(
-        f"/api/v1/courses/{course}/roster/{target_user_id}",
+    instructor_denied = await client.delete(
+        f"/api/v1/courses/{course}/roster/{admin['user']['id']}",
         headers=instructor_headers,
+        params={"role": "instructor"},
+    )
+    assert instructor_denied.status_code == 403
+
+    other_instructor_removed = await client.delete(
+        f"/api/v1/courses/{course}/roster/{instructor['user']['id']}",
+        headers=admin_headers,
         params={"role": "instructor"},
     )
     assert other_instructor_removed.status_code == 204
 
     self_remove = await client.delete(
-        f"/api/v1/courses/{course}/roster/{instructor['user']['id']}",
-        headers=instructor_headers,
+        f"/api/v1/courses/{course}/roster/{admin['user']['id']}",
+        headers=admin_headers,
         params={"role": "instructor"},
     )
     assert self_remove.status_code == 409
 
     student_headers, _ = await login(client, "daniel.reyes@miners.utep.edu")
     student_attempt = await client.delete(
-        f"/api/v1/courses/{course}/roster/{target_user_id}",
+        f"/api/v1/courses/{course}/roster/{admin['user']['id']}",
         headers=student_headers,
         params={"role": "instructor"},
     )
@@ -251,19 +257,18 @@ async def test_instructor_removal_guards(client):
 
 @pytest.mark.asyncio
 async def test_cannot_remove_last_instructor(client):
-    admin_headers, _ = await login(client, "gerardo.sillas@utep.edu")
-    joe_headers, joe = await login(client, "joe.mota@utep.edu")
+    admin_headers, admin = await login(client, "gerardo.sillas@utep.edu")
     course = await course_id(client, admin_headers, "PHAR 5320")
     instructors = await client.get(f"/api/v1/courses/{course}/instructors", headers=admin_headers)
     assert instructors.status_code == 200, instructors.text
-    joe_id = joe["user"]["id"]
-    other_instructor_ids = [person["id"] for person in instructors.json() if person["id"] != joe_id]
+    admin_id = admin["user"]["id"]
+    other_instructor_ids = [person["id"] for person in instructors.json() if person["id"] != admin_id]
     assert other_instructor_ids
 
     for instructor_id in other_instructor_ids:
         removed = await client.delete(
             f"/api/v1/courses/{course}/roster/{instructor_id}",
-            headers=joe_headers,
+            headers=admin_headers,
             params={"role": "instructor"},
         )
         assert removed.status_code == 204, removed.text
@@ -271,10 +276,10 @@ async def test_cannot_remove_last_instructor(client):
     remaining = await client.get(f"/api/v1/courses/{course}/instructors", headers=admin_headers)
     assert remaining.status_code == 200, remaining.text
     assert len(remaining.json()) == 1
-    assert remaining.json()[0]["id"] == joe_id
+    assert remaining.json()[0]["id"] == admin_id
 
     final_removal = await client.delete(
-        f"/api/v1/courses/{course}/roster/{joe_id}",
+        f"/api/v1/courses/{course}/roster/{admin_id}",
         headers=admin_headers,
         params={"role": "instructor"},
     )
@@ -284,7 +289,7 @@ async def test_cannot_remove_last_instructor(client):
     remaining_after_rejection = await client.get(f"/api/v1/courses/{course}/instructors", headers=admin_headers)
     assert remaining_after_rejection.status_code == 200, remaining_after_rejection.text
     assert len(remaining_after_rejection.json()) == 1
-    assert remaining_after_rejection.json()[0]["id"] == joe_id
+    assert remaining_after_rejection.json()[0]["id"] == admin_id
 
 
 @pytest.mark.asyncio

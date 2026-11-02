@@ -1,13 +1,14 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.schemas.clinical import AnswerKeyIn, AnswerKeyOut, CaseIn, CaseOut
 from app.services.access import can, ensure_course_open, memberships_for, require_course
 from app.services.answer_keys import deny_answer_key, read_answer_key, upsert_answer_key
 from app.services.audit import log_event
+from app.services.case_import import import_cases, template_workbook
 from app.services.cases import create_case, list_cases, load_case, update_case
 from app.services.serialize import authored_case_out
 
@@ -66,6 +67,42 @@ async def post_case(
     patient = await create_case(db, body=body, actor=user, course_id=course_id, ip=_ip(request))
     await db.commit()
     return authored_case_out(patient)
+
+
+@router.get("/import-template")
+async def download_case_template(
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    course_id: Annotated[uuid.UUID, Query()],
+    role: Annotated[str, Query()],
+):
+    rows = await memberships_for(db, user.id)
+    await _require_author(db, user, role, rows, course_id, request, "case.template")
+    return Response(
+        template_workbook(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="Patient_Case_Upload_Template.xlsx"'},
+    )
+
+
+@router.post("/import")
+async def post_case_import(
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    course_id: Annotated[uuid.UUID, Query()],
+    role: Annotated[str, Query()],
+    file: UploadFile = File(...),
+):
+    rows = await memberships_for(db, user.id)
+    await _require_author(db, user, role, rows, course_id, request, "case.import")
+    await ensure_course_open(db, course_id)
+    result = await import_cases(
+        db, payload=await file.read(), actor=user, course_id=course_id, ip=_ip(request),
+    )
+    await db.commit()
+    return result
 
 
 @router.get("/{case_id}", response_model=CaseOut, response_model_exclude_none=True)

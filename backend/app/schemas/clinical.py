@@ -9,8 +9,10 @@ from app.schemas.common import APIModel
 DisciplineCode = Literal[
     "pharmacy", "physical_therapy", "occupational_therapy", "speech_language_pathology", "nursing"
 ]
-NoteTemplate = Literal["pharmacy_mtm", "pt_daily_soap", "general_soap"]
-RoleCode = Literal["student", "instructor", "admin", "front_desk", "patient"]
+NoteTemplate = Literal[
+    "pharmacy_soap", "sbar", "phone_note", "telehealth_visit", "pharmacy_mtm", "pt_daily_soap", "general_soap"
+]
+RoleCode = Literal["student", "instructor", "course_coordinator", "admin", "front_desk", "patient"]
 CourseStatus = Literal["planned", "active", "ended", "archived"]
 
 
@@ -28,6 +30,7 @@ class PublicUser(APIModel):
     phone_last4: str | None = None
     must_change_password: bool = False
     is_active: bool = True
+    archived_at: datetime | None = None
     roles: list[RoleAssignmentOut]
     roster_status: Literal["active", "inactive"] | None = None
     deactivated_at: datetime | None = None
@@ -41,6 +44,7 @@ class CourseOut(APIModel):
     status: CourseStatus
     instructor_ids: list[str]
     rubric_file_name: str | None = None
+    grading_guide: dict | None = None
 
 
 class CourseCreate(APIModel):
@@ -54,9 +58,11 @@ class CourseStatusPatch(APIModel):
 
 
 class AllergyOut(APIModel):
+    id: str | None = None
     substance: str
     reaction: str | None = None
     severity: str | None = None
+    category: str = "medication"
 
 
 class MedicationOut(APIModel):
@@ -67,9 +73,13 @@ class MedicationOut(APIModel):
     frequency: str
     indication: str | None = None
     adherence: str | None = None
+    status: str = "active"
+    prescribed: bool = False
+    discontinued_at: datetime | None = None
 
 
 class ProblemOut(APIModel):
+    id: str | None = None
     code: str | None = None
     description: str
     since: str | None = None
@@ -86,8 +96,10 @@ class LabOut(APIModel):
 
 
 class VitalOut(APIModel):
+    id: str | None = None
     label: str
     value: str
+    recorded_at: datetime | None = None
 
 
 class EncounterOut(APIModel):
@@ -148,6 +160,11 @@ class PatientOut(APIModel):
     encounter: EncounterOut
     insurance: InsuranceOut
     emergency_contact: EmergencyContactOut
+    section_locks: dict[str, bool] = {}
+    prefill_sections: list[str] = []
+    unit: str | None = None
+    room: str | None = None
+    bed: str | None = None
 
 
 class LatestNote(APIModel):
@@ -189,7 +206,7 @@ class NoteCommentOut(APIModel):
 
 
 class SectionCommentIn(APIModel):
-    section_id: Literal["S", "O", "MR", "A", "P"] | None = None
+    section_id: str | None = Field(default=None, max_length=10)
     body: str = Field(min_length=1)
 
 
@@ -213,6 +230,9 @@ class NoteOut(APIModel):
     version: int
     content: dict[str, str]
     diagnoses: list[IcdCode]
+    cpt_codes: list[IcdCode] = []
+    body_locked: bool = False
+    rubric_scores: dict | None = None
     routed_to_id: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -233,6 +253,7 @@ class DraftPatch(APIModel):
     template_id: NoteTemplate | None = None
     content: dict[str, str] | None = None
     diagnoses: list[IcdCode] | None = None
+    cpt_codes: list[IcdCode] | None = None
     routed_to_id: uuid.UUID | None = None
 
 
@@ -287,7 +308,7 @@ class RosterRowIn(APIModel):
 class RosterImport(APIModel):
     discipline: DisciplineCode
     rows: list[RosterRowIn]
-    role: Literal["student", "instructor"] = "student"
+    role: Literal["student", "instructor", "course_coordinator"] = "student"
 
 
 class TempPassword(APIModel):
@@ -306,6 +327,7 @@ class CaseAllergyIn(APIModel):
     substance: str = ""
     reaction: str | None = None
     severity: str | None = None
+    category: str | None = None
 
 
 class CaseMedicationIn(APIModel):
@@ -315,6 +337,7 @@ class CaseMedicationIn(APIModel):
     frequency: str = ""
     indication: str | None = None
     adherence: str | None = None
+    prescribed: bool = False
 
 
 class CaseProblemIn(APIModel):
@@ -360,6 +383,11 @@ class CaseIn(APIModel):
     problems: list[CaseProblemIn] = []
     labs: list[CaseLabIn] = []
     vitals: list[CaseVitalIn] = []
+    section_locks: dict[str, bool] | None = None
+    prefill_sections: list[str] | None = None
+    unit: str | None = None
+    room: str | None = None
+    bed: str | None = None
 
 
 class CaseOut(PatientOut):
@@ -396,3 +424,84 @@ class AuditOut(APIModel):
     entity: str
     result: str
     detail: str | None = None
+
+
+class AllergyWrite(APIModel):
+    substance: str = ""
+    reaction: str | None = None
+    severity: str | None = None
+    category: str = "medication"
+
+
+class MedicationWrite(APIModel):
+    name: str = ""
+    dose: str = ""
+    route: str = ""
+    frequency: str = ""
+    indication: str | None = None
+    adherence: str | None = None
+    prescribed: bool = False
+
+
+class VitalWrite(APIModel):
+    label: str
+    value: str
+
+
+class LabWrite(APIModel):
+    name: str
+    value: str = ""
+    unit: str = ""
+    reference_range: str = ""
+    flag: str | None = None
+    collected_at: date
+
+
+class ProblemWrite(APIModel):
+    code: str | None = None
+    description: str
+    since: str | None = None
+
+
+class HistoryWrite(APIModel):
+    section: Literal["medical_history", "surgical_history", "chief_complaint"]
+    value: str = ""
+
+
+class PlacementWrite(APIModel):
+    unit: str | None = None
+    room: str | None = None
+    bed: str | None = None
+
+
+class AdministerWrite(APIModel):
+    dose_given: str = ""
+
+
+class AdministrationReview(APIModel):
+    decision: Literal["accepted", "needs_follow_up"]
+    comment: str = ""
+
+
+class ScoreCriterion(APIModel):
+    id: str
+    score: float | None = None
+    feedback: str = ""
+    max_points: float | None = None
+
+
+class ScoreWrite(APIModel):
+    criteria: list[ScoreCriterion] = []
+    overall_feedback: str = ""
+
+
+class InstructorEdit(APIModel):
+    content: dict[str, str] | None = None
+    diagnoses: list[IcdCode] | None = None
+    cpt_codes: list[IcdCode] | None = None
+
+
+class PortalAccess(APIModel):
+    email: str
+    full_name: str
+    patient_id: uuid.UUID

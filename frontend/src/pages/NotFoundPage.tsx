@@ -8,7 +8,8 @@ export default function NotFoundPage() {
   const home = homePathFor(activeRole);
   const homeLabel =
     activeRole === "admin" ? "Go to roster"
-      : activeRole === "instructor" || activeRole === "student" ? "Go to dashboard"
+      : activeRole === "instructor" || activeRole === "course_coordinator" || activeRole === "student" ? "Go to dashboard"
+        : activeRole === "patient" ? "Go to my chart"
         : "Go to patients";
 
   return (

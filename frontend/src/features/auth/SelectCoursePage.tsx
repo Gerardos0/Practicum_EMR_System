@@ -60,7 +60,7 @@ export default function SelectCoursePage() {
         <Typography color="text.secondary" sx={{ mb: 3 }}>
           Choose the course you're working in today.
           {activeRole === "student" && " You'll see the patients and cases assigned to that class."}
-          {activeRole === "instructor" && " You'll review notes and manage the roster for that class."}
+          {(activeRole === "instructor" || activeRole === "course_coordinator") && " You'll review notes and teach that class."}
           {activeRole === "admin" && " You'll manage rosters and activity for that class."}
         </Typography>
 

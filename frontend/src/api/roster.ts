@@ -19,7 +19,7 @@ export async function listRoster(courseId: string): Promise<User[]> {
 }
 
 export async function importRoster(
-  courseId: string, discipline: Discipline, rows: RosterRow[], role: "student" | "instructor" = "student",
+  courseId: string, discipline: Discipline, rows: RosterRow[], role: "student" | "instructor" | "course_coordinator" = "student",
 ): Promise<RosterImportResult> {
   return request<RosterImportResult>(`/courses/${courseId}/roster/import`, {
     method: "POST",

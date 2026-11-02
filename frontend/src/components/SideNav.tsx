@@ -8,6 +8,7 @@ import BadgeOutlined from "@mui/icons-material/BadgeOutlined";
 import HistoryOutlined from "@mui/icons-material/HistoryOutlined";
 import SchoolOutlined from "@mui/icons-material/SchoolOutlined";
 import QueryStatsOutlined from "@mui/icons-material/QueryStatsOutlined";
+import AssessmentOutlined from "@mui/icons-material/AssessmentOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import TextFieldsOutlined from "@mui/icons-material/TextFieldsOutlined";
@@ -32,12 +33,13 @@ const ICON = {
   courses: <SchoolOutlined fontSize="small" />,
   reports: <QueryStatsOutlined fontSize="small" />,
   cases: <MenuBookOutlined fontSize="small" />,
+  teaching: <AssessmentOutlined fontSize="small" />,
 };
 
 function useNav(): NavItem[] {
   const { user, activeRole, courseId } = useSession();
   const queue = useAsync(
-    () => activeRole === "instructor" ? listReviewQueue(courseId, activeRole) : Promise.resolve([]),
+    () => (activeRole === "instructor" || activeRole === "course_coordinator") ? listReviewQueue(courseId, activeRole) : Promise.resolve([]),
     [user.id, activeRole, courseId],
   );
   const pending = queue.data?.filter((q) => q.note.status === "pending_review").length ?? 0;
@@ -52,19 +54,28 @@ function useNav(): NavItem[] {
       { to: "/review", label: "Review queue", icon: ICON.review, badge: pending },
       { to: "/patients", label: "Patients", icon: ICON.patients },
       { to: "/cases", label: "Cases", icon: ICON.cases },
-      { to: "/admin/roster", label: "Roster", icon: ICON.roster },
+      { to: "/teaching", label: "Grades and time", icon: ICON.teaching },
+      { to: "/audit", label: "Activity log", icon: ICON.audit },
+    ],
+    course_coordinator: [
+      { to: "/dashboard", label: "Dashboard", icon: ICON.dashboard },
+      { to: "/review", label: "Review queue", icon: ICON.review, badge: pending },
+      { to: "/patients", label: "Patients", icon: ICON.patients },
+      { to: "/cases", label: "Cases", icon: ICON.cases },
+      { to: "/admin/roster", label: "Instructors", icon: ICON.roster },
+      { to: "/teaching", label: "Grades and time", icon: ICON.teaching },
       { to: "/audit", label: "Activity log", icon: ICON.audit },
     ],
     admin: [
       { to: "/admin/courses", label: "Courses", icon: ICON.courses },
       { to: "/admin/reports", label: "Reports", icon: ICON.reports },
       { to: "/admin/roster", label: "Roster", icon: ICON.roster },
+      { to: "/teaching", label: "Grades and time", icon: ICON.teaching },
       { to: "/audit", label: "Activity log", icon: ICON.audit },
       { to: "/patients", label: "Patients", icon: ICON.patients },
-      { to: "/cases", label: "Cases", icon: ICON.cases },
     ],
     front_desk: [{ to: "/patients", label: "Patients", icon: ICON.patients }],
-    patient: [],
+    patient: [{ to: "/portal", label: "My chart", icon: ICON.patients }],
   };
   return byRole[activeRole];
 }
