@@ -127,7 +127,8 @@ The migration command applies all database migrations. The seed command creates 
 
 - Student: `daniel.reyes@miners.utep.edu`
 - Instructor: `joe.mota@utep.edu`
-- Administrator (also an instructor in seeded courses): `gerardo.sillas@utep.edu`
+- Administrator: `clarissa.dominguez@utep.edu`
+- Administrator who also teaches: `gerardo.sillas@utep.edu`
 
 Use the configured seed demo password for each account.
 

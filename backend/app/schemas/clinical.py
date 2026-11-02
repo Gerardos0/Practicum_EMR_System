@@ -323,6 +323,12 @@ class RosterImportResult(APIModel):
     temporary_passwords: list[TempPassword] = []
 
 
+class EnrollmentCreate(APIModel):
+    user_id: uuid.UUID
+    role: Literal["student", "instructor", "course_coordinator"]
+    discipline: DisciplineCode
+
+
 class CaseAllergyIn(APIModel):
     substance: str = ""
     reaction: str | None = None

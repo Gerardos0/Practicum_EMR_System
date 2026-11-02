@@ -3,6 +3,12 @@ import { Button, Stack, TextField } from "@mui/material";
 import type { Discipline, RosterRow } from "../../types";
 import { validateRosterRow } from "./parseRoster";
 
+function validateStaffRow(row: { fullName: string; email: string; universityId: string }) {
+  if (!row.fullName) return { ...row, problem: "Missing name" };
+  if (!/@(miners\.)?utep\.edu$/.test(row.email)) return { ...row, problem: "Email must be @miners.utep.edu or @utep.edu" };
+  return { ...row, problem: undefined };
+}
+
 interface AddPersonFormProps {
   role: "student" | "instructor" | "course_coordinator";
   discipline: Discipline;
@@ -23,7 +29,7 @@ export default function AddPersonForm({ role, onSubmit }: AddPersonFormProps) {
       email: email.trim().toLowerCase(),
       universityId: universityId.trim(),
     };
-    const validated = validateRosterRow(row);
+    const validated = role === "student" ? validateRosterRow(row) : validateStaffRow(row);
     if (validated.problem) {
       const field = validated.problem === "Missing name"
         ? "fullName"
@@ -65,14 +71,16 @@ export default function AddPersonForm({ role, onSubmit }: AddPersonFormProps) {
         error={Boolean(problems.email)}
         helperText={problems.email}
       />
-      <TextField
-        size="small"
-        label="800 number"
-        value={universityId}
-        onChange={(event) => setUniversityId(event.target.value)}
-        error={Boolean(problems.universityId)}
-        helperText={problems.universityId}
-      />
+      {role === "student" && (
+        <TextField
+          size="small"
+          label="800 number"
+          value={universityId}
+          onChange={(event) => setUniversityId(event.target.value)}
+          error={Boolean(problems.universityId)}
+          helperText={problems.universityId}
+        />
+      )}
       <Button type="submit" variant="contained" disabled={busy} sx={{ alignSelf: "flex-start" }}>
         {busy ? "Adding..." : role === "instructor" ? "Add instructor" : role === "course_coordinator" ? "Add course coordinator" : "Add student"}
       </Button>

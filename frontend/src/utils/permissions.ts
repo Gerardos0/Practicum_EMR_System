@@ -58,7 +58,7 @@ export function homePathFor(role: Role): string {
     case "course_coordinator":
       return "/dashboard";
     case "admin":
-      return "/admin/courses";
+      return "/admin";
     case "patient":
       return "/portal";
     default:
