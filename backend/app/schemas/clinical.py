@@ -46,6 +46,10 @@ class CourseOut(APIModel):
     instructor_ids: list[str]
     rubric_file_name: str | None = None
     grading_guide: dict | None = None
+    guardrail_profile: str = "practicum"
+    guardrail_mode: str | None = None
+    ai_assist: bool = False
+    ai_provider_configured: bool = False
 
 
 class CourseCreate(APIModel):
@@ -60,6 +64,12 @@ class CourseStatusPatch(APIModel):
 
 class InactivityDaysPatch(APIModel):
     days: int = Field(ge=1, le=90)
+
+
+class CoursePolicyPatch(APIModel):
+    guardrail_profile: Literal["intro_pharmacy", "practicum", "clinical_other"] | None = None
+    guardrail_mode: Literal["off", "advisory", "acknowledge", "block"] | None = None
+    ai_assist: bool | None = None
 
 
 class PresenceIn(APIModel):
@@ -86,6 +96,10 @@ class MedicationOut(APIModel):
     status: str = "active"
     prescribed: bool = False
     discontinued_at: datetime | None = None
+    rxcui: str | None = None
+    generic_name: str | None = None
+    brand_names: list[str] = Field(default_factory=list)
+    flags: list[dict] = Field(default_factory=list)
 
 
 class ProblemOut(APIModel):
@@ -190,6 +204,7 @@ class PatientRowOut(APIModel):
     patient: PatientOut
     owner_name: str | None = None
     latest_note: LatestNote | None = None
+    open_flag_count: int = 0
 
 
 class StatusPatch(APIModel):
@@ -258,6 +273,7 @@ class NoteOut(APIModel):
     diagnoses: list[IcdCode]
     cpt_codes: list[CptSelection] = Field(default_factory=list)
     body_locked: bool = False
+    sensitivity: str = "standard"
     rubric_scores: dict | None = None
     routed_to_id: str | None = None
     created_at: datetime
@@ -500,6 +516,31 @@ class MedicationWrite(APIModel):
     adherence: str | None = None
     access_cost: str | None = None
     prescribed: bool = False
+    rxcui: str | None = None
+    generic_name: str | None = None
+    brand_names: list[str] = Field(default_factory=list)
+    acknowledged_flags: list[str] = Field(default_factory=list)
+    clear_flags: bool = False
+
+
+class SuggestIn(APIModel):
+    section_id: str = Field(min_length=1, max_length=40)
+
+
+class DoseCheckIn(APIModel):
+    text: str = Field(default="", max_length=20000)
+    acknowledged_flags: list[str] = Field(default_factory=list)
+
+
+class DoseFlagOut(APIModel):
+    code: str
+    message: str
+
+
+class DoseCheckOut(APIModel):
+    flags: list[DoseFlagOut]
+    blocked: bool = False
+    needs_acknowledgement: bool = False
 
 
 class VitalWrite(APIModel):
@@ -593,6 +634,7 @@ class NoteTemplateIn(APIModel):
     discipline: DisciplineCode
     course_id: uuid.UUID | None = None
     sensitive: bool = False
+    sensitivity: Literal["standard", "psychiatry", "protected"] | None = None
     sections: list[TemplateSectionIn] = Field(min_length=1, max_length=12)
 
 
@@ -602,4 +644,5 @@ class NoteTemplateOut(APIModel):
     discipline: str
     scope: Literal["shared", "course"]
     sensitive: bool = False
+    sensitivity: str = "standard"
     sections: list[TemplateSectionIn]

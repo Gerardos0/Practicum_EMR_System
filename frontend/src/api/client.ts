@@ -20,6 +20,7 @@ export interface StoredSession {
   activeRole: Role;
   courseId?: string;
   accessToken: string;
+  refreshToken?: string;
   mustChangePassword: boolean;
 }
 
@@ -81,9 +82,14 @@ export function refreshAccessToken(): Promise<string | null> {
   refreshing = (async () => {
     const current = readSession();
     if (!current) return null;
+    if (!current.refreshToken) {
+      writeSession(null);
+      return null;
+    }
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${current.accessToken}` },
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: current.refreshToken }),
     });
     if (!res.ok) {
       writeSession(null);
@@ -91,6 +97,7 @@ export function refreshAccessToken(): Promise<string | null> {
     }
     const body = (await res.json()) as {
       access_token: string;
+      refresh_token?: string;
       mustChangePassword: boolean;
       user: User;
     };
@@ -98,6 +105,7 @@ export function refreshAccessToken(): Promise<string | null> {
     writeSession({
       ...latest,
       accessToken: body.access_token,
+      refreshToken: body.refresh_token ?? latest.refreshToken,
       mustChangePassword: body.mustChangePassword,
       user: body.user,
     });

@@ -22,6 +22,13 @@ export async function createCourse(input: Pick<Course, "code" | "title" | "term"
   return request<Course>("/courses", { method: "POST", json: input });
 }
 
+export async function setCoursePolicy(
+  courseId: string,
+  body: Pick<Course, "guardrailProfile" | "guardrailMode" | "aiAssist">,
+): Promise<Course> {
+  return request<Course>(`/courses/${courseId}/policy`, { method: "PATCH", json: body });
+}
+
 export async function setCourseStatus(courseId: string, status: CourseStatus): Promise<Course> {
   return request<Course>(`/courses/${courseId}/status`, { method: "POST", json: { status } });
 }

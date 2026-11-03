@@ -5,6 +5,7 @@ export interface PatientRow {
   patient: Patient;
   ownerName?: string;
   latestNote?: { status: NoteStatus; updatedAt: string };
+  openFlagCount?: number;
 }
 
 export async function listPatients(role: Role, courseId: string): Promise<PatientRow[]> {

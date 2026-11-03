@@ -468,6 +468,8 @@ async def _copy_children(db: AsyncSession, source: Patient, clone: Patient) -> N
             patient_id=clone.id, name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
             indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
             status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+            rxcui=item.rxcui, generic_name=item.generic_name, brand_names=list(item.brand_names or []),
+            flags=list(item.flags or []),
         ))
     for item in source.problems:
         db.add(Problem(patient_id=clone.id, code=item.code, description=item.description, since=item.since))

@@ -27,12 +27,13 @@ interface Props {
   onDiagnoses?: (d: IcdCode[]) => void;
   comments?: NoteComment[];
   onComment?: (sectionId: string, body: string) => Promise<void>;
+  onFill?: (sectionId: string) => void;
 }
 
 const SOAP = new Set(["S", "O", "A", "P"]);
 
 export default function NoteFields({
-  templateId, patient, content, diagnoses, readOnly, errors, onField, onDiagnoses, comments, onComment,
+  templateId, patient, content, diagnoses, readOnly, errors, onField, onDiagnoses, comments, onComment, onFill,
 }: Props) {
   const { activeRole, courseId } = useSession();
   const saved = useAsync(() => listNoteTemplates(activeRole, courseId), [activeRole, courseId]);
@@ -77,6 +78,9 @@ export default function NoteFields({
               </Box>
             )}
             <Typography id={`sec-${section.id}`} component="h3" variant="h6" sx={{ flex: 1 }}>{section.title}</Typography>
+            {onFill && !readOnly && (
+              <Button size="small" onClick={() => onFill(section.id)} sx={{ minHeight: 44 }}>Fill from chart</Button>
+            )}
             {onComment && (
               <Button type="button" size="small" onClick={() => { setOpenSection(section.id); setDraft(""); setCommentError(""); }}>
                 Comment on this section
@@ -169,7 +173,7 @@ function Field({
   }
 
   if (f.kind === "icd10") {
-    if (structured) return <AssessmentEditor diagnoses={diagnoses} readOnly={readOnly} onDiagnoses={onDiagnoses} />;
+    if (structured) return <AssessmentEditor diagnoses={diagnoses} readOnly={readOnly} onDiagnoses={onDiagnoses} chartDiagnoses={chartDiagnoses(patient)} />;
     if (readOnly) {
       return (
         <ReadBlock label={f.label}>
@@ -180,6 +184,7 @@ function Field({
     return (
       <IcdSearch
         id={`field-${f.id}`} label={label} value={diagnoses} error={error}
+        chartDiagnoses={chartDiagnoses(patient)}
         onChange={(next) => onDiagnoses?.(next)}
       />
     );
@@ -206,10 +211,14 @@ function Field({
   );
 }
 
+function chartDiagnoses(patient: Patient): IcdCode[] {
+  return patient.problems.flatMap((problem) => problem.code ? [{ code: problem.code, label: problem.description }] : []);
+}
+
 function IcdSearch({
-  id, label, value, error, onChange,
+  id, label, value, error, onChange, chartDiagnoses: fromChart = [],
 }: {
-  id: string; label: string; value: IcdCode[]; error?: boolean; onChange: (next: IcdCode[]) => void;
+  id: string; label: string; value: IcdCode[]; error?: boolean; onChange: (next: IcdCode[]) => void; chartDiagnoses?: IcdCode[];
 }) {
   const [options, setOptions] = useState<IcdCode[]>([]);
   const [query, setQuery] = useState("");
@@ -230,7 +239,7 @@ function IcdSearch({
 
   return (
     <Autocomplete
-      multiple options={searching ? options : []} value={value} filterOptions={(rows) => rows}
+      multiple options={searching ? [...fromChart, ...options.filter((row) => !fromChart.some((item) => item.code === row.code))] : fromChart} value={value} filterOptions={(rows) => rows}
       getOptionLabel={(option) => `${option.code} ${option.label}`}
       isOptionEqualToValue={(a, b) => a.code === b.code}
       onChange={(_, next) => onChange(next)}

@@ -40,9 +40,19 @@ async def assert_usable(db: AsyncSession, template_id: str, course_id: uuid.UUID
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown note template.")
 
 
-async def is_sensitive(db: AsyncSession, template_id: str) -> bool:
+async def template_sensitivity(db: AsyncSession, template_id: str) -> str:
     saved = await load_saved(db, template_id)
-    return bool(saved and saved.sensitive)
+    if saved is None:
+        return "standard"
+    if saved.sensitivity in {"psychiatry", "protected"}:
+        return saved.sensitivity
+    if saved.sensitive:
+        return "protected"
+    return "standard"
+
+
+async def is_sensitive(db: AsyncSession, template_id: str) -> bool:
+    return await template_sensitivity(db, template_id) != "standard"
 
 
 async def allowed_section_ids(db: AsyncSession, template_id: str) -> set[str]:

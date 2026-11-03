@@ -35,7 +35,7 @@ export default function LoginPage() {
     setError("");
     login(email, password)
       .then((result) => {
-        signIn(result.user, result.accessToken, result.mustChangePassword);
+        signIn(result.user, result.accessToken, result.mustChangePassword, result.refreshToken);
         if (result.mustChangePassword) {
           navigate("/change-password", { replace: true });
           return;

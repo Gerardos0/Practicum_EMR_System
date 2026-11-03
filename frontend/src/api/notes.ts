@@ -5,6 +5,20 @@ export async function listNotesForPatient(role: Role, patientId: string): Promis
   return request<ClinicalNote[]>(`/patients/${patientId}/notes`, { query: { role } });
 }
 
+export function suggestSection(role: Role, noteId: string, sectionId: string): Promise<{ sectionId: string; suggestion: string }> {
+  return request(`/notes/${noteId}/suggest`, { method: "POST", query: { role }, json: { sectionId } });
+}
+
+export function checkInsertedDose(
+  role: Role, noteId: string, text: string, acknowledgedFlags: string[] = [],
+): Promise<{ flags: { code: string; message: string }[]; blocked: boolean; needsAcknowledgement: boolean }> {
+  return request(`/notes/${noteId}/dose-check`, {
+    method: "POST",
+    query: { role },
+    json: { text, acknowledgedFlags },
+  });
+}
+
 export async function getNote(role: Role, id: string): Promise<ClinicalNote> {
   return request<ClinicalNote>(`/notes/${id}`, { query: { role } });
 }

@@ -3,6 +3,7 @@ import {
   AppBar, Box, Chip, Divider, FormControlLabel, IconButton, InputBase, Menu, MenuItem, Select,
   Switch, ToggleButton, ToggleButtonGroup, Toolbar, Tooltip, Typography,
 } from "@mui/material";
+import MenuOpenRounded from "@mui/icons-material/MenuOpenRounded";
 import MenuRounded from "@mui/icons-material/MenuRounded";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import TextIncreaseOutlined from "@mui/icons-material/TextIncreaseOutlined";
@@ -66,9 +67,16 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
         <Toolbar sx={{ gap: 1.5, flexWrap: "wrap", py: 1.5, px: { xs: 2, md: 3 }, minHeight: { md: 76 } }}>
           <IconButton
             aria-label="Open navigation" onClick={onOpenNav}
-            sx={{ display: { md: "none" }, color: utep.navy }}
+            sx={{ display: { md: "none" }, color: utep.navy, minWidth: 44, minHeight: 44 }}
           >
             <MenuRounded />
+          </IconButton>
+          <IconButton
+            aria-label={prefs.navCollapsed ? "Expand navigation" : "Collapse navigation"}
+            onClick={() => setPrefs({ navCollapsed: !prefs.navCollapsed })}
+            sx={{ display: { xs: "none", md: "inline-flex" }, color: utep.navy, minWidth: 44, minHeight: 44 }}
+          >
+            {prefs.navCollapsed ? <MenuRounded /> : <MenuOpenRounded />}
           </IconButton>
 
           <Box sx={{ flex: "1 1 220px", minWidth: 0 }}>

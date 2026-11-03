@@ -138,7 +138,8 @@ async def test_lexicomp_does_not_invent_a_result(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
     quiet = await lexicomp_interactions(["warfarin", "aspirin"])
-    assert quiet == {"configured": False, "text": None}
+    assert quiet["configured"] is False
+    assert quiet["text"].startswith("Teaching interaction check.")
     assert calls["count"] == 0
 
     monkeypatch.setattr("app.services.reference_data.settings.LEXICOMP_API_URL", "https://lexicomp.test/interactions")

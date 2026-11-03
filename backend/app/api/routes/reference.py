@@ -4,7 +4,14 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, DbSession
-from app.services.reference_data import lexicomp_interactions, lexicomp_status, search_cpt, search_icd10, search_medications
+from app.services.reference_data import (
+    lexicomp_interactions,
+    lexicomp_status,
+    medication_details,
+    search_cpt,
+    search_icd10,
+    search_medications,
+)
 
 router = APIRouter(prefix="/reference", tags=["reference"])
 
@@ -17,6 +24,11 @@ async def icd10(user: CurrentUser, q: Annotated[str, Query()] = ""):
 @router.get("/medications")
 async def medications(user: CurrentUser, q: Annotated[str, Query()] = ""):
     return await search_medications(q)
+
+
+@router.get("/medications/{rxcui}")
+async def medication(user: CurrentUser, rxcui: str):
+    return await medication_details(rxcui)
 
 
 @router.get("/cpt")

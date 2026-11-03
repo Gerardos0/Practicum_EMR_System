@@ -9,6 +9,7 @@ import { useAsync } from "../../utils/useAsync";
 import { useSession } from "../auth/useSession";
 import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
+import { actionLabel } from "./auditLabels";
 
 export default function AuditLogPage() {
   usePageHeading("Activity log");
@@ -28,7 +29,7 @@ export default function AuditLogPage() {
 
   const rows = data.filter((a) =>
     (!deniedOnly || a.result === "denied") &&
-    (!q.trim() || [a.actorName, a.action, a.entity].some((v) => v.toLowerCase().includes(q.trim().toLowerCase()))),
+    (!q.trim() || [a.actorName, actionLabel(a.action, a.detail), a.entity].some((v) => v.toLowerCase().includes(q.trim().toLowerCase()))),
   );
 
   if (audit.error) return <PageError error={audit.error} />;
@@ -70,7 +71,7 @@ export default function AuditLogPage() {
                 <TableRow key={a.id} sx={a.result === "denied" ? { bgcolor: "#FEF3F2" } : undefined}>
                   <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateTime(a.timestamp)}</TableCell>
                   <TableCell>{a.actorName}</TableCell>
-                  <TableCell>{a.action}</TableCell>
+                  <TableCell>{actionLabel(a.action, a.detail)}</TableCell>
                   <TableCell>{a.entity}</TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: a.result === "denied" ? "error.main" : "success.main" }}>

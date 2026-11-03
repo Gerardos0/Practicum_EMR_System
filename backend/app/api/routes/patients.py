@@ -48,7 +48,7 @@ from app.services.chart_edits import (
     update_allergy,
     update_medication,
 )
-from app.services.access import can, ensure_course_open, ensure_student_may_enter, memberships_for, require, require_course
+from app.services.access import can, ensure_course_open, ensure_student_may_enter, may_read_note, memberships_for, require, require_course
 from app.services.answer_keys import deny_answer_key, read_answer_key
 from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
@@ -101,12 +101,20 @@ async def list_patients(
         if not can(role, "note:view_sensitive"):
             note_query = note_query.where(ClinicalNote.sensitive.is_(False))
         latest = await db.scalar(note_query.order_by(ClinicalNote.updated_at.desc()))
+        if latest is not None and latest.sensitive:
+            await db.refresh(latest, attribute_names=["discipline"])
+            if not may_read_note(role, rows, course_id, latest):
+                latest = await db.scalar(
+                    note_query.where(ClinicalNote.sensitive.is_(False)).order_by(ClinicalNote.updated_at.desc())
+                )
         shown_owner = full_owner(patient)
+        open_flags = sum(1 for med in patient.medications if med.status == "active" and med.flags)
         visible.append(
             {
                 "patient": patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role),
                 "owner_name": shown_owner,
                 "latest_note": {"status": latest.status, "updated_at": latest.updated_at} if latest else None,
+                "open_flag_count": open_flags,
             }
         )
     return visible

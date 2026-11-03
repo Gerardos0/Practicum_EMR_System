@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { courseIdsForRole } from "../../utils/permissions";
+import { logout } from "../../api/auth";
 import {
   readSession, refreshAccessToken, SESSION_EVENT, setSignedOutNotice, tokenExpiresAt, writeSession,
   type StoredSession,
@@ -80,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       assignment,
       discipline: assignment?.discipline,
       courseId: session?.courseId,
-      signIn: (user, accessToken, mustChangePassword) => {
+      signIn: (user, accessToken, mustChangePassword, refreshToken) => {
         const first = user.roles[0];
         const onlyCourse = user.roles.length === 1 && first?.courseIds.length === 1 ? first.courseIds[0] : undefined;
         persist({
@@ -88,10 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           activeRole: first?.role ?? "student",
           courseId: onlyCourse,
           accessToken,
+          refreshToken,
           mustChangePassword,
         });
       },
-      signOut: () => persist(null),
+      signOut: () => {
+        const refreshToken = sessionRef.current?.refreshToken;
+        if (refreshToken) void logout(refreshToken).catch(() => undefined);
+        persist(null);
+      },
       clearPasswordChange: () => {
         if (!sessionRef.current) return;
         persist({ ...sessionRef.current, mustChangePassword: false });

@@ -7,21 +7,27 @@ import {
   addMedication, administerMedication, deleteMedicationEnteredInError, discontinueMedication,
   listAdministrations, reviewAdministration, updateMedication, type AdministrationRecord,
 } from "../../api/chart";
-import { lexicompInteractions, lexicompStatus, searchMedications, type LexicompInteractions, type LexicompStatus } from "../../api/reference";
+import { getCourse } from "../../api/courses";
+import { lexicompInteractions, lexicompStatus, medicationDetails, searchMedications, type LexicompInteractions, type LexicompStatus } from "../../api/reference";
 import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { canEditSection } from "../chart/access";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
 
-const blank = { name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "", prescribed: false };
+const blank = {
+  name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "", prescribed: false,
+  rxcui: "", genericName: "", brandNames: [] as string[], acknowledgedFlags: [] as string[],
+};
 
 export default function MedicationsTab({ patient, onChange }: { patient: Patient; onChange: (patient: Patient) => void }) {
-  const { activeRole } = useSession();
+  const { activeRole, courseId } = useSession();
+  const course = useAsync(() => (courseId ? getCourse(courseId) : Promise.resolve(undefined)), [courseId]);
   const editable = canEditSection(activeRole, patient, "medications");
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState<string>();
   const [names, setNames] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<Record<string, string>>({});
   const [lexicomp, setLexicomp] = useState<LexicompStatus>();
   const [interactions, setInteractions] = useState<LexicompInteractions>();
   const [message, setMessage] = useState("");
@@ -37,22 +43,44 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
 
   const medicationNames = active.map((item) => item.name).join("|");
   useEffect(() => {
-    if (!lexicomp?.configured) return;
     let alive = true;
     lexicompInteractions(medicationNames ? medicationNames.split("|") : [])
       .then((result) => { if (alive) setInteractions(result); })
       .catch(() => { if (alive) setInteractions({ configured: false, text: null }); });
     return () => { alive = false; };
-  }, [lexicomp?.configured, medicationNames]);
+  }, [medicationNames]);
 
   useEffect(() => {
     const term = form.name.trim();
     if (term.length < 2) return;
     const timer = setTimeout(() => {
-      searchMedications(term).then((rows) => setNames(rows.map((row) => row.name))).catch(() => setNames([]));
+      searchMedications(term).then((rows) => {
+        setNames(rows.map((row) => row.name));
+        setCatalog(Object.fromEntries(rows.map((row) => [row.name.toLowerCase(), row.rxcui])));
+      }).catch(() => setNames([]));
     }, 250);
     return () => clearTimeout(timer);
   }, [form.name]);
+
+  useEffect(() => {
+    const rxcui = catalog[form.name.trim().toLowerCase()];
+    if (!rxcui || rxcui === form.rxcui) return;
+    let alive = true;
+    medicationDetails(rxcui)
+      .then((detail) => {
+        if (!alive) return;
+        setForm((prev) => ({
+          ...prev,
+          rxcui: detail.rxcui,
+          genericName: detail.genericName,
+          brandNames: detail.brandNames,
+        }));
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [catalog, form.name, form.rxcui]);
+
+  const needsAck = (course.data?.guardrailMode ?? (course.data?.guardrailProfile === "intro_pharmacy" ? "acknowledge" : "advisory")) === "acknowledge";
 
   const save = async () => {
     setError("");
@@ -62,6 +90,10 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
         indication: form.indication || undefined,
         adherence: form.adherence || undefined,
         accessCost: form.accessCost || undefined,
+        rxcui: form.rxcui || undefined,
+        genericName: form.genericName || undefined,
+        brandNames: form.brandNames,
+        acknowledgedFlags: form.acknowledgedFlags,
       };
       const next = editingId
         ? await updateMedication(activeRole, patient.id, editingId, body)
@@ -90,7 +122,7 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
       <Paper sx={{ p: 2, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6">Interaction checking</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {lexicomp?.configured ? (interactions?.text || "No interaction text was returned.") : "The interaction check is unavailable."}
+          {interactions?.text || (lexicomp?.configured ? "No interaction text was returned." : "The interaction check is unavailable.")}
         </Typography>
         {lexicomp?.url && (
           <Button sx={{ mt: 1 }} href={lexicomp.url} target="_blank" rel="noreferrer">Open Lexicomp</Button>
@@ -105,7 +137,17 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
             <Autocomplete
               freeSolo options={names} inputValue={form.name}
               onInputChange={(_, value) => setForm({ ...form, name: value })}
-              renderInput={(params) => <TextField {...params} label="Name" helperText="Names come from RxNorm. The Lexicomp catalog is separate." />}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Name"
+                  helperText={
+                    form.genericName
+                      ? `Generic: ${form.genericName}${form.brandNames.length ? `. Brands: ${form.brandNames.slice(0, 3).join(", ")}` : ""}`
+                      : "Names come from RxNorm. The Lexicomp catalog is separate."
+                  }
+                />
+              )}
             />
             <TextField label="Dose" value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} />
             <TextField label="How taken" value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} />
@@ -114,7 +156,12 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
             <TextField label="Access or cost" value={form.accessCost} onChange={(e) => setForm({ ...form, accessCost: e.target.value })} />
             <TextField label="Indication" value={form.indication} onChange={(e) => setForm({ ...form, indication: e.target.value })} />
           </Box>
-          <Button sx={{ mt: 1.5 }} variant="contained" onClick={save}>{editingId ? "Save change" : "Add medication"}</Button>
+          {needsAck && (
+            <Button sx={{ mt: 1 }} size="small" onClick={() => setForm({ ...form, acknowledgedFlags: ["dose_extreme", "unit_mismatch", "missing_unit"] })}>
+              I reviewed the dose warning
+            </Button>
+          )}
+          <Button sx={{ mt: 1.5, minHeight: 44 }} variant="contained" onClick={save}>{editingId ? "Save change" : "Add medication"}</Button>
         </Paper>
       )}
       <MedTable
@@ -129,10 +176,13 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
             name: row.name, dose: row.dose, route: row.route, frequency: row.frequency,
             indication: row.indication ?? "", adherence: row.adherence ?? "", accessCost: row.accessCost ?? "",
             prescribed: Boolean(row.prescribed),
+            rxcui: row.rxcui ?? "", genericName: row.genericName ?? "", brandNames: row.brandNames ?? [],
+            acknowledgedFlags: [],
           });
         }}
         onDiscontinue={(row) => run(() => discontinueMedication(activeRole, patient.id, row.id!))}
         onMistake={(row) => run(() => deleteMedicationEnteredInError(activeRole, patient.id, row.id!))}
+        onClear={canReview ? (row) => run(() => updateMedication(activeRole, patient.id, row.id!, { ...row, clearFlags: true })) : undefined}
         onGive={(row) => run(
           () => administerMedication(activeRole, patient.id, row.id!, row.dose),
           `${row.name} was recorded and sent to the instructor for review.`,
@@ -182,7 +232,7 @@ function AdministrationList({
 }
 
 function MedTable({
-  title, rows, empty, editable, inpatient, onEdit, onDiscontinue, onMistake, onGive,
+  title, rows, empty, editable, inpatient, onEdit, onDiscontinue, onMistake, onGive, onClear,
 }: {
   title: string;
   rows: Medication[];
@@ -193,6 +243,7 @@ function MedTable({
   onDiscontinue?: (row: Medication) => void;
   onMistake?: (row: Medication) => void;
   onGive?: (row: Medication) => void;
+  onClear?: (row: Medication) => void;
 }) {
   if (rows.length === 0) return empty ? <EmptyState title={empty} /> : null;
   return (
@@ -209,7 +260,13 @@ function MedTable({
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id ?? row.name}>
-                <TableCell sx={{ fontWeight: 600 }}>{row.name}{row.prescribed ? " (prescribed)" : ""}</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>
+                  {row.name}{row.prescribed ? " (prescribed)" : ""}
+                  {row.genericName ? <Typography variant="caption" display="block">Generic: {row.genericName}</Typography> : null}
+                  {(row.flags ?? []).map((flag) => (
+                    <Typography key={flag.code} variant="caption" color="warning.main" display="block">{flag.message}</Typography>
+                  ))}
+                </TableCell>
                 <TableCell>{row.dose}</TableCell>
                 <TableCell>{row.route}</TableCell>
                 <TableCell>{row.frequency}</TableCell>
@@ -220,6 +277,7 @@ function MedTable({
                   {editable && onDiscontinue && <Button size="small" onClick={() => onDiscontinue(row)}>Discontinue</Button>}
                   {editable && onMistake && <Button size="small" color="error" onClick={() => onMistake(row)}>Entered in error</Button>}
                   {inpatient && onGive && <Button size="small" onClick={() => onGive(row)}>Give now</Button>}
+                  {onClear && (row.flags ?? []).length > 0 && <Button size="small" onClick={() => onClear(row)}>Clear flag</Button>}
                 </TableCell>
               </TableRow>
             ))}

@@ -30,8 +30,16 @@ def _out(row: SavedNoteTemplate) -> dict:
         "discipline": row.discipline,
         "scope": "shared" if row.course_id is None else "course",
         "sensitive": row.sensitive,
+        "sensitivity": row.sensitivity or ("protected" if row.sensitive else "standard"),
         "sections": row.sections or [],
     }
+
+
+def _classify(sensitive: bool, sensitivity: str | None) -> tuple[bool, str]:
+    kind = sensitivity or ("protected" if sensitive else "standard")
+    if kind not in {"standard", "psychiatry", "protected"}:
+        kind = "standard"
+    return kind != "standard", kind
 
 
 @router.get("", response_model=list[NoteTemplateOut])
@@ -68,11 +76,13 @@ async def create_note_template(
         if role not in {"instructor", "course_coordinator"}:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't save a template for this course.")
         await ensure_course_open(db, body.course_id)
+    sensitive, sensitivity = _classify(body.sensitive, body.sensitivity)
     row = SavedNoteTemplate(
         name=body.name.strip(),
         discipline=body.discipline,
         course_id=body.course_id,
-        sensitive=body.sensitive,
+        sensitive=sensitive,
+        sensitivity=sensitivity,
         sections=_sections(body.sections),
         created_by_id=user.id,
     )
