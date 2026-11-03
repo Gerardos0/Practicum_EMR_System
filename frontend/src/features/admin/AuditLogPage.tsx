@@ -6,8 +6,8 @@ import { listAudit } from "../../api/audit";
 import { listCoursesForUser } from "../../api/courses";
 import { formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
-import { useSession } from "../auth/AuthContext";
-import { usePageHeading } from "../../components/PageHeading";
+import { useSession } from "../auth/useSession";
+import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
 
 export default function AuditLogPage() {

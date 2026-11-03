@@ -58,6 +58,7 @@ PERMISSIONS = {
     "encounter:advance": "Advance the encounter status during a visit",
     "note:author": "Write and sign a clinical note",
     "note:cosign": "Co-sign or return a student note",
+    "note:view_sensitive": "Open a note created from a sensitive template",
     "referral:create": "Write a referral",
     "roster:import": "Import or remove students on a course roster",
     "instructor:remove": "Remove an instructor from a course",

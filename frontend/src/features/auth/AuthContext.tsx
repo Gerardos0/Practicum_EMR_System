@@ -1,28 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Discipline, Role, RoleAssignment, User } from "../../types";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { courseIdsForRole } from "../../utils/permissions";
 import {
   readSession, refreshAccessToken, SESSION_EVENT, setSignedOutNotice, tokenExpiresAt, writeSession,
   type StoredSession,
 } from "../../api/client";
+import { AuthContext, type AuthCtx } from "./useSession";
 
 const IDLE_MS = 15 * 60 * 1000;
-
-interface AuthCtx {
-  session: StoredSession | null;
-  user: User | null;
-  activeRole: Role | null;
-  assignment: RoleAssignment | null;
-  discipline: Discipline | undefined;
-  courseId: string | undefined;
-  signIn: (user: User, accessToken: string, mustChangePassword: boolean) => void;
-  signOut: () => void;
-  clearPasswordChange: () => void;
-  switchRole: (role: Role) => void;
-  selectCourse: (courseId: string) => void;
-}
-
-const AuthContext = createContext<AuthCtx | null>(null);
 
 function load(): StoredSession | null {
   const session = readSession();
@@ -126,21 +110,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, persist]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
-  return ctx;
-}
-
-export function useSession() {
-  const ctx = useAuth();
-  if (!ctx.user || !ctx.activeRole) throw new Error("No active session");
-  return {
-    ...ctx,
-    user: ctx.user,
-    activeRole: ctx.activeRole,
-    courseId: ctx.courseId ?? "",
-  };
 }

@@ -4,7 +4,7 @@ import type { Patient, User } from "../../../types";
 import { assignCase, type PatientRow } from "../../../api/patients";
 import { listCases } from "../../../api/cases";
 import { listRoster } from "../../../api/roster";
-import { useSession } from "../../auth/AuthContext";
+import { useSession } from "../../auth/useSession";
 import { useAsync } from "../../../utils/useAsync";
 
 interface Source {

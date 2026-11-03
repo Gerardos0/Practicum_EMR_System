@@ -3,11 +3,11 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { useNavigate } from "react-router-dom";
 import { copyCase, downloadCaseTemplate, importCases, listCases } from "../../api/cases";
 import { listCoursesForUser } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import { formatDateTime } from "../../utils/format";
 import { courseIdsForRole } from "../../utils/permissions";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
 import AssignCaseDialog from "../patients/components/AssignCaseDialog";

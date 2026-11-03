@@ -9,7 +9,7 @@ from app.models.clinical import (
     Allergy, Appointment, ClinicalNote, CourseMembership, Encounter, LabResult, Medication, Patient, Problem, Vital,
 )
 from app.models.user import Role, User
-from app.services.access import can, full_name, require, require_course
+from app.services.access import can, ensure_student_may_enter, full_name, require, require_course
 from app.services.audit import log_event
 
 LIFECYCLE = {"Active", "Inactive", "Prospective", "Discharged from practice", "Archived", "Deceased"}
@@ -26,6 +26,7 @@ async def load_patient(db: AsyncSession, patient_id: uuid.UUID) -> Patient:
 
 async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: str, rows, *, request_ip: str | None) -> None:
     require_course(role, patient.course_id, user, rows)
+    await ensure_student_may_enter(db, role, patient.course_id)
     if patient.mode == "case" and not can(role, "case:author"):
         await log_event(
             db,
@@ -351,6 +352,8 @@ async def assign_case(
         unit=source.unit,
         room=source.room,
         bed=source.bed,
+        photo=source.photo,
+        photo_content_type=source.photo_content_type,
         encounter=Encounter(
             type=source.encounter.type if source.encounter else "Office visit",
             date=date.today(),

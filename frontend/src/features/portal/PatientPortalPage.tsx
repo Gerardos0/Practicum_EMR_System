@@ -4,7 +4,7 @@ import { useAsync } from "../../utils/useAsync";
 import { formatDate } from "../../utils/format";
 import { trainingStripe, utep } from "../../theme/tokens";
 import PageError from "../../components/PageError";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 
 interface PortalChart {
   patient: { name: string; dob: string; mrn: string };

@@ -123,12 +123,10 @@ export function AssessmentEditor({
   const [query, setQuery] = useState("");
   const [lookupError, setLookupError] = useState("");
 
+  const term = query.trim();
+  const searching = term.length >= 2 && !readOnly;
   useEffect(() => {
-    const term = query.trim();
-    if (term.length < 2 || readOnly) {
-      setOptions([]);
-      return;
-    }
+    if (!searching) return;
     let alive = true;
     const timer = setTimeout(() => {
       searchIcd10(term)
@@ -136,7 +134,8 @@ export function AssessmentEditor({
         .catch((error: Error) => { if (alive) { setOptions([]); setLookupError(error.message); } });
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
-  }, [query, readOnly]);
+  }, [term, searching]);
+  const shownOptions = searching ? options : [];
 
   const move = (index: number, delta: number) => {
     const target = index + delta;
@@ -152,7 +151,7 @@ export function AssessmentEditor({
       <Typography variant="subtitle2">Problem list (ICD-10)</Typography>
       {!readOnly && (
         <Autocomplete
-          options={options}
+          options={shownOptions}
           filterOptions={(rows) => rows}
           getOptionLabel={(option) => `${option.code} ${option.label}`}
           onInputChange={(_, next) => setQuery(next)}

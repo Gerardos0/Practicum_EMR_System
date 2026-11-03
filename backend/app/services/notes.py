@@ -10,7 +10,7 @@ from app.services.access import can, require
 from app.services.audit import log_event
 from app.services.note_prefill import diagnoses_from_patient, prefill_from_patient
 from app.services.charts import utcnow
-from app.services.templates import section_ids
+from app.services.note_templates import allowed_section_ids, assert_usable, is_sensitive
 
 EDITABLE = {"draft", "returned"}
 
@@ -45,10 +45,12 @@ async def create_draft(
     discipline = await db.scalar(select(Discipline).where(Discipline.code == discipline_code))
     if discipline is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Unknown discipline.")
+    await assert_usable(db, template_id, patient.course_id)
     note = ClinicalNote(
         patient_id=patient.id,
         encounter_id=patient.encounter.id,
         template_id=template_id,
+        sensitive=await is_sensitive(db, template_id),
         author_id=author.id,
         discipline_id=discipline.id,
         mode=patient.mode,
@@ -78,7 +80,12 @@ async def save_draft(db, note: ClinicalNote, author: User, expected_version: int
         raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead of changing it.")
     _check_version(note, expected_version)
     if patch.get("template_id"):
+        patient = await db.get(Patient, note.patient_id)
+        if patient is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "This patient doesn't exist or was archived.")
+        await assert_usable(db, patch["template_id"], patient.course_id)
         note.template_id = patch["template_id"]
+        note.sensitive = await is_sensitive(db, note.template_id)
     if patch.get("content") is not None:
         note.content = patch["content"]
     if patch.get("diagnoses") is not None:
@@ -211,7 +218,7 @@ async def add_section_comment(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't comment on notes.")
     if note.status != "pending_review":
         raise HTTPException(status.HTTP_409_CONFLICT, "Comments can be added while a note is pending review.")
-    if section_id and section_id not in section_ids(note.template_id):
+    if section_id and section_id not in await allowed_section_ids(db, note.template_id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That section isn't on this note.")
     text = body.strip()
     if not text:

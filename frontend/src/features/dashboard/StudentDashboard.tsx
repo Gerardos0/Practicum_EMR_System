@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Box, LinearProgress, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import PeopleAltOutlined from "@mui/icons-material/PeopleAltOutlined";
@@ -6,11 +7,12 @@ import ScienceOutlined from "@mui/icons-material/ScienceOutlined";
 import { Link as RouterLink } from "react-router-dom";
 import { listPatients, type PatientRow } from "../../api/patients";
 import { caseloadHref, matchesCaseload } from "../patients/caseload";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
 import NoteStatusChip from "../../components/NoteStatusChip";
-import { DAY_MS, Panel, StatCard, StatGrid, VisitChip, patientName, since } from "./components/DashboardParts";
+import { Panel, StatCard, StatGrid, VisitChip } from "./components/DashboardParts";
+import { DAY_MS, patientName, since } from "./dashboardFormat";
 import { utep } from "../../theme/tokens";
 
 function continueTo(row: PatientRow) {
@@ -20,11 +22,11 @@ function continueTo(row: PatientRow) {
 export default function StudentDashboard() {
   const { activeRole, courseId } = useSession();
   const patients = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
+  const [now] = useState(() => Date.now());
 
   if (patients.loading && !patients.data) return <LinearProgress />;
 
   const rows = patients.data ?? [];
-  const now = Date.now();
   const assessment = rows.filter((r) => matchesCaseload(r, "assigned"));
   const practice = rows.filter((r) => matchesCaseload(r, "practice"));
   const inProgress = rows.filter((r) => matchesCaseload(r, "in-clinic"));

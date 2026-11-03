@@ -322,8 +322,8 @@ async def test_ended_course_rejects_writes(client):
         params={"role": "student"},
         json=payload,
     )
-    assert blocked.status_code == 409
-    assert blocked.json()["detail"] == "This course has ended and cannot be edited."
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == "This course has ended."
 
 
 @pytest.mark.asyncio

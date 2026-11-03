@@ -178,6 +178,7 @@ class PatientOut(APIModel):
     unit: str | None = None
     room: str | None = None
     bed: str | None = None
+    has_photo: bool = False
 
 
 class LatestNote(APIModel):
@@ -269,13 +270,13 @@ class NoteOut(APIModel):
 
 
 class DraftCreate(APIModel):
-    template_id: NoteTemplate
+    template_id: str = Field(min_length=1, max_length=40)
     discipline: DisciplineCode
 
 
 class DraftPatch(APIModel):
     expected_version: int
-    template_id: NoteTemplate | None = None
+    template_id: str | None = Field(default=None, max_length=40)
     content: dict[str, str] | None = None
     diagnoses: list[IcdCode] | None = None
     cpt_codes: list[CptSelection] | None = None
@@ -563,3 +564,42 @@ class PortalAccess(APIModel):
     email: str
     full_name: str
     patient_id: uuid.UUID
+
+
+class PhotoIn(APIModel):
+    content_type: Literal["image/jpeg", "image/png", "image/webp"]
+    data: str = Field(min_length=1)
+
+
+class PhotoOut(APIModel):
+    content_type: str
+    data: str
+
+
+class TemplateFieldIn(APIModel):
+    id: str = Field(min_length=1, max_length=40)
+    label: str = Field(min_length=1, max_length=120)
+    kind: Literal["text", "textarea", "icd10", "medrec"]
+
+
+class TemplateSectionIn(APIModel):
+    id: str = Field(min_length=1, max_length=10)
+    title: str = Field(min_length=1, max_length=80)
+    fields: list[TemplateFieldIn] = Field(min_length=1, max_length=12)
+
+
+class NoteTemplateIn(APIModel):
+    name: str = Field(min_length=1, max_length=120)
+    discipline: DisciplineCode
+    course_id: uuid.UUID | None = None
+    sensitive: bool = False
+    sections: list[TemplateSectionIn] = Field(min_length=1, max_length=12)
+
+
+class NoteTemplateOut(APIModel):
+    id: str
+    name: str
+    discipline: str
+    scope: Literal["shared", "course"]
+    sensitive: bool = False
+    sections: list[TemplateSectionIn]

@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
     CORS_ORIGIN_REGEX: str | None = None
     LEXICOMP_URL: str | None = None
+    LEXICOMP_API_URL: str | None = None
+    LEXICOMP_API_KEY: str | None = None
 
     @model_validator(mode="after")
     def normalize(self) -> "Settings":

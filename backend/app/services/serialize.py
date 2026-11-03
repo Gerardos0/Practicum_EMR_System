@@ -119,6 +119,7 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
         "unit": patient.unit,
         "room": patient.room,
         "bed": patient.bed,
+        "has_photo": bool(patient.photo),
         "family_history": patient.family_history,
         "surgical_history": patient.surgical_history,
         "social_history": patient.social_history,

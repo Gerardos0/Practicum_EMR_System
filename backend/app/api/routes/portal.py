@@ -30,6 +30,7 @@ async def portal_chart(
         .where(
             ClinicalNote.patient_id == patient.id,
             ClinicalNote.archived.is_(False),
+            ClinicalNote.sensitive.is_(False),
             ClinicalNote.status.in_(("signed", "cosigned")),
         )
         .order_by(ClinicalNote.signed_at.desc())

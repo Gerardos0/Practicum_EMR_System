@@ -6,7 +6,7 @@ import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { commentOnNote, cosignNote, getNote, instructorEditNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
 import { getChartGradingGuide } from "../../api/cases";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import { formatDateTime } from "../../utils/format";
 import { disciplineLabel } from "../../utils/labels";

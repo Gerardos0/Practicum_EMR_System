@@ -14,6 +14,7 @@ TEACHING_PERMISSIONS = [
     "patient:reset_practice",
     "encounter:advance",
     "note:cosign",
+    "note:view_sensitive",
     "referral:create",
     "audit:view",
     "case:author",
@@ -35,6 +36,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "user:manage_access",
         "report:run",
         "report:export_teaching",
+        "note:view_sensitive",
     ],
     "front_desk": [],
     "patient": ["portal:view"],
@@ -68,6 +70,14 @@ async def memberships_for(db: AsyncSession, user_id: uuid.UUID) -> list[CourseMe
         )
     )
     return list(result.all())
+
+
+async def ensure_student_may_enter(db: AsyncSession, role: str, course_id: uuid.UUID) -> None:
+    if role != "student":
+        return
+    course = await db.get(Course, course_id)
+    if course is not None and course.status == "ended":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This course has ended.")
 
 
 async def ensure_course_open(db: AsyncSession, course_id: uuid.UUID) -> Course:
