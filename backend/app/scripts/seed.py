@@ -189,6 +189,8 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
     await _member(db, gerardo, pt, roles["instructor"], None)
     await _member(db, joe, phar, roles["instructor"], None)
     await _charts(db, phar, pt, ana, sam, luis, gerardo, daniel, clarissa)
+    rosa = await db.scalar(select(Patient).where(Patient.mrn == "TR-20001"))
+    await _ensure_patient_portal_user(db, roles["patient"], rosa, hashed)
     await _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy)
     await _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, therapy, hashed)
 
@@ -218,6 +220,37 @@ async def _person(db, email, first, last, university_id, phone, hashed) -> User:
         db.add(user)
         await db.flush()
     await db.refresh(user, attribute_names=["roles"])
+    return user
+
+
+async def _ensure_patient_portal_user(db, patient_role: Role, patient: Patient, hashed_password: str) -> User:
+    email = "patient.demo@example.com"
+    user = await db.scalar(select(User).options(selectinload(User.roles)).where(User.email == email))
+    if user is None:
+        user = User(
+            email=email,
+            first_name="Rosa",
+            last_name="Demo",
+            hashed_password=hashed_password,
+            must_change_password=False,
+            is_active=True,
+            portal_patient_id=patient.id,
+            roles=[patient_role],
+        )
+        db.add(user)
+    else:
+        user.first_name = "Rosa"
+        user.last_name = "Demo"
+        user.hashed_password = hashed_password
+        user.must_change_password = False
+        user.is_active = True
+        user.archived_at = None
+        user.purged_at = None
+        user.deleted_at = None
+        user.portal_patient_id = patient.id
+        if patient_role not in user.roles:
+            user.roles.append(patient_role)
+    await db.flush()
     return user
 
 

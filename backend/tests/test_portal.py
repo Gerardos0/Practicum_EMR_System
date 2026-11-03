@@ -11,6 +11,17 @@ from tests.test_workflows import course_id, login, patient_by_mrn
 
 
 @pytest.mark.asyncio
+async def test_seeded_demo_patient_can_sign_in_and_view_portal(client):
+    headers, _ = await login(client, "patient.demo@example.com")
+
+    response = await client.get("/api/v1/portal", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["patient"]["mrn"] == "TR-20001"
+    assert response.json()["labs"]
+
+
+@pytest.mark.asyncio
 async def test_portal_returns_only_linked_chart_sorted_and_audits_success(client, db_session):
     admin, _ = await login(client, "gerardo.sillas@utep.edu")
     course = await course_id(client, admin, "PHAR 5320")
