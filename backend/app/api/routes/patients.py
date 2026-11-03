@@ -1,3 +1,5 @@
+import base64
+import binascii
 import uuid
 from typing import Annotated
 
@@ -19,6 +21,8 @@ from app.schemas.clinical import (
     MedicationWrite,
     PatientOut,
     PatientRowOut,
+    PhotoIn,
+    PhotoOut,
     PlacementWrite,
     PresenceIn,
     ProblemWrite,
@@ -44,7 +48,7 @@ from app.services.chart_edits import (
     update_allergy,
     update_medication,
 )
-from app.services.access import ensure_course_open, memberships_for, require_course
+from app.services.access import can, ensure_course_open, ensure_student_may_enter, memberships_for, require, require_course
 from app.services.answer_keys import deny_answer_key, read_answer_key
 from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
@@ -70,6 +74,7 @@ async def list_patients(
     from app.services.access import require_course
 
     require_course(role, course_id, user, rows)
+    await ensure_student_may_enter(db, role, course_id)
     patients = list(
         (
             await db.scalars(
@@ -93,6 +98,8 @@ async def list_patients(
             note_query = note_query.where(ClinicalNote.author_id == author_id)
         elif role != "student" and patient.owner_id is not None:
             note_query = note_query.where(ClinicalNote.author_id == patient.owner_id)
+        if not can(role, "note:view_sensitive"):
+            note_query = note_query.where(ClinicalNote.sensitive.is_(False))
         latest = await db.scalar(note_query.order_by(ClinicalNote.updated_at.desc()))
         shown_owner = full_owner(patient)
         visible.append(
@@ -156,6 +163,67 @@ async def get_patient(
     )
     await db.commit()
     return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role)
+
+
+def _decode_photo(data: str) -> bytes:
+    payload = data.split(",", 1)[1] if data.startswith("data:") else data
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The photo is not a valid image file.") from exc
+    if len(raw) > 1_000_000:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The photo must be 1 MB or smaller.")
+    return raw
+
+
+@router.get("/{patient_id}/photo", response_model=PhotoOut)
+async def get_photo(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    if not patient.photo:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This chart has no photo.")
+    return {"content_type": patient.photo_content_type or "image/jpeg", "data": base64.b64encode(patient.photo).decode()}
+
+
+@router.put("/{patient_id}/photo", response_model=PhotoOut)
+async def put_photo(
+    patient_id: uuid.UUID,
+    body: PhotoIn,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    require_course(role, patient.course_id, user, rows)
+    require(role, "case:author", "Your role can't add a patient photo.")
+    if patient.mode != "case":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Add the photo on the case master. Assigned charts keep the photo from when they were assigned.",
+        )
+    raw = _decode_photo(body.data)
+    patient.photo = raw
+    patient.photo_content_type = body.content_type
+    await log_event(
+        db,
+        action="patient.photo",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        actor_user_id=user.id,
+        course_id=patient.course_id,
+        ip_address=_ip(request),
+    )
+    await db.commit()
+    return {"content_type": body.content_type, "data": base64.b64encode(raw).decode()}
 
 
 @router.get("/{patient_id}/answer-key", response_model=AnswerKeyOut, response_model_exclude_none=True)

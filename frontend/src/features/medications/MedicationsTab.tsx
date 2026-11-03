@@ -7,8 +7,8 @@ import {
   addMedication, administerMedication, deleteMedicationEnteredInError, discontinueMedication,
   listAdministrations, reviewAdministration, updateMedication, type AdministrationRecord,
 } from "../../api/chart";
-import { lexicompStatus, searchMedications, type LexicompStatus } from "../../api/reference";
-import { useSession } from "../auth/AuthContext";
+import { lexicompInteractions, lexicompStatus, searchMedications, type LexicompInteractions, type LexicompStatus } from "../../api/reference";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { canEditSection } from "../chart/access";
 import { useAsync } from "../../utils/useAsync";
@@ -23,6 +23,7 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
   const [editingId, setEditingId] = useState<string>();
   const [names, setNames] = useState<string[]>([]);
   const [lexicomp, setLexicomp] = useState<LexicompStatus>();
+  const [interactions, setInteractions] = useState<LexicompInteractions>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const given = useAsync(() => listAdministrations(activeRole, patient.id), [activeRole, patient.id]);
@@ -33,6 +34,16 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
   useEffect(() => {
     lexicompStatus().then(setLexicomp).catch((e: Error) => setLexicomp({ configured: false, detail: e.message }));
   }, []);
+
+  const medicationNames = active.map((item) => item.name).join("|");
+  useEffect(() => {
+    if (!lexicomp?.configured) return;
+    let alive = true;
+    lexicompInteractions(medicationNames ? medicationNames.split("|") : [])
+      .then((result) => { if (alive) setInteractions(result); })
+      .catch(() => { if (alive) setInteractions({ configured: false, text: null }); });
+    return () => { alive = false; };
+  }, [lexicomp?.configured, medicationNames]);
 
   useEffect(() => {
     const term = form.name.trim();
@@ -78,8 +89,10 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
     <Stack spacing={2}>
       <Paper sx={{ p: 2, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6">Interaction checking</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{lexicomp?.detail}</Typography>
-        {lexicomp?.configured && lexicomp.url && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          {lexicomp?.configured ? (interactions?.text || "No interaction text was returned.") : "The interaction check is unavailable."}
+        </Typography>
+        {lexicomp?.url && (
           <Button sx={{ mt: 1 }} href={lexicomp.url} target="_blank" rel="noreferrer">Open Lexicomp</Button>
         )}
       </Paper>

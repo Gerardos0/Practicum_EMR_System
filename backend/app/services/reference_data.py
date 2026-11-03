@@ -66,11 +66,37 @@ def search_cpt(term: str) -> list[dict[str, str]]:
 
 
 def lexicomp_status() -> dict:
-    url = (settings.LEXICOMP_URL or "").strip()
-    if not url:
-        return {
-            "configured": False,
-            "url": None,
-            "detail": "Interaction checking uses the university Lexicomp subscription. An administrator still needs to set LEXICOMP_URL.",
-        }
-    return {"configured": True, "url": url, "detail": "Open Lexicomp to check interactions. This chart does not score them."}
+    library = (settings.LEXICOMP_URL or "").strip() or None
+    api_url = (settings.LEXICOMP_API_URL or "").strip()
+    api_key = (settings.LEXICOMP_API_KEY or "").strip()
+    configured = bool(api_url and api_key)
+    if configured:
+        detail = "Interaction results come from Lexicomp."
+    else:
+        detail = "The interaction check is unavailable."
+    return {"configured": configured, "url": library, "detail": detail}
+
+
+async def lexicomp_interactions(medications: list[str]) -> dict:
+    api_url = (settings.LEXICOMP_API_URL or "").strip()
+    api_key = (settings.LEXICOMP_API_KEY or "").strip()
+    if not api_url or not api_key:
+        return {"configured": False, "text": None}
+    names = [name.strip() for name in medications if name and name.strip()]
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            response = await client.post(
+                api_url,
+                json={"medications": names},
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Lexicomp is unavailable right now.") from exc
+    text = payload.get("text") if isinstance(payload, dict) else None
+    if text is None and isinstance(payload, dict):
+        text = payload.get("interactions")
+    if not isinstance(text, str):
+        text = None
+    return {"configured": True, "text": text}

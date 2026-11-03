@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { flushSync } from "react-dom";
 import {
   Box, Button, Card, CardActionArea, CardContent, Chip, Stack, ToggleButton, ToggleButtonGroup, Typography,
@@ -10,40 +10,28 @@ import { disciplineLabel, roleLabel } from "../../utils/labels";
 import { courseIdsForRole, homePathFor, uniqueRoles } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
 import { trainingStripe, utep } from "../../theme/tokens";
-import { useSession } from "./AuthContext";
+import { useSession } from "./useSession";
 
 export default function SelectCoursePage() {
   const navigate = useNavigate();
-  const { user, activeRole, courseId, switchRole, selectCourse, signOut } = useSession();
-  const [picked, setPicked] = useState<string>();
-  const [opening, setOpening] = useState(false);
+  const { user, activeRole, switchRole, selectCourse, signOut } = useSession();
+  const [pickedId, setPickedId] = useState<string>();
   const { data: courses = [], loading, error } = useAsync(() => listCoursesForUser(), [user.id]);
 
   const assignment = user.roles.find((r) => r.role === activeRole);
   const roles = uniqueRoles(user);
   const roleCourseIds = courseIdsForRole(user, activeRole);
-  const available = activeRole === "admin" ? courses : courses.filter((c) => roleCourseIds.includes(c.id));
+  const available = activeRole === "admin"
+    ? courses
+    : courses.filter((c) => roleCourseIds.includes(c.id) && (activeRole !== "student" || c.status !== "ended"));
 
-  const availableIds = available.map((c) => c.id).join(",");
-  // One course → pre-select so Open course is one click away.
-  useEffect(() => {
-    if (available.length === 1) setPicked(available[0].id);
-    else setPicked((prev) => (prev && available.some((c) => c.id === prev) ? prev : undefined));
-    // availableIds captures course identity for the active role
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRole, availableIds]);
-
-  // Navigate only after the session has the course — avoids empty queues/lists on first paint.
-  useEffect(() => {
-    if (!opening || !picked || courseId !== picked) return;
-    setOpening(false);
-    navigate(homePathFor(activeRole), { replace: true });
-  }, [opening, picked, courseId, activeRole, navigate]);
+  const soleId = available.length === 1 ? available[0].id : undefined;
+  const picked = pickedId && available.some((c) => c.id === pickedId) ? pickedId : soleId;
 
   const go = () => {
     if (!picked) return;
     flushSync(() => selectCourse(picked));
-    setOpening(true);
+    navigate(homePathFor(activeRole), { replace: true });
   };
 
   return (
@@ -70,7 +58,7 @@ export default function SelectCoursePage() {
             <Typography variant="subtitle2" id="role-label" sx={{ mb: 1 }}>Sign in as</Typography>
             <ToggleButtonGroup
               exclusive value={activeRole} aria-labelledby="role-label" size="small"
-              onChange={(_, r) => { if (r) { switchRole(r); setPicked(undefined); } }}
+              onChange={(_, r) => { if (r) { switchRole(r); setPickedId(undefined); } }}
             >
               {roles.map((role) => (
                 <ToggleButton key={role} value={role} sx={{ px: 2 }}>{roleLabel[role]}</ToggleButton>
@@ -100,7 +88,7 @@ export default function SelectCoursePage() {
                   bgcolor: selected ? "rgba(14,34,80,0.04)" : "background.paper",
                 }}
               >
-                <CardActionArea role="radio" aria-checked={selected} onClick={() => setPicked(c.id)} onDoubleClick={go}>
+                <CardActionArea role="radio" aria-checked={selected} onClick={() => setPickedId(c.id)} onDoubleClick={go}>
                   <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="subtitle1">{c.code}: {c.title}</Typography>
@@ -125,8 +113,8 @@ export default function SelectCoursePage() {
           )}
         </Stack>
 
-        <Button variant="contained" size="large" sx={{ mt: 3 }} disabled={!picked || opening} onClick={go}>
-          {!picked ? "Select a course to continue" : opening ? "Opening…" : "Open course"}
+        <Button variant="contained" size="large" sx={{ mt: 3 }} disabled={!picked} onClick={go}>
+          {picked ? "Open course" : "Select a course to continue"}
         </Button>
         </>
         )}

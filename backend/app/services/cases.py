@@ -404,6 +404,8 @@ async def copy_case(
         unit=patient.unit,
         room=patient.room,
         bed=patient.bed,
+        photo=patient.photo,
+        photo_content_type=patient.photo_content_type,
         encounter=Encounter(
             type=patient.encounter.type if patient.encounter else "Office visit",
             date=date.today(),

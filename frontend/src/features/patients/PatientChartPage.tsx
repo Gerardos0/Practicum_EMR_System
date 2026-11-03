@@ -4,12 +4,12 @@ import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "rea
 import { getPatient, updatePatientStatus } from "../../api/patients";
 import { recordPresence, updatePlacement } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
 import { utep } from "../../theme/tokens";
 import PageError from "../../components/PageError";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import PatientBanner from "./components/PatientBanner";
 import StatusDialog from "./components/StatusDialog";
 import SummaryTab from "./components/SummaryTab";

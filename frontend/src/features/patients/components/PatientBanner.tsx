@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { Box, Button, Chip, Paper, Typography } from "@mui/material";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import type { Patient } from "../../../types";
+import { getPatientPhoto } from "../../../api/patients";
 import { formatDate } from "../../../utils/format";
 import { utep } from "../../../theme/tokens";
+import { useSession } from "../../auth/useSession";
 
 interface Props {
   patient: Patient;
@@ -14,7 +17,18 @@ interface Props {
 const card = { borderRadius: "16px", overflow: "hidden" } as const;
 
 export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
+  const { activeRole } = useSession();
   const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`;
+  const [photo, setPhoto] = useState<{ id: string; src: string }>();
+  useEffect(() => {
+    if (!p.hasPhoto) return;
+    let live = true;
+    getPatientPhoto(activeRole, p.id)
+      .then((row) => { if (live) setPhoto({ id: p.id, src: `data:${row.contentType};base64,${row.data}` }); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [activeRole, p.hasPhoto, p.id]);
+  const shownPhoto = p.hasPhoto && photo?.id === p.id ? photo.src : undefined;
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
     ["Setting", p.status.careSetting],
@@ -34,14 +48,16 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
         }}
       >
         <Box
-          aria-hidden
+          aria-hidden={shownPhoto ? undefined : true}
           sx={{
             width: compact ? 44 : 52, height: compact ? 44 : 52, borderRadius: "50%",
             bgcolor: utep.navy, color: "#fff", display: "grid", placeItems: "center",
-            fontWeight: 800, fontSize: compact ? 16 : 18,
+            fontWeight: 800, fontSize: compact ? 16 : 18, overflow: "hidden",
           }}
         >
-          {initials}
+          {shownPhoto ? (
+            <Box component="img" src={shownPhoto} alt={`${p.firstName} ${p.lastName}`} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : initials}
         </Box>
 
         <Box sx={{ minWidth: 0 }}>

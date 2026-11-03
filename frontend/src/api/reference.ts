@@ -22,3 +22,15 @@ export interface LexicompStatus {
 export function lexicompStatus(): Promise<LexicompStatus> {
   return request<LexicompStatus>("/reference/lexicomp");
 }
+
+export interface LexicompInteractions {
+  configured: boolean;
+  text: string | null;
+}
+
+export function lexicompInteractions(medications: string[]): Promise<LexicompInteractions> {
+  return request<LexicompInteractions>("/reference/lexicomp/interactions", {
+    method: "POST",
+    json: { medications },
+  });
+}

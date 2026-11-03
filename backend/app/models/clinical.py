@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -74,6 +74,8 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     insurance_member_id: Mapped[str | None] = mapped_column(String(60))
     insurance_group_number: Mapped[str | None] = mapped_column(String(60))
     insurance_notes: Mapped[str | None] = mapped_column(Text)
+    photo: Mapped[bytes | None] = mapped_column(LargeBinary)
+    photo_content_type: Mapped[str | None] = mapped_column(String(40))
     emergency_contact_name: Mapped[str | None] = mapped_column(String(120))
     emergency_contact_phone: Mapped[str | None] = mapped_column(String(40))
     emergency_contact_relationship: Mapped[str | None] = mapped_column(String(60))
@@ -172,6 +174,7 @@ class ClinicalNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id"), index=True)
     encounter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("encounters.id"))
     template_id: Mapped[str] = mapped_column(String(40))
+    sensitive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     discipline_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("disciplines.id"))
     mode: Mapped[str] = mapped_column(String(20))
@@ -217,6 +220,17 @@ class NoteAddendum(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     author: Mapped[User] = relationship(lazy="selectin")
+
+
+class SavedNoteTemplate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "note_templates"
+
+    name: Mapped[str] = mapped_column(String(120))
+    discipline: Mapped[str] = mapped_column(String(40))
+    course_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    sensitive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sections: Mapped[list[Any]] = mapped_column(JSONB)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Appointment(UUIDPrimaryKeyMixin, Base):

@@ -1,6 +1,6 @@
 import { Alert, Box, LinearProgress } from "@mui/material";
-import { useSession } from "../auth/AuthContext";
-import { usePageHeading } from "../../components/PageHeading";
+import { useSession } from "../auth/useSession";
+import { usePageHeading } from "../../components/usePageHeading";
 import StudentDashboard from "./StudentDashboard";
 import InstructorDashboard from "./InstructorDashboard";
 

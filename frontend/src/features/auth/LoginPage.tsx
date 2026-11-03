@@ -9,7 +9,7 @@ import { login } from "../../api/auth";
 import { takeSignedOutNotice } from "../../api/client";
 import { homePathFor, uniqueRoles } from "../../utils/permissions";
 import { trainingStripe, utep } from "../../theme/tokens";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./useSession";
 
 export default function LoginPage() {
   const navigate = useNavigate();

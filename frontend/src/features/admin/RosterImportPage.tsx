@@ -9,12 +9,12 @@ import { importRoster, listRoster, removeFromCourse, setRosterActive, type TempP
 import { getCourse, listInstructors } from "../../api/courses";
 import { archiveUser, deleteAccount, purgeExpiredAccounts, resetPassword, setUserActive } from "../../api/users";
 import EditAccountDialog from "./EditAccountDialog";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { disciplineLabel, roleLabel } from "../../utils/labels";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import { parseRosterFile, ROSTER_TEMPLATE_CSV } from "./parseRoster";
 import AddPersonForm from "./AddPersonForm";
 import EnrollAccount from "./EnrollAccount";

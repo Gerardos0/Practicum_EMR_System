@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 import { Alert, Box, Button, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { downloadChartTime, downloadGrades, getActivity, getCourse, uploadGradingGuide } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
 import { formatDateTime } from "../../utils/format";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import CourseRubricPanel from "../encounters/components/CourseRubricPanel";
+import NoteTemplateAuthor from "../encounters/components/NoteTemplateAuthor";
 
 function iso(day: Date) {
   const month = String(day.getMonth() + 1).padStart(2, "0");
@@ -121,6 +122,7 @@ export default function TeachingPage() {
           </Table>
         </Box>
       </Paper>
+      <NoteTemplateAuthor role={activeRole} courseId={courseId} />
     </Stack>
   );
 }

@@ -15,6 +15,23 @@ export async function getPatient(role: Role, id: string): Promise<Patient> {
   return request<Patient>(`/patients/${id}`, { query: { role } });
 }
 
+export interface PatientPhoto {
+  contentType: string;
+  data: string;
+}
+
+export function getPatientPhoto(role: Role, id: string): Promise<PatientPhoto> {
+  return request<PatientPhoto>(`/patients/${id}/photo`, { query: { role } });
+}
+
+export function savePatientPhoto(role: Role, id: string, contentType: string, data: string): Promise<PatientPhoto> {
+  return request<PatientPhoto>(`/patients/${id}/photo`, {
+    method: "PUT",
+    query: { role },
+    json: { contentType, data },
+  });
+}
+
 export async function updatePatientStatus(role: Role, id: string, patch: Partial<PatientStatus>): Promise<Patient> {
   return request<Patient>(`/patients/${id}/status`, { method: "PATCH", query: { role }, json: patch });
 }

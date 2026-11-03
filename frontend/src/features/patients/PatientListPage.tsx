@@ -6,13 +6,13 @@ import {
 import Check from "@mui/icons-material/Check";
 import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import { listPatients, resetPracticePatient, unassignCase, type PatientRow } from "../../api/patients";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { formatDate, formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import AssignCaseDialog from "./components/AssignCaseDialog";
 import { CASELOAD_VIEWS, caseloadHref, caseloadViewMeta, matchesCaseload, parseCaseloadView } from "./caseload";
 import type { CaseMode } from "../../types";

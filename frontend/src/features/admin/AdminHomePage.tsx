@@ -1,9 +1,9 @@
 import { Box, Button, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { listCoursesForUser } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 
 export default function AdminHomePage() {
   usePageHeading("Administration");

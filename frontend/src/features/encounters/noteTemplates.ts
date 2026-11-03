@@ -18,7 +18,7 @@ export interface TemplateSection {
 }
 
 export interface NoteTemplate {
-  id: NoteTemplateId;
+  id: string;
   name: string;
   disciplines: Discipline[] | "all";
   sections: TemplateSection[];
@@ -243,10 +243,12 @@ function historyBlock(patient: Patient): string {
  * history blocks so students start from the encounter instead of a blank form.
  * Only fills fields the template actually has.
  */
-export function prefillFromPatient(templateId: NoteTemplateId, patient: Patient): Record<string, string> {
+export function prefillFromPatient(templateId: string, patient: Patient, template?: NoteTemplate): Record<string, string> {
   const enabled = new Set(patient.prefillSections ?? []);
   if (enabled.size === 0) return {};
-  const fieldIds = new Set(TEMPLATES[templateId].sections.flatMap((s) => s.fields.map((f) => f.id)));
+  const chosen = template ?? (templateId in TEMPLATES ? TEMPLATES[templateId as NoteTemplateId] : undefined);
+  if (!chosen) return {};
+  const fieldIds = new Set(chosen.sections.flatMap((s) => s.fields.map((f) => f.id)));
   const vitals = vitalsBlock(patient);
   const labs = labsBlock(patient);
   const draft: Record<string, string> = {};

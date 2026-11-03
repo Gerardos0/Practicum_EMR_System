@@ -5,8 +5,8 @@ import {
 import DownloadOutlined from "@mui/icons-material/DownloadOutlined";
 import { downloadCourseReport, getCourseReport } from "../../api/reports";
 import { listCoursesForUser } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
-import { usePageHeading } from "../../components/PageHeading";
+import { useSession } from "../auth/useSession";
+import { usePageHeading } from "../../components/usePageHeading";
 import { useAsync } from "../../utils/useAsync";
 
 const STATUS_LABELS: Record<string, string> = {

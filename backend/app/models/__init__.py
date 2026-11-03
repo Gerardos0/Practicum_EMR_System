@@ -16,6 +16,7 @@ from app.models.clinical import (  # noqa: F401
     NoteComment,
     Patient,
     Problem,
+    SavedNoteTemplate,
     Referral,
     Vital,
 )

@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
@@ -18,7 +18,7 @@ from app.schemas.clinical import (
     QueueItemOut,
     SignRequest,
 )
-from app.services.access import ensure_course_open, memberships_for, require_course
+from app.services.access import can, ensure_course_open, memberships_for, require_course
 from app.services.audit import log_event
 from app.services.charts import ensure_visible, load_patient
 from app.services.notes import (
@@ -73,6 +73,8 @@ async def list_notes(
     notes = (await db.scalars(query.order_by(ClinicalNote.updated_at.desc()))).all()
     payload = []
     for note in notes:
+        if note.sensitive and not can(role, "note:view_sensitive"):
+            continue
         payload.append(note_out(await _reload(db, note), include_scores=role != "student"))
     return payload
 
@@ -112,6 +114,8 @@ async def get_note(
     role: Annotated[str, Query()],
 ):
     note = await load_note(db, note_id)
+    if note.sensitive and not can(role, "note:view_sensitive"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found.")
     patient = await load_patient(db, note.patient_id)
     rows = await memberships_for(db, user.id)
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
@@ -133,6 +137,16 @@ async def get_note(
         await db.refresh(item, attribute_names=["author"])
     for item in note.addenda:
         await db.refresh(item, attribute_names=["author"])
+    if note.sensitive:
+        await log_event(
+            db,
+            action="note.view_sensitive",
+            entity_type="note",
+            entity_id=str(note.id),
+            actor_user_id=user.id,
+            course_id=patient.course_id,
+            ip_address=_ip(request),
+        )
     await log_event(
         db,
         action="note.view",
@@ -319,6 +333,8 @@ async def review_queue(
     ).all()
     items = []
     for note in notes:
+        if note.sensitive and not can(role, "note:view_sensitive"):
+            continue
         patient = await load_patient(db, note.patient_id)
         owner = f"{patient.owner.first_name} {patient.owner.last_name}" if patient.owner else None
         items.append({"note": note_out(await _reload(db, note), include_scores=role != "student"), "patient": patient_out(patient, owner_name=owner, viewer_role=role)})

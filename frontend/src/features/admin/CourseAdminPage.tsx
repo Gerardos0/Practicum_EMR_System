@@ -6,8 +6,9 @@ import {
 import { createCourse, downloadAllActivity, listCoursesForUser, setCourseStatus, setInactivityDays } from "../../api/courses";
 import type { Course, CourseStatus } from "../../types";
 import { useAsync } from "../../utils/useAsync";
-import { useSession } from "../auth/AuthContext";
-import { usePageHeading } from "../../components/PageHeading";
+import { useSession } from "../auth/useSession";
+import { usePageHeading } from "../../components/usePageHeading";
+import NoteTemplateAuthor from "../encounters/components/NoteTemplateAuthor";
 
 const statusTone: Record<CourseStatus, "default" | "info" | "success" | "warning"> = {
   planned: "info",
@@ -168,6 +169,7 @@ export default function CourseAdminPage() {
           }}>Download Excel</Button>
         </Stack>
       </Paper>
+      <NoteTemplateAuthor role="admin" />
     </Stack>
   );
 }

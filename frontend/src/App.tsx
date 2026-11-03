@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DisplayPrefsProvider } from "./theme/DisplayPrefsProvider";
-import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { AuthProvider } from "./features/auth/AuthContext";
+import { useAuth } from "./features/auth/useSession";
 import RequireAuth from "./features/auth/RequireAuth";
 import LoginPage from "./features/auth/LoginPage";
 import ChangePasswordPage from "./features/auth/ChangePasswordPage";

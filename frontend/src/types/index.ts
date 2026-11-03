@@ -191,6 +191,7 @@ export interface Patient {
   unit?: string;
   room?: string;
   bed?: string;
+  hasPhoto?: boolean;
 }
 
 export type NoteStatus = "draft" | "signed" | "pending_review" | "returned" | "cosigned";
@@ -242,7 +243,7 @@ export interface ClinicalNote {
   id: string;
   patientId: string;
   encounterId: string;
-  templateId: NoteTemplateId;
+  templateId: string;
   authorId: string;
   authorName: string;
   authorDiscipline: Discipline;
