@@ -7,7 +7,7 @@ import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import type { Discipline, RosterRow, User } from "../../types";
 import { importRoster, listRoster, removeFromCourse, setRosterActive, type TempPassword } from "../../api/roster";
 import { getCourse, listInstructors } from "../../api/courses";
-import { archiveUser, purgeExpiredAccounts, resetPassword, setUserActive } from "../../api/users";
+import { archiveUser, deleteAccount, purgeExpiredAccounts, resetPassword, setUserActive } from "../../api/users";
 import EditAccountDialog from "./EditAccountDialog";
 import { useSession } from "../auth/AuthContext";
 import { can } from "../../utils/permissions";
@@ -33,6 +33,8 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
   const [passwords, setPasswords] = useState<TempPassword[]>([]);
   const [removing, setRemoving] = useState<{ person: User; role: "student" | "instructor" | "course_coordinator" }>();
   const [editing, setEditing] = useState<User>();
+  const [deleting, setDeleting] = useState<User>();
+  const [confirmEmail, setConfirmEmail] = useState("");
 
   const course = useAsync(() => (courseId ? getCourse(courseId) : Promise.resolve(undefined)), [courseId]);
   const roster = useAsync(
@@ -261,6 +263,9 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
                         {activeRole === "admin" && (
                           <Button size="small" disabled={u.id === user.id} onClick={() => issuePassword(u)}>Reset password</Button>
                         )}
+                        {activeRole === "admin" && (
+                          <Button size="small" color="error" disabled={u.id === user.id} onClick={() => { setConfirmEmail(""); setDeleting(u); }}>Delete account</Button>
+                        )}
                         <Button size="small" color="error" onClick={() => setRemoving({ person: u, role: "student" })}>Remove</Button>
                       </TableCell>
                     </TableRow>
@@ -323,6 +328,9 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
                       {activeRole === "admin" && (
                         <Button size="small" disabled={person.id === user.id} onClick={() => issuePassword(person)}>Reset password</Button>
                       )}
+                      {activeRole === "admin" && (
+                        <Button size="small" color="error" disabled={person.id === user.id} onClick={() => { setConfirmEmail(""); setDeleting(person); }}>Delete account</Button>
+                      )}
                       {roles.filter((role) => role !== "course_coordinator" || activeRole === "admin").map((role) => (
                         <Button key={role} size="small" color="error" disabled={person.id === user.id} onClick={() => setRemoving({ person, role })}>
                           Remove {roleLabel[role].toLowerCase()}
@@ -350,6 +358,42 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
           setMessage({ kind: "success", text: `${updated.fullName}'s account was updated.` });
         }}
       />
+
+      <Dialog open={Boolean(deleting)} onClose={() => setDeleting(undefined)}>
+        <DialogTitle>Delete {deleting?.fullName}'s account?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            The login stops working and class memberships are removed. Charts and notes stay so the grade record remains. Type {deleting?.email} to confirm.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Email"
+            value={confirmEmail}
+            onChange={(event) => setConfirmEmail(event.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleting(undefined)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={!deleting || confirmEmail.trim().toLowerCase() !== deleting.email.toLowerCase()}
+            onClick={async () => {
+              const target = deleting!;
+              try {
+                await deleteAccount(target.id, confirmEmail.trim());
+                roster.reload();
+                instructors.reload();
+                setMessage({ kind: "success", text: `${target.fullName}'s login was removed. Charts and notes were kept.` });
+              } catch (e) {
+                setMessage({ kind: "error", text: (e as Error).message });
+              }
+              setDeleting(undefined);
+            }}
+          >Delete account</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(removing)} onClose={() => setRemoving(undefined)}>
         <DialogTitle>Remove {removing?.person.fullName} from {course.data?.code}?</DialogTitle>

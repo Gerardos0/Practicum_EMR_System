@@ -1,4 +1,6 @@
 
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,9 +8,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes import audit, auth, cases, courses, notes, patients, portal, reference, reports, scheduling, users
 from app.core.config import settings
-from app.db.session import get_db
+from app.db.session import AsyncSessionLocal, get_db
+from app.services.audit import log_event
+from app.services.retention import purge_expired
 
-app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    async with AsyncSessionLocal() as session:
+        count = await purge_expired(session)
+        if count:
+            await log_event(
+                session,
+                action="user.purge_expired",
+                entity_type="user",
+                detail=str(count),
+            )
+        await session.commit()
+    yield
+
+
+app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

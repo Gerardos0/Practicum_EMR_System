@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { listPatients, resetPracticePatient, unassignCase, type PatientRow } from "../../api/patients";
 import { useSession } from "../auth/AuthContext";
 import { can } from "../../utils/permissions";
-import { formatDateTime } from "../../utils/format";
+import { formatDate, formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
@@ -46,7 +46,11 @@ export default function PatientListPage() {
       const q = query.trim().toLowerCase();
       if (!q) return true;
       const p = r.patient;
-      return [p.firstName, p.lastName, p.mrn, r.ownerName ?? ""].some((v) => v.toLowerCase().includes(q));
+      const dob = (p.dob || "").slice(0, 10);
+      const [year, month, day] = dob.split("-");
+      const numericDob = year && month && day ? `${month}/${day}/${year}` : "";
+      return [p.firstName, p.lastName, p.mrn, r.ownerName ?? "", dob, numericDob, dob ? formatDate(dob) : ""]
+        .some((v) => v.toLowerCase().includes(q));
     });
 
   const doReset = async () => {
@@ -117,7 +121,7 @@ export default function PatientListPage() {
                 title={query ? "No patients match that search" : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
                 action={!query && mode === "assessment" && canAssign ? <Button variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button> : undefined}
               >
-                {query ? "Try a last name or the full MRN." : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
+                {query ? "Try a last name, a date of birth, or the full MRN." : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
               </EmptyState>
             </Box>
           ) : (
@@ -169,7 +173,7 @@ export default function PatientListPage() {
                         {p.ageYears} y, {p.sexAtBirth}
                       </TableCell>
                       <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                        <Chip size="small" label={p.status.encounter} color={p.status.encounter === "Checked in" || p.status.encounter === "In progress" ? "info" : "default"} variant="outlined" />
+                        <Chip size="small" label={p.status.encounter} color={p.status.encounter === "Checked in" || p.status.encounter === "Roomed" || p.status.encounter === "In progress" ? "info" : "default"} variant="outlined" />
                       </TableCell>
                       <TableCell>
                         <NoteStatusChip status={r.latestNote?.status} />

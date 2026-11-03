@@ -26,7 +26,7 @@ export default function StudentDashboard() {
   const now = Date.now();
   const assessment = rows.filter((r) => r.patient.mode === "assessment");
   const practice = rows.filter((r) => r.patient.mode === "practice");
-  const inProgress = rows.filter((r) => r.patient.status.encounter === "In progress" || r.patient.status.encounter === "Checked in");
+  const inProgress = rows.filter((r) => r.patient.status.encounter === "In progress" || r.patient.status.encounter === "Checked in" || r.patient.status.encounter === "Roomed");
   const returned = rows.filter((r) => r.latestNote?.status === "returned");
   const pending = rows.filter((r) => r.latestNote?.status === "pending_review");
   const flagged = rows.filter((r) => r.patient.labs.some((l) => l.flag));

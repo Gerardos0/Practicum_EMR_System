@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Chip, LinearProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow,
   TextField, Typography,
 } from "@mui/material";
-import { createCourse, listCoursesForUser, setCourseStatus } from "../../api/courses";
+import { createCourse, downloadAllActivity, listCoursesForUser, setCourseStatus, setInactivityDays } from "../../api/courses";
 import type { Course, CourseStatus } from "../../types";
 import { useAsync } from "../../utils/useAsync";
 import { useSession } from "../auth/AuthContext";
@@ -25,6 +25,17 @@ export default function CourseAdminPage() {
   const [term, setTerm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [start, setStart] = useState(() => {
+    const day = new Date();
+    day.setDate(day.getDate() - 30);
+    const month = String(day.getMonth() + 1).padStart(2, "0");
+    return `${day.getFullYear()}-${month}-${String(day.getDate()).padStart(2, "0")}`;
+  });
+  const [end, setEnd] = useState(() => {
+    const day = new Date();
+    const month = String(day.getMonth() + 1).padStart(2, "0");
+    return `${day.getFullYear()}-${month}-${String(day.getDate()).padStart(2, "0")}`;
+  });
 
   const mutateStatus = async (course: Course, next: CourseStatus) => {
     setBusy(true);
@@ -65,14 +76,30 @@ export default function CourseAdminPage() {
         <Button size="small" color="error" disabled={busy} onClick={() => mutateStatus(course, "archived")}>Archive</Button>
       </Stack>
     );
+    if (course.status === "archived") return <Button size="small" disabled={busy} onClick={() => mutateStatus(course, "active")}>Retrieve</Button>;
     return null;
+  };
+
+  const saveDays = async (course: Course, value: string) => {
+    const days = Number(value);
+    if (!Number.isInteger(days) || days < 1 || days > 90 || days === course.inactivityDays) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await setInactivityDays(course.id, days);
+      courses.setData((current) => current?.map((item) => item.id === updated.id ? updated : item));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <Stack spacing={2.5}>
       <Box>
         <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Classes</Typography>
-        <Typography variant="body2" color="text.secondary">Create a class and manage whether it is open for teaching.</Typography>
+        <Typography variant="body2" color="text.secondary">Create a class, set how many days without chart activity flags a student, and retrieve an archived class.</Typography>
       </Box>
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 
@@ -94,7 +121,7 @@ export default function CourseAdminPage() {
         <Box sx={{ overflowX: "auto", p: 1 }}>
           <Table size="small">
             <TableHead>
-              <TableRow><TableCell>Code</TableCell><TableCell>Title</TableCell><TableCell>Term</TableCell><TableCell>Status</TableCell><TableCell align="right">Actions</TableCell></TableRow>
+              <TableRow><TableCell>Code</TableCell><TableCell>Title</TableCell><TableCell>Term</TableCell><TableCell>Status</TableCell><TableCell>At-risk days</TableCell><TableCell align="right">Actions</TableCell></TableRow>
             </TableHead>
             <TableBody>
               {(courses.data ?? []).map((course) => (
@@ -103,15 +130,43 @@ export default function CourseAdminPage() {
                   <TableCell>{course.title}</TableCell>
                   <TableCell>{course.term}</TableCell>
                   <TableCell><Chip size="small" label={course.status} color={statusTone[course.status]} /></TableCell>
+                  <TableCell>
+                    <TextField
+                      key={`${course.id}-${course.inactivityDays ?? 7}`}
+                      size="small"
+                      type="number"
+                      defaultValue={course.inactivityDays ?? 7}
+                      disabled={busy}
+                      onBlur={(event) => saveDays(course, event.target.value)}
+                      slotProps={{ htmlInput: { min: 1, max: 90, "aria-label": `Days without chart activity for ${course.code}` } }}
+                      sx={{ width: 88 }}
+                    />
+                  </TableCell>
                   <TableCell align="right">{actions(course)}</TableCell>
                 </TableRow>
               ))}
               {!courses.loading && courses.data?.length === 0 && (
-                <TableRow><TableCell colSpan={5} sx={{ color: "text.secondary" }}>No courses yet.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} sx={{ color: "text.secondary" }}>No courses yet.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </Box>
+      </Paper>
+
+      <Paper sx={{ p: 2.5 }}>
+        <Typography component="h2" variant="h6">Activity for every class</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          One workbook with a row per student in each class. Case charts are not included.
+        </Typography>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
+          <TextField size="small" type="date" label="From" value={start} onChange={(e) => setStart(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField size="small" type="date" label="To" value={end} onChange={(e) => setEnd(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
+          <Button variant="outlined" disabled={!start || !end} onClick={async () => {
+            setError("");
+            try { await downloadAllActivity(start, end); }
+            catch (e) { setError((e as Error).message); }
+          }}>Download Excel</Button>
+        </Stack>
       </Paper>
     </Stack>
   );

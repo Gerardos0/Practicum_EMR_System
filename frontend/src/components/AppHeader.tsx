@@ -102,7 +102,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
                   navigate(qs ? `/patients?${qs}` : "/patients", { replace: true });
                 }}
                 sx={{ flex: 1, fontSize: 14 }}
-                placeholder={activeRole === "student" ? "Search name or MRN" : "Search patient, MRN, or student"}
+                placeholder={activeRole === "student" ? "Search name, MRN, or date of birth" : "Search patient, MRN, date of birth, or student"}
                 inputProps={{ "aria-label": "Search patients" }}
               />
             </Box>

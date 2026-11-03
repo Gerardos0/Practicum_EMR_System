@@ -7,7 +7,8 @@ import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import type { ClinicalNote, IcdCode, NoteTemplateId, Patient, User } from "../../types";
 import { getPatient } from "../../api/patients";
 import { addAddendum, createDraft, getNote, listNotesForPatient, saveDraft, signNote } from "../../api/notes";
-import { getCourse, listInstructors } from "../../api/courses";
+import { listInstructors } from "../../api/courses";
+import { getChartGradingGuide } from "../../api/cases";
 import { useSession } from "../auth/AuthContext";
 import { formatDate, formatTime } from "../../utils/format";
 import { listCpt } from "../../api/reference";
@@ -50,7 +51,10 @@ export default function NoteEditorPage() {
   const [error, setError] = useState("");
   const [showErrors, setShowErrors] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const course = useAsync(() => (courseId ? getCourse(courseId) : Promise.resolve(undefined)), [courseId]);
+  const guide = useAsync(
+    () => (patientId ? getChartGradingGuide(activeRole, patientId) : Promise.resolve({ criteria: [], source: "course" as const })),
+    [activeRole, patientId],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -312,7 +316,7 @@ export default function NoteEditorPage() {
           <Paper sx={{ p: 2.5 }}>
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isAssessment ? "Submission" : "Practice note"}</Typography>
             <NoteProgress note={note} />
-            <CourseRubricPanel guide={course.data?.gradingGuide} fileName={course.data?.rubricFileName} />
+            <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />
 
             {editable && (
               <Stack spacing={1.5} sx={{ mt: 2 }}>

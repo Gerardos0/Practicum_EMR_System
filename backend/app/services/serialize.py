@@ -24,13 +24,14 @@ def course_out(course: Course, instructor_ids: list[str]) -> dict:
         "title": course.title,
         "term": course.term,
         "status": course.status,
+        "inactivity_days": course.inactivity_days,
         "instructor_ids": instructor_ids,
         "rubric_file_name": course.rubric_file_name,
         "grading_guide": course.grading_guide,
     }
 
 
-def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
+def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | None = None) -> dict:
     encounter = patient.encounter
     payload = {
         "id": str(patient.id),
@@ -78,6 +79,7 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
                 "frequency": m.frequency,
                 "indication": m.indication,
                 "adherence": m.adherence,
+                "access_cost": m.access_cost,
                 "status": m.status,
                 "prescribed": m.prescribed,
                 "discontinued_at": m.discontinued_at,
@@ -101,7 +103,16 @@ def patient_out(patient: Patient, *, owner_name: str | None) -> dict:
             for lab in patient.labs
         ],
         "vitals": [
-            {"id": str(v.id), "label": v.label, "value": v.value, "recorded_at": v.recorded_at} for v in patient.vitals
+            {
+                "id": str(v.id),
+                "label": v.label,
+                "value": v.value,
+                "recorded_at": v.recorded_at,
+                "recorded_by_name": v.recorded_by_name,
+                "status": v.status or "recorded",
+            }
+            for v in patient.vitals
+            if viewer_role != "student" or (v.status or "recorded") != "entered_in_error"
         ],
         "section_locks": locks_or_default(patient.section_locks),
         "prefill_sections": prefill_or_default(patient.prefill_sections),
@@ -185,6 +196,8 @@ def authored_case_out(patient: Patient) -> dict:
     payload = patient_out(patient, owner_name=None)
     payload["created_by_name"] = full_name(patient.created_by) if patient.created_by else None
     payload["updated_at"] = patient.updated_at
+    payload["grading_guide"] = patient.grading_guide
+    payload["triggers"] = list(patient.planted_triggers or [])
     return payload
 
 

@@ -14,3 +14,7 @@ class UserActivePatch(APIModel):
 class UserActiveOut(APIModel):
     id: str
     is_active: bool
+
+
+class DeleteAccount(APIModel):
+    email: str

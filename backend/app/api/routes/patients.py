@@ -20,8 +20,10 @@ from app.schemas.clinical import (
     PatientOut,
     PatientRowOut,
     PlacementWrite,
+    PresenceIn,
     ProblemWrite,
     StatusPatch,
+    TriggersOut,
     VitalWrite,
 )
 from app.services.chart_edits import (
@@ -31,6 +33,7 @@ from app.services.chart_edits import (
     add_problem,
     add_vital,
     administer_medication,
+    mark_vital_entered_in_error,
     delete_allergy,
     delete_medication,
     discontinue_medication,
@@ -43,6 +46,7 @@ from app.services.chart_edits import (
 )
 from app.services.access import ensure_course_open, memberships_for, require_course
 from app.services.answer_keys import deny_answer_key, read_answer_key
+from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
 from app.services.charts import apply_status, assign_case, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
 from app.services.serialize import patient_out
@@ -93,7 +97,7 @@ async def list_patients(
         shown_owner = full_owner(patient)
         visible.append(
             {
-                "patient": patient_out(patient, owner_name=owner_name_for(patient, role)),
+                "patient": patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role),
                 "owner_name": shown_owner,
                 "latest_note": {"status": latest.status, "updated_at": latest.updated_at} if latest else None,
             }
@@ -121,7 +125,7 @@ async def assign_patient(
         db, source=source, owner=owner, actor=user, role=role, course_id=course_id, ip=_ip(request),
     )
     await db.commit()
-    return patient_out(clone, owner_name=owner_name_for(clone, role))
+    return patient_out(clone, owner_name=owner_name_for(clone, role), viewer_role=role)
 
 
 def full_owner(patient: Patient) -> str | None:
@@ -151,7 +155,7 @@ async def get_patient(
         ip_address=_ip(request),
     )
     await db.commit()
-    return patient_out(patient, owner_name=owner_name_for(patient, role))
+    return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.get("/{patient_id}/answer-key", response_model=AnswerKeyOut, response_model_exclude_none=True)
@@ -177,6 +181,43 @@ async def get_copy_answer_key(
     return payload
 
 
+@router.get("/{patient_id}/grading-guide")
+async def get_chart_grading_guide(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    return await grading_guide_for(db, patient)
+
+
+@router.get("/{patient_id}/triggers", response_model=TriggersOut, response_model_exclude_none=True)
+async def get_chart_triggers(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await deny_triggers(
+        db, user=user, role=role, rows=rows, course_id=patient.course_id,
+        entity_id=str(patient.id), ip=_ip(request),
+    )
+    payload = await triggers_for(db, patient)
+    await log_event(
+        db, action="triggers.view", entity_type="patient", entity_id=str(patient.id),
+        actor_user_id=user.id, course_id=patient.course_id, ip_address=_ip(request),
+    )
+    await db.commit()
+    return {"triggers": payload}
+
+
 @router.patch("/{patient_id}/status", response_model=PatientOut, response_model_exclude_none=True)
 async def update_status(
     patient_id: uuid.UUID,
@@ -192,7 +233,7 @@ async def update_status(
     await ensure_course_open(db, patient.course_id)
     await apply_status(db, patient, user, role, body.model_dump(exclude_unset=True), _ip(request))
     await db.commit()
-    return patient_out(patient, owner_name=owner_name_for(patient, role))
+    return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.post("/{patient_id}/reset", status_code=204)
@@ -236,11 +277,18 @@ async def _open_chart(patient_id, db, user, request, role):
 
 
 @router.post("/{patient_id}/presence", status_code=204)
-async def presence(patient_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request, role: Annotated[str, Query()]):
+async def presence(
+    patient_id: uuid.UUID,
+    body: PresenceIn,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
     patient = await load_patient(db, patient_id)
     rows = await memberships_for(db, user.id)
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
-    await record_presence(db, patient, user, _ip(request))
+    await record_presence(db, patient, user, _ip(request), active=body.active)
     await db.commit()
 
 
@@ -249,7 +297,7 @@ async def post_allergy(patient_id: uuid.UUID, body: AllergyWrite, db: DbSession,
     patient = await _open_chart(patient_id, db, user, request, role)
     await add_allergy(db, patient, user, role, body.model_dump(), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.patch("/{patient_id}/allergies/{allergy_id}", response_model=PatientOut, response_model_exclude_none=True)
@@ -257,7 +305,7 @@ async def patch_allergy(patient_id: uuid.UUID, allergy_id: uuid.UUID, body: Alle
     patient = await _open_chart(patient_id, db, user, request, role)
     await update_allergy(db, patient, user, role, allergy_id, body.model_dump(exclude_unset=True), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.delete("/{patient_id}/allergies/{allergy_id}", response_model=PatientOut, response_model_exclude_none=True)
@@ -265,7 +313,7 @@ async def remove_allergy(patient_id: uuid.UUID, allergy_id: uuid.UUID, db: DbSes
     patient = await _open_chart(patient_id, db, user, request, role)
     await delete_allergy(db, patient, user, role, allergy_id, _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.post("/{patient_id}/medications", response_model=PatientOut, response_model_exclude_none=True)
@@ -273,7 +321,7 @@ async def post_medication(patient_id: uuid.UUID, body: MedicationWrite, db: DbSe
     patient = await _open_chart(patient_id, db, user, request, role)
     await add_medication(db, patient, user, role, body.model_dump(), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.patch("/{patient_id}/medications/{medication_id}", response_model=PatientOut, response_model_exclude_none=True)
@@ -281,7 +329,7 @@ async def patch_medication(patient_id: uuid.UUID, medication_id: uuid.UUID, body
     patient = await _open_chart(patient_id, db, user, request, role)
     await update_medication(db, patient, user, role, medication_id, body.model_dump(exclude_unset=True), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.post("/{patient_id}/medications/{medication_id}/discontinue", response_model=PatientOut, response_model_exclude_none=True)
@@ -289,7 +337,7 @@ async def discontinue(patient_id: uuid.UUID, medication_id: uuid.UUID, db: DbSes
     patient = await _open_chart(patient_id, db, user, request, role)
     await discontinue_medication(db, patient, user, role, medication_id, _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.delete("/{patient_id}/medications/{medication_id}", response_model=PatientOut, response_model_exclude_none=True)
@@ -305,7 +353,7 @@ async def remove_medication(
     patient = await _open_chart(patient_id, db, user, request, role)
     await delete_medication(db, patient, user, role, medication_id, reason, _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.post("/{patient_id}/medications/{medication_id}/administrations", status_code=201)
@@ -321,7 +369,22 @@ async def post_vital(patient_id: uuid.UUID, body: VitalWrite, db: DbSession, use
     patient = await _open_chart(patient_id, db, user, request, role)
     await add_vital(db, patient, user, role, body.model_dump(), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
+
+
+@router.post("/{patient_id}/vitals/{vital_id}/entered-in-error", response_model=PatientOut, response_model_exclude_none=True)
+async def vital_entered_in_error(
+    patient_id: uuid.UUID,
+    vital_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    await mark_vital_entered_in_error(db, patient, user, role, vital_id, _ip(request))
+    await db.commit()
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.post("/{patient_id}/labs", response_model=PatientOut, response_model_exclude_none=True)
@@ -329,7 +392,7 @@ async def post_lab(patient_id: uuid.UUID, body: LabWrite, db: DbSession, user: C
     patient = await _open_chart(patient_id, db, user, request, role)
     await add_lab(db, patient, user, role, body.model_dump(), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.post("/{patient_id}/problems", response_model=PatientOut, response_model_exclude_none=True)
@@ -337,7 +400,7 @@ async def post_problem(patient_id: uuid.UUID, body: ProblemWrite, db: DbSession,
     patient = await _open_chart(patient_id, db, user, request, role)
     await add_problem(db, patient, user, role, body.model_dump(), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.patch("/{patient_id}/history", response_model=PatientOut, response_model_exclude_none=True)
@@ -345,7 +408,7 @@ async def patch_history(patient_id: uuid.UUID, body: HistoryWrite, db: DbSession
     patient = await _open_chart(patient_id, db, user, request, role)
     await set_history(db, patient, user, role, body.section, body.value, _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.patch("/{patient_id}/placement", response_model=PatientOut, response_model_exclude_none=True)
@@ -353,7 +416,7 @@ async def patch_placement(patient_id: uuid.UUID, body: PlacementWrite, db: DbSes
     patient = await _open_chart(patient_id, db, user, request, role)
     await set_placement(db, patient, user, role, body.model_dump(), _ip(request))
     await db.commit()
-    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role))
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
 @router.get("/{patient_id}/administrations")

@@ -1,5 +1,5 @@
 import type {
-  Allergy, AuthoredCase, CareSetting, EncounterStatus, LabResult, LifecycleStatus, Medication, Problem, Role, Vital,
+  Allergy, AuthoredCase, CareSetting, EncounterStatus, GradingGuide, LabResult, LifecycleStatus, Medication, PlantedTrigger, Problem, Role, Vital,
 } from "../types";
 import { downloadFile, request } from "./client";
 
@@ -79,6 +79,28 @@ export async function getAnswerKey(role: Role, caseId: string): Promise<AnswerKe
 
 export async function getChartAnswerKey(role: Role, patientId: string): Promise<AnswerKey> {
   return request<AnswerKey>(`/patients/${patientId}/answer-key`, { query: { role } });
+}
+
+export async function uploadCaseRubric(role: Role, caseId: string, file: File): Promise<GradingGuide> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request<GradingGuide>(`/cases/${caseId}/rubric`, { method: "POST", query: { role }, formData });
+}
+
+export async function getChartGradingGuide(role: Role, patientId: string): Promise<GradingGuide> {
+  return request<GradingGuide>(`/patients/${patientId}/grading-guide`, { query: { role } });
+}
+
+export async function putTriggers(role: Role, caseId: string, triggers: PlantedTrigger[]): Promise<{ triggers: PlantedTrigger[] }> {
+  return request(`/cases/${caseId}/triggers`, { method: "PUT", query: { role }, json: { triggers } });
+}
+
+export async function getChartTriggers(role: Role, patientId: string): Promise<{ triggers: PlantedTrigger[] }> {
+  return request(`/patients/${patientId}/triggers`, { query: { role } });
+}
+
+export async function copyCase(role: Role, caseId: string, courseId: string): Promise<AuthoredCase> {
+  return request<AuthoredCase>(`/cases/${caseId}/copy`, { method: "POST", query: { role }, json: { courseId } });
 }
 
 export async function putAnswerKey(

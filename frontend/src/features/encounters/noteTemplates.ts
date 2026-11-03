@@ -121,8 +121,7 @@ const generalSoap: NoteTemplate = {
     {
       id: "A", title: "Assessment",
       fields: [
-        { id: "dx", label: "Problem list (ICD-10)", kind: "icd10",  },
-        { id: "rationale", label: "Clinical rationale", kind: "textarea", rows: 3 },
+        { id: "dx", label: "Problem list (ICD-10)", kind: "icd10" },
       ],
     },
     {
@@ -212,8 +211,9 @@ export function missingRequired(): string[] {
 }
 
 function vitalsBlock(patient: Patient): string {
-  if (!patient.vitals.length) return "";
-  return patient.vitals.map((v) => `${v.label}: ${v.value}`).join("; ");
+  const vitals = patient.vitals.filter((v) => v.status !== "entered_in_error");
+  if (!vitals.length) return "";
+  return vitals.map((v) => `${v.label}: ${v.value}`).join("; ");
 }
 
 function labsBlock(patient: Patient): string {

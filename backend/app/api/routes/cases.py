@@ -4,12 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Query, Request, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession
-from app.schemas.clinical import AnswerKeyIn, AnswerKeyOut, CaseIn, CaseOut
+from app.schemas.clinical import AnswerKeyIn, AnswerKeyOut, CaseCopyIn, CaseIn, CaseOut, TriggersIn, TriggersOut
 from app.services.access import can, ensure_course_open, memberships_for, require_course
 from app.services.answer_keys import deny_answer_key, read_answer_key, upsert_answer_key
 from app.services.audit import log_event
 from app.services.case_import import import_cases, template_workbook
-from app.services.cases import create_case, list_cases, load_case, update_case
+from app.services.cases import copy_case, create_case, list_cases, load_case, save_case_rubric, save_triggers, update_case
 from app.services.serialize import authored_case_out
 
 router = APIRouter(prefix="/cases", tags=["cases"])
@@ -193,3 +193,68 @@ async def put_case_answer_key(
     )
     await db.commit()
     return payload
+
+
+@router.post("/{case_id}/rubric")
+async def post_case_rubric(
+    case_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+    file: UploadFile = File(...),
+):
+    patient = await load_case(db, case_id)
+    rows = await memberships_for(db, user.id)
+    await _require_author(db, user, role, rows, patient.course_id, request, "case.grading_guide")
+    await ensure_course_open(db, patient.course_id)
+    guide = await save_case_rubric(db, patient, file.filename or "rubric.pdf", await file.read())
+    await log_event(
+        db, action="case.grading_guide", entity_type="patient", entity_id=str(patient.id),
+        actor_user_id=user.id, course_id=patient.course_id, ip_address=_ip(request),
+        detail=guide.get("file_name"),
+    )
+    await db.commit()
+    return guide
+
+
+@router.put("/{case_id}/triggers", response_model=TriggersOut, response_model_exclude_none=True)
+async def put_case_triggers(
+    case_id: uuid.UUID,
+    body: TriggersIn,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_case(db, case_id)
+    rows = await memberships_for(db, user.id)
+    await _require_author(db, user, role, rows, patient.course_id, request, "case.triggers")
+    await ensure_course_open(db, patient.course_id)
+    saved = await save_triggers(db, patient, body.triggers)
+    await log_event(
+        db, action="case.triggers", entity_type="patient", entity_id=str(patient.id),
+        actor_user_id=user.id, course_id=patient.course_id, ip_address=_ip(request),
+        detail=f"{len(saved)} planted findings",
+    )
+    await db.commit()
+    return {"triggers": saved}
+
+
+@router.post("/{case_id}/copy", response_model=CaseOut, response_model_exclude_none=True)
+async def post_case_copy(
+    case_id: uuid.UUID,
+    body: CaseCopyIn,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_case(db, case_id)
+    rows = await memberships_for(db, user.id)
+    await _require_author(db, user, role, rows, patient.course_id, request, "case.copy")
+    clone = await copy_case(
+        db, patient=patient, destination_id=body.course_id, actor=user, rows=rows, ip=_ip(request),
+    )
+    await db.commit()
+    return authored_case_out(clone)

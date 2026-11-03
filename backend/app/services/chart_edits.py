@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.clinical_sections import ALLERGY_CATEGORIES, locks_or_default
 from app.models.clinical import Allergy, ChartSession, LabResult, Medication, MedicationAdministration, Patient, Problem, Vital
 from app.models.user import User
-from app.services.access import can
+from app.services.access import can, full_name
 from app.services.audit import log_event
 from app.services.charts import utcnow
 
@@ -90,6 +90,7 @@ async def add_medication(db, patient: Patient, actor: User, role: str, body: dic
             frequency=(body.get("frequency") or "").strip(),
             indication=(body.get("indication") or "").strip() or None,
             adherence=(body.get("adherence") or "").strip() or None,
+            access_cost=(body.get("access_cost") or "").strip() or None,
             prescribed=bool(body.get("prescribed")),
             status="active",
         )
@@ -103,10 +104,10 @@ async def update_medication(db, patient: Patient, actor: User, role: str, medica
     row = _find(patient.medications, medication_id, "Medication")
     if row.status == "entered_in_error":
         raise HTTPException(status.HTTP_409_CONFLICT, "That medication was removed as a mistake.")
-    for field in ("name", "dose", "route", "frequency", "indication", "adherence"):
+    for field in ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost"):
         if field in body:
             value = (body.get(field) or "").strip()
-            setattr(row, field, value or None if field in {"indication", "adherence"} else value)
+            setattr(row, field, value or None if field in {"indication", "adherence", "access_cost"} else value)
     if "prescribed" in body:
         row.prescribed = bool(body["prescribed"])
     await _touch(db, patient, actor, ip, "medication.update", row.name)
@@ -143,8 +144,26 @@ async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip
     value = (body.get("value") or "").strip()
     if not label or not value:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A vital needs a label and a value.")
-    patient.vitals.append(Vital(label=label, value=value, recorded_at=utcnow()))
+    patient.vitals.append(
+        Vital(
+            label=label,
+            value=value,
+            recorded_at=utcnow(),
+            recorded_by_name=full_name(actor),
+            status="recorded",
+        )
+    )
     await _touch(db, patient, actor, ip, "vital.add", f"{label} {value}")
+
+
+async def mark_vital_entered_in_error(db, patient: Patient, actor: User, role: str, vital_id: uuid.UUID, ip: str | None) -> None:
+    if not _can_edit_section(role, patient, "vitals"):
+        _deny("vitals")
+    row = _find(patient.vitals, vital_id, "Vital")
+    if row.status == "entered_in_error":
+        raise HTTPException(status.HTTP_409_CONFLICT, "That vital was already marked entered in error.")
+    row.status = "entered_in_error"
+    await _touch(db, patient, actor, ip, "vital.entered_in_error", f"{row.label} {row.value}")
 
 
 async def add_lab(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
@@ -254,7 +273,9 @@ async def review_administration(db, row: MedicationAdministration, reviewer: Use
     )
 
 
-async def record_presence(db, patient: Patient, user: User, ip: str | None) -> None:
+async def record_presence(db, patient: Patient, user: User, ip: str | None, *, active: bool) -> None:
+    if not active:
+        return
     now = utcnow()
     latest = await db.scalar(
         select(ChartSession)

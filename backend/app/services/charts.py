@@ -13,7 +13,7 @@ from app.services.access import can, full_name, require, require_course
 from app.services.audit import log_event
 
 LIFECYCLE = {"Active", "Inactive", "Prospective", "Discharged from practice", "Archived", "Deceased"}
-ENCOUNTER_STATUS = {"Scheduled", "Checked in", "In progress", "Checked out", "Closed"}
+ENCOUNTER_STATUS = {"Scheduled", "Checked in", "Roomed", "In progress", "Checked out", "Closed"}
 CARE_SETTING = {"Outpatient", "Inpatient", "Emergency", "Discharged"}
 
 
@@ -189,11 +189,11 @@ async def _replace_children(db: AsyncSession, patient: Patient, snap: dict) -> N
         (
             "medications",
             Medication,
-            ("name", "dose", "route", "frequency", "indication", "adherence", "status", "prescribed", "discontinued_at"),
+            ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost", "status", "prescribed", "discontinued_at"),
         ),
         ("problems", Problem, ("code", "description", "since")),
         ("labs", LabResult, ("name", "value", "unit", "reference_range", "flag", "collected_at")),
-        ("vitals", Vital, ("label", "value", "recorded_at")),
+        ("vitals", Vital, ("label", "value", "recorded_at", "recorded_by_name", "status")),
     )
     for key, model, fields in specs:
         getattr(patient, key).clear()
@@ -245,6 +245,7 @@ def chart_snapshot(patient: Patient) -> dict:
                 "frequency": m.frequency,
                 "indication": m.indication,
                 "adherence": m.adherence,
+                "access_cost": m.access_cost,
                 "status": m.status,
                 "prescribed": m.prescribed,
                 "discontinued_at": m.discontinued_at.isoformat() if m.discontinued_at else None,
@@ -272,6 +273,8 @@ def chart_snapshot(patient: Patient) -> dict:
                 "label": v.label,
                 "value": v.value,
                 "recorded_at": v.recorded_at.isoformat() if v.recorded_at else None,
+                "recorded_by_name": v.recorded_by_name,
+                "status": v.status or "recorded",
             }
             for v in patient.vitals
         ],
@@ -360,8 +363,8 @@ async def assign_case(
         clone.medications.append(
             Medication(
                 name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
-                indication=item.indication, adherence=item.adherence, status=item.status,
-                prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+                indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
+                status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
             )
         )
     for item in source.problems:
@@ -374,7 +377,15 @@ async def assign_case(
             )
         )
     for item in source.vitals:
-        clone.vitals.append(Vital(label=item.label, value=item.value, recorded_at=item.recorded_at))
+        clone.vitals.append(
+            Vital(
+                label=item.label,
+                value=item.value,
+                recorded_at=item.recorded_at,
+                recorded_by_name=item.recorded_by_name,
+                status=item.status or "recorded",
+            )
+        )
     db.add(clone)
     await db.flush()
 

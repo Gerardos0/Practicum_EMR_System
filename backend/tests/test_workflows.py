@@ -111,12 +111,17 @@ async def test_admin_course_lifecycle_and_report(client):
         f"/api/v1/courses/{course['id']}/status", headers=headers, json={"status": "archived"}
     )
     assert archived.status_code == 200
-    archived_blocked = await client.post(
+    still_archived = await client.post(
+        f"/api/v1/courses/{course['id']}/status", headers=headers, json={"status": "planned"}
+    )
+    assert still_archived.status_code == 409
+    retrieved = await client.post(
         f"/api/v1/courses/{course['id']}/status", headers=headers, json={"status": "active"}
     )
-    assert archived_blocked.status_code == 409
+    assert retrieved.status_code == 200
+    assert retrieved.json()["status"] == "active"
     listed = await client.get("/api/v1/courses", headers=headers)
-    assert any(item["id"] == course["id"] and item["status"] == "archived" for item in listed.json())
+    assert any(item["id"] == course["id"] and item["status"] == "active" for item in listed.json())
 
 
 @pytest.mark.asyncio

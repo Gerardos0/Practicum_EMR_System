@@ -11,11 +11,11 @@ from app.core.security import hash_password
 from app.models.clinical import CourseMembership
 from app.models.user import Role, User
 from app.schemas.clinical import PortalAccess, PublicUser, TempPassword
-from app.schemas.users import AccountUpdate, UserActiveOut, UserActivePatch
+from app.schemas.users import AccountUpdate, DeleteAccount, UserActiveOut, UserActivePatch
 from app.services.access import memberships_for, require, require_held_role
 from app.services.audit import log_event
 from app.services.charts import load_patient, utcnow
-from app.services.retention import RETENTION, purge_expired
+from app.services.retention import RETENTION, anonymize_user, purge_expired
 from app.services.serialize import user_out
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -171,6 +171,31 @@ async def archive_user(user_id: uuid.UUID, db: DbSession, user: CurrentUser, req
     )
     await db.commit()
     return {"id": str(target.id), "archived_at": target.archived_at}
+
+
+@router.post("/{user_id}/delete")
+async def delete_account(user_id: uuid.UUID, body: DeleteAccount, db: DbSession, user: CurrentUser, request: Request):
+    rows = await memberships_for(db, user.id)
+    _require_account_admin(user, rows)
+    if user_id == user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You can't delete your own account.")
+    target = await db.get(User, user_id)
+    if target is None or target.deleted_at is not None or target.purged_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
+    if body.email.strip().lower() != target.email.lower():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Type the account email to confirm.")
+    await anonymize_user(db, target)
+    await log_event(
+        db,
+        action="user.delete",
+        entity_type="user",
+        entity_id=str(target.id),
+        actor_user_id=user.id,
+        ip_address=request.client.host if request.client else None,
+        detail="login anonymized; charts and notes kept",
+    )
+    await db.commit()
+    return {"id": str(target.id)}
 
 
 @router.post("/purge-expired")

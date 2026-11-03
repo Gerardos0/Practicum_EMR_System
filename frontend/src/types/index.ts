@@ -27,12 +27,29 @@ export interface User {
   deactivatedAt?: string;
 }
 
+export interface ActivityRow {
+  userId: string;
+  student: string;
+  lastSignIn?: string;
+  sessions: number;
+  activeMinutes: number;
+  chartsOpened: number;
+  notesStarted: number;
+  notesSubmitted: number;
+}
+
+export interface AtRiskReport {
+  days: number;
+  students: { userId: string; student: string; reasons: string[] }[];
+}
+
 export interface Course {
   id: string;
   code: string;
   title: string;
   term: string;
   status: CourseStatus;
+  inactivityDays?: number;
   instructorIds: string[];
   rubricFileName?: string;
   gradingGuide?: GradingGuide | null;
@@ -46,8 +63,14 @@ export interface GradingCriterion {
 }
 
 export interface GradingGuide {
-  file_name?: string;
+  file_name?: string | null;
   criteria: GradingCriterion[];
+  source?: "case" | "course";
+}
+
+export interface PlantedTrigger {
+  finding: string;
+  explanation: string;
 }
 
 export interface RubricScores {
@@ -59,7 +82,7 @@ export type CaseMode = "practice" | "assessment" | "case";
 
 export type LifecycleStatus =
   | "Active" | "Inactive" | "Prospective" | "Discharged from practice" | "Archived" | "Deceased";
-export type EncounterStatus = "Scheduled" | "Checked in" | "In progress" | "Checked out" | "Closed";
+export type EncounterStatus = "Scheduled" | "Checked in" | "Roomed" | "In progress" | "Checked out" | "Closed";
 export type CareSetting = "Outpatient" | "Inpatient" | "Emergency" | "Discharged";
 
 export interface PatientStatus {
@@ -87,6 +110,7 @@ export interface Medication {
   frequency: string;
   indication?: string;
   adherence?: string;
+  accessCost?: string;
   status?: "active" | "discontinued" | "entered_in_error";
   prescribed?: boolean;
   discontinuedAt?: string;
@@ -107,6 +131,8 @@ export interface Vital {
   label: string;
   value: string;
   recordedAt?: string;
+  recordedByName?: string;
+  status?: "recorded" | "entered_in_error";
 }
 
 export interface Problem {
@@ -173,6 +199,7 @@ export type NoteTemplateId =
 export interface IcdCode {
   code: string;
   label: string;
+  rationale?: string;
 }
 
 export interface NoteComment {
@@ -195,6 +222,8 @@ export interface Addendum {
 export interface AuthoredCase extends Patient {
   createdByName?: string;
   updatedAt: string;
+  gradingGuide?: GradingGuide | null;
+  triggers?: PlantedTrigger[];
 }
 
 export interface ClinicalNote {

@@ -20,6 +20,7 @@ class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(200))
     term: Mapped[str] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
+    inactivity_days: Mapped[int] = mapped_column(Integer, default=7, server_default="7")
     rubric_file_name: Mapped[str | None] = mapped_column(String(255))
     grading_guide: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
@@ -80,6 +81,8 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     answer_key_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     section_locks: Mapped[dict[str, Any]] = mapped_column(JSONB, default=lambda: dict(DEFAULT_SECTION_LOCKS))
     prefill_sections: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    grading_guide: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    planted_triggers: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     unit: Mapped[str | None] = mapped_column(String(80))
     room: Mapped[str | None] = mapped_column(String(40))
     bed: Mapped[str | None] = mapped_column(String(40))
@@ -116,6 +119,7 @@ class Medication(UUIDPrimaryKeyMixin, Base):
     frequency: Mapped[str] = mapped_column(String(80))
     indication: Mapped[str | None] = mapped_column(String(120))
     adherence: Mapped[str | None] = mapped_column(String(120))
+    access_cost: Mapped[str | None] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
     discontinued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     prescribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -149,6 +153,8 @@ class Vital(UUIDPrimaryKeyMixin, Base):
     label: Mapped[str] = mapped_column(String(40))
     value: Mapped[str] = mapped_column(String(40))
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recorded_by_name: Mapped[str | None] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20), default="recorded", server_default="recorded")
 
 
 class Encounter(UUIDPrimaryKeyMixin, Base):

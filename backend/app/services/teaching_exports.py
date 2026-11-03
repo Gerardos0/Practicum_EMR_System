@@ -2,15 +2,12 @@
 
 import io
 import uuid
-from collections import defaultdict
-from datetime import datetime, timezone
 
 from openpyxl import Workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.clinical import ChartSession, ClinicalNote, Patient
-from app.models.user import User
+from app.models.clinical import ClinicalNote, Patient
 from app.services.access import full_name
 
 
@@ -18,12 +15,6 @@ def _sheet_bytes(book: Workbook) -> bytes:
     buffer = io.BytesIO()
     book.save(buffer)
     return buffer.getvalue()
-
-
-def _aware(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
 
 
 async def grade_workbook(db: AsyncSession, course_id: uuid.UUID, case_key: str) -> bytes:
@@ -99,23 +90,3 @@ def _score(payload: dict | None) -> tuple[float | None, float]:
     return total, possible
 
 
-async def activity_workbook(db: AsyncSession, course_id: uuid.UUID) -> bytes:
-    sessions = list((await db.scalars(select(ChartSession).where(ChartSession.course_id == course_id))).all())
-    totals: dict[uuid.UUID, float] = defaultdict(float)
-    for session in sessions:
-        started = _aware(session.started_at)
-        seen = _aware(session.last_seen_at)
-        totals[session.user_id] += max(0, (seen - started).total_seconds())
-    book = Workbook()
-    sheet = book.active
-    sheet.title = "Time in record"
-    sheet.append(["Student", "Minutes in the medical record"])
-    if not totals:
-        sheet.append(["No chart time recorded yet", 0])
-    else:
-        users = list((await db.scalars(select(User).where(User.id.in_(totals)))).all())
-        by_id = {user.id: user for user in users}
-        for user_id, seconds in sorted(totals.items(), key=lambda item: full_name(by_id[item[0]]) if item[0] in by_id else ""):
-            person = by_id.get(user_id)
-            sheet.append([full_name(person) if person else str(user_id), round(seconds / 60, 1)])
-    return _sheet_bytes(book)

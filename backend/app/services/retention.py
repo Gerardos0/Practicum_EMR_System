@@ -1,12 +1,13 @@
-"""Program accounts stay until an administrator archives them. Records are kept two years."""
+"""Archived accounts stay for two years, then the login is anonymized. Charts and notes stay."""
 
+import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
-from app.models.clinical import ClinicalNote, NoteAddendum, NoteComment
+from app.models.clinical import CourseMembership
 from app.models.user import User
 from app.services.charts import utcnow
 
@@ -16,6 +17,19 @@ RETENTION = timedelta(days=365 * 2)
 def retention_ends(archived_at: datetime) -> datetime:
     value = archived_at if archived_at.tzinfo else archived_at.replace(tzinfo=timezone.utc)
     return value + RETENTION
+
+
+async def anonymize_user(db: AsyncSession, user: User) -> None:
+    await db.execute(delete(CourseMembership).where(CourseMembership.user_id == user.id))
+    user.first_name = "Archived"
+    user.last_name = "Student"
+    user.email = f"archived-{user.id}@invalid.local"
+    user.university_id = None
+    user.phone_last4 = None
+    user.hashed_password = hash_password(secrets.token_urlsafe(18))
+    user.is_active = False
+    user.must_change_password = False
+    user.purged_at = utcnow()
 
 
 async def purge_expired(db: AsyncSession) -> int:
@@ -28,21 +42,5 @@ async def purge_expired(db: AsyncSession) -> int:
         ).all()
     )
     for user in users:
-        note_ids = list(
-            (await db.scalars(select(ClinicalNote.id).where(ClinicalNote.author_id == user.id))).all()
-        )
-        if note_ids:
-            await db.execute(NoteComment.__table__.delete().where(NoteComment.note_id.in_(note_ids)))
-            await db.execute(NoteAddendum.__table__.delete().where(NoteAddendum.note_id.in_(note_ids)))
-            await db.execute(ClinicalNote.__table__.delete().where(ClinicalNote.id.in_(note_ids)))
-        await db.execute(NoteComment.__table__.delete().where(NoteComment.author_id == user.id))
-        await db.execute(NoteAddendum.__table__.delete().where(NoteAddendum.author_id == user.id))
-        user.first_name = "Archived"
-        user.last_name = "Student"
-        user.email = f"archived-{user.id}@invalid.local"
-        user.university_id = None
-        user.phone_last4 = None
-        user.hashed_password = hash_password(str(user.id))
-        user.is_active = False
-        user.purged_at = utcnow()
+        await anonymize_user(db, user)
     return len(users)

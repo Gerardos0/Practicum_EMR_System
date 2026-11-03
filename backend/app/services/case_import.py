@@ -192,6 +192,8 @@ def _children(values: dict, index: int) -> dict:
                 "route": bits[2] if len(bits) > 2 else "",
                 "frequency": bits[3] if len(bits) > 3 else "",
                 "indication": bits[4] if len(bits) > 4 else None,
+                "adherence": bits[5] if len(bits) > 5 else None,
+                "access_cost": bits[6] if len(bits) > 6 else None,
                 "status": "active",
             }
         )

@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
-import { Alert, Box, Button, LinearProgress, Paper, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { downloadCaseTemplate, importCases, listCases } from "../../api/cases";
+import { copyCase, downloadCaseTemplate, importCases, listCases } from "../../api/cases";
+import { listCoursesForUser } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
 import { useAsync } from "../../utils/useAsync";
 import { formatDateTime } from "../../utils/format";
+import { courseIdsForRole } from "../../utils/permissions";
 import { usePageHeading } from "../../components/PageHeading";
 import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
@@ -17,6 +19,7 @@ export default function CaseListPage() {
   const { activeRole, courseId } = useSession();
   const cases = useAsync(() => listCases(activeRole, courseId), [activeRole, courseId]);
   const [assignCase, setAssignCase] = useState<AuthoredCase>();
+  const [copyTarget, setCopyTarget] = useState<AuthoredCase>();
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -28,7 +31,7 @@ export default function CaseListPage() {
         <Box sx={{ flex: 1, minWidth: 220 }}>
           <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Case masters</Typography>
           <Typography variant="body2" color="text.secondary">
-            Build a case once, then assign private copies. Lock and prefill changes apply to copies of the same case. Other edits stay on the master.
+            Build a case once, then assign private copies. Charts already assigned keep their locks and prefill. Later edits stay on the master.
           </Typography>
         </Box>
         <Button variant="outlined" onClick={() => downloadCaseTemplate(activeRole, courseId)}>Download template</Button>
@@ -78,6 +81,7 @@ export default function CaseListPage() {
                   <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{item.status.program || "—"}</TableCell>
                   <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{formatDateTime(item.updatedAt)}</TableCell>
                   <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                    <Button size="small" onClick={() => setCopyTarget(item)}>Copy to course</Button>
                     <Button size="small" onClick={() => setAssignCase(item)}>Assign</Button>
                   </TableCell>
                 </TableRow>
@@ -85,6 +89,17 @@ export default function CaseListPage() {
             </TableBody>
           </Table>
         </Paper>
+      )}
+
+      {copyTarget && (
+        <CopyCaseDialog
+          item={copyTarget}
+          onClose={() => setCopyTarget(undefined)}
+          onCopied={(name) => {
+            setCopyTarget(undefined);
+            setNotice(`${copyTarget.lastName}, ${copyTarget.firstName} copied to ${name}.`);
+          }}
+        />
       )}
 
       {assignCase && (
@@ -97,5 +112,65 @@ export default function CaseListPage() {
         />
       )}
     </Box>
+  );
+}
+
+function CopyCaseDialog({ item, onClose, onCopied }: { item: AuthoredCase; onClose: () => void; onCopied: (courseName: string) => void }) {
+  const { user, activeRole, courseId } = useSession();
+  const courses = useAsync(() => listCoursesForUser(), [user.id]);
+  const teaching = new Set([
+    ...courseIdsForRole(user, "instructor"),
+    ...courseIdsForRole(user, "course_coordinator"),
+  ]);
+  const destinations = (courses.data ?? []).filter((course) => course.id !== courseId && teaching.has(course.id));
+  const [destinationId, setDestinationId] = useState(destinations[0]?.id ?? "");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const selected = destinations.find((course) => course.id === destinationId) ?? destinations[0];
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Copy {item.lastName}, {item.firstName}</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Creates a new case in the other course, including the answer key, rubric, and planted triggers. Assigned charts and notes stay here.
+        </Typography>
+        {destinations.length === 0 ? (
+          <Alert severity="info">You teach only this course, so there is nowhere to copy it.</Alert>
+        ) : (
+          <TextField
+            select
+            fullWidth
+            label="Destination course"
+            value={selected?.id ?? ""}
+            onChange={(e) => setDestinationId(e.target.value)}
+          >
+            {destinations.map((course) => (
+              <MenuItem key={course.id} value={course.id}>{course.code} · {course.title}</MenuItem>
+            ))}
+          </TextField>
+        )}
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={busy || !selected}
+          onClick={async () => {
+            if (!selected) return;
+            setBusy(true);
+            setError("");
+            try {
+              await copyCase(activeRole, item.id, selected.id);
+              onCopied(`${selected.code}`);
+            } catch (e) {
+              setError((e as Error).message);
+              setBusy(false);
+            }
+          }}
+        >Copy</Button>
+      </DialogActions>
+    </Dialog>
   );
 }

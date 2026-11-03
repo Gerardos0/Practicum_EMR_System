@@ -9,11 +9,13 @@ import { useAsync } from "../../utils/useAsync";
 import { usePageHeading } from "../../components/PageHeading";
 import PageError from "../../components/PageError";
 import AnswerKeyEditor from "./AnswerKeyEditor";
+import CaseRubricPanel from "./CaseRubricPanel";
+import CaseTriggersEditor from "./CaseTriggersEditor";
 import EditableTable from "./EditableTable";
 import type { AuthoredCase, CareSetting, EncounterStatus, LifecycleStatus } from "../../types";
 
 const LIFECYCLE: LifecycleStatus[] = ["Active", "Inactive", "Prospective", "Discharged from practice", "Archived", "Deceased"];
-const ENCOUNTER: EncounterStatus[] = ["Scheduled", "Checked in", "In progress", "Checked out", "Closed"];
+const ENCOUNTER: EncounterStatus[] = ["Scheduled", "Checked in", "Roomed", "In progress", "Checked out", "Closed"];
 const SETTING: CareSetting[] = ["Outpatient", "Inpatient", "Emergency", "Discharged"];
 
 interface Draft {
@@ -109,7 +111,8 @@ function draftFrom(item: AuthoredCase): Draft {
     program: item.status.program ?? "",
     allergies: item.allergies.map((a) => row({ substance: a.substance, reaction: a.reaction, severity: a.severity, category: a.category ?? "medication" })),
     medications: item.medications.map((m) => row({
-      name: m.name, dose: m.dose, route: m.route, frequency: m.frequency, indication: m.indication, adherence: m.adherence,
+      name: m.name, dose: m.dose, route: m.route, frequency: m.frequency,
+      indication: m.indication, adherence: m.adherence, accessCost: m.accessCost,
     })),
     problems: item.problems.map((p) => row({ code: p.code, description: p.description, since: p.since })),
     labs: item.labs.map((l) => row({
@@ -173,7 +176,8 @@ export default function CaseEditorPage() {
         severity: (r.severity || undefined) as CaseInput["allergies"][number]["severity"],
       })),
       medications: draft.medications.filter((r) => r.name.trim()).map((r) => ({
-        name: r.name, dose: r.dose, route: r.route, frequency: r.frequency, indication: r.indication || undefined, adherence: r.adherence || undefined,
+        name: r.name, dose: r.dose, route: r.route, frequency: r.frequency,
+        indication: r.indication || undefined, adherence: r.adherence || undefined, accessCost: r.accessCost || undefined,
       })),
       problems: draft.problems.filter((r) => r.description.trim()).map((r) => ({
         code: r.code || undefined, description: r.description, since: r.since || undefined,
@@ -267,7 +271,7 @@ export default function CaseEditorPage() {
       <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
         <Typography component="h2" variant="h6">What students can change</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Checked sections stay open on assigned copies. Name, date of birth, and MRN always appear in the note header. Other note text is copied only for the sections you check below.
+          Checked sections stay open on charts assigned after you save. Charts already assigned keep the locks and prefill they had. Name, date of birth, and MRN always appear in the note header. Other note text is copied only for the sections you check below.
         </Typography>
         <Box sx={{ display: "flex", flexWrap: "wrap" }}>
           {STUDENT_SECTIONS.map(([id, label]) => (
@@ -312,10 +316,11 @@ export default function CaseEditorPage() {
       <Paper sx={{ p: { xs: 2, md: 2.5 }, overflowX: "auto" }}>
         <EditableTable
           label="Medications" addLabel="medication" rows={draft.medications} onChange={(medications) => set({ medications })}
-          blank={{ name: "", dose: "", route: "", frequency: "", indication: "", adherence: "" }}
+          blank={{ name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "" }}
           columns={[
-            { key: "name", label: "Name" }, { key: "dose", label: "Dose" }, { key: "route", label: "Route" },
-            { key: "frequency", label: "Frequency" }, { key: "indication", label: "Indication" }, { key: "adherence", label: "Adherence" },
+            { key: "name", label: "Name" }, { key: "dose", label: "Dose" }, { key: "route", label: "How taken" },
+            { key: "frequency", label: "Frequency" }, { key: "adherence", label: "Adherence" },
+            { key: "accessCost", label: "Access or cost" }, { key: "indication", label: "Indication" },
           ]}
         />
       </Paper>
@@ -348,13 +353,21 @@ export default function CaseEditorPage() {
 
       {isNew ? (
         <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
-          <Typography component="h2" variant="h6">Answer key</Typography>
-          <Typography variant="body2" color="text.secondary">Save the case first. Then you can add the expected diagnoses.</Typography>
+          <Typography component="h2" variant="h6">Answer key, rubric, and triggers</Typography>
+          <Typography variant="body2" color="text.secondary">Save the case first. Then you can add the expected diagnoses, a rubric, and planted triggers.</Typography>
         </Paper>
       ) : (
-        <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
-          <AnswerKeyEditor role={activeRole} caseId={caseId} />
-        </Paper>
+        <>
+          <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+            <AnswerKeyEditor role={activeRole} caseId={caseId} />
+          </Paper>
+          <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+            <CaseRubricPanel key={existing.data?.updatedAt ?? "new"} role={activeRole} caseId={caseId} initial={existing.data?.gradingGuide} />
+          </Paper>
+          <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+            <CaseTriggersEditor key={existing.data?.updatedAt ?? "new"} role={activeRole} caseId={caseId} initial={existing.data?.triggers ?? []} />
+          </Paper>
+        </>
       )}
 
       <Box sx={{ display: "flex", gap: 1 }}>

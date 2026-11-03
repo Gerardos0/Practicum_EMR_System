@@ -10,6 +10,10 @@ export async function setUserActive(userId: string, isActive: boolean): Promise<
   await request<void>(`/users/${userId}/active`, { method: "PATCH", json: { isActive } });
 }
 
+export async function deleteAccount(userId: string, email: string): Promise<void> {
+  await request(`/users/${userId}/delete`, { method: "POST", json: { email } });
+}
+
 export async function archiveUser(userId: string): Promise<void> {
   await request<void>(`/users/${userId}/archive`, { method: "POST" });
 }

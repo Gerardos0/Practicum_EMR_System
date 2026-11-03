@@ -46,10 +46,24 @@ export default function PatientChartPage() {
 
   useEffect(() => {
     if (!patient.data) return;
-    const beat = () => { recordPresence(activeRole, patientId).catch(() => undefined); };
+    let lastInput = Date.now();
+    const mark = () => { lastInput = Date.now(); };
+    window.addEventListener("pointerdown", mark);
+    window.addEventListener("pointermove", mark);
+    window.addEventListener("keydown", mark);
+    const beat = () => {
+      const active = document.visibilityState === "visible" && Date.now() - lastInput < 60_000;
+      if (!active) return;
+      recordPresence(activeRole, patientId).catch(() => undefined);
+    };
     beat();
     const timer = window.setInterval(beat, 25_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pointerdown", mark);
+      window.removeEventListener("pointermove", mark);
+      window.removeEventListener("keydown", mark);
+    };
   }, [patient.data?.id, patientId, activeRole]);
 
   if (patient.error) return <PageError error={patient.error} />;

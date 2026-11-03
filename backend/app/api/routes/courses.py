@@ -16,6 +16,7 @@ from app.schemas.clinical import (
     CourseCreate,
     CourseOut,
     CourseStatusPatch,
+    InactivityDaysPatch,
     EnrollmentCreate,
     PublicUser,
     RosterImport,
@@ -33,7 +34,7 @@ COURSE_TRANSITIONS = {
     "planned": {"active"},
     "active": {"ended"},
     "ended": {"active", "archived"},
-    "archived": set(),
+    "archived": {"active"},
 }
 
 
@@ -69,7 +70,7 @@ async def create_course(body: CourseCreate, db: DbSession, user: CurrentUser, re
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Course code, title, and term are required.")
     if await db.scalar(select(Course.id).where(Course.code == code, Course.term == term)):
         raise HTTPException(status.HTTP_409_CONFLICT, "A course with that code already exists for that term.")
-    course = Course(code=code, title=title, term=term, status="planned")
+    course = Course(code=code, title=title, term=term, status="planned", inactivity_days=7)
     db.add(course)
     await db.flush()
     await log_event(
@@ -390,6 +391,31 @@ async def update_course_status(
         course_id=course.id,
         ip_address=_ip(request),
         detail=f"{previous} -> {course.status}",
+    )
+    await db.commit()
+    return course_out(course, [str(person.id) for person in await _instructors(db, course.id)])
+
+
+@router.patch("/{course_id}/inactivity-days", response_model=CourseOut, response_model_exclude_none=True)
+async def set_inactivity_days(
+    course_id: uuid.UUID, body: InactivityDaysPatch, db: DbSession, user: CurrentUser, request: Request
+):
+    rows = await memberships_for(db, user.id)
+    _require_admin(user, rows)
+    require("admin", "course:manage_status", "Your role can't change the activity window.")
+    course = await db.get(Course, course_id)
+    if course is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found.")
+    course.inactivity_days = body.days
+    await log_event(
+        db,
+        action="course.inactivity_days",
+        entity_type="course",
+        entity_id=str(course.id),
+        actor_user_id=user.id,
+        course_id=course.id,
+        ip_address=_ip(request),
+        detail=str(body.days),
     )
     await db.commit()
     return course_out(course, [str(person.id) for person in await _instructors(db, course.id)])

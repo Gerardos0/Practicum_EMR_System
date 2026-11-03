@@ -16,7 +16,10 @@ def _vitals_block(patient: Patient) -> str:
     vitals = patient.vitals or []
     if not vitals:
         return ""
-    return "; ".join(f"{v.label}: {v.value}" for v in vitals)
+    visible = [v for v in vitals if (v.status or "recorded") != "entered_in_error"]
+    if not visible:
+        return ""
+    return "; ".join(f"{v.label}: {v.value}" for v in visible)
 
 
 def _labs_block(patient: Patient) -> str:
