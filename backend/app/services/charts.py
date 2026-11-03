@@ -341,6 +341,7 @@ async def assign_case(
         insurance_payer=source.insurance_payer,
         insurance_member_id=source.insurance_member_id,
         insurance_group_number=source.insurance_group_number,
+        insurance_notes=source.insurance_notes,
         emergency_contact_name=source.emergency_contact_name,
         emergency_contact_phone=source.emergency_contact_phone,
         emergency_contact_relationship=source.emergency_contact_relationship,

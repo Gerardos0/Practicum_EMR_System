@@ -42,6 +42,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginRoute />} />
+            <Route path="/portal/preview" element={<PatientPortalPage previewMode />} />
 
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route path="/change-password" element={<ChangePasswordPage />} />

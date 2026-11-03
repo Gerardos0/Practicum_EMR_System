@@ -148,6 +148,13 @@ export interface Encounter {
   date: string;
 }
 
+export interface Insurance {
+  payer?: string | null;
+  memberId?: string | null;
+  groupNumber?: string | null;
+  notes?: string | null;
+}
+
 export interface Patient {
   id: string;
   mrn: string;
@@ -178,6 +185,7 @@ export interface Patient {
   surgicalHistory: string;
   socialHistory: string;
   encounter: Encounter;
+  insurance?: Insurance;
   sectionLocks?: Record<string, boolean>;
   prefillSections?: string[];
   unit?: string;

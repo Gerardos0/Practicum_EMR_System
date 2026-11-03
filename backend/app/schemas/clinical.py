@@ -131,6 +131,7 @@ class InsuranceOut(APIModel):
     payer: str | None = None
     member_id: str | None = None
     group_number: str | None = None
+    notes: str | None = None
 
 
 class EmergencyContactOut(APIModel):
@@ -399,6 +400,10 @@ class CaseIn(APIModel):
     surgical_history: str = ""
     family_history: str = ""
     social_history: str = ""
+    insurance_payer: str | None = None
+    insurance_member_id: str | None = None
+    insurance_group_number: str | None = None
+    insurance_notes: str | None = None
     encounter_type: str = "Office visit"
     care_setting: str = "Outpatient"
     lifecycle: str = "Active"

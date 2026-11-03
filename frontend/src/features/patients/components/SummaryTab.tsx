@@ -157,6 +157,18 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         </Typography>
       </Paper>
 
+      <Paper sx={card}>
+        <Typography component="h2" variant="h6" sx={titleSx}>Insurance</Typography>
+        {p.insurance?.payer || p.insurance?.memberId || p.insurance?.groupNumber || p.insurance?.notes ? (
+          <Stack spacing={0.5}>
+            {p.insurance.payer && <Typography variant="body2"><strong>Payer:</strong> {p.insurance.payer}</Typography>}
+            {p.insurance.memberId && <Typography variant="body2"><strong>Member ID:</strong> {p.insurance.memberId}</Typography>}
+            {p.insurance.groupNumber && <Typography variant="body2"><strong>Group:</strong> {p.insurance.groupNumber}</Typography>}
+            {p.insurance.notes && <Typography variant="body2"><strong>Notes:</strong> {p.insurance.notes}</Typography>}
+          </Stack>
+        ) : <Typography variant="body2" color="text.secondary">Not on file</Typography>}
+      </Paper>
+
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
         <Paper sx={card}>
           <Typography component="h2" variant="h6" sx={titleSx}>Allergies</Typography>

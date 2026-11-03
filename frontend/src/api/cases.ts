@@ -16,6 +16,10 @@ export interface CaseInput {
   surgicalHistory: string;
   familyHistory: string;
   socialHistory: string;
+  insurancePayer?: string;
+  insuranceMemberId?: string;
+  insuranceGroupNumber?: string;
+  insuranceNotes?: string;
   encounterType: string;
   careSetting: CareSetting;
   lifecycle: LifecycleStatus;

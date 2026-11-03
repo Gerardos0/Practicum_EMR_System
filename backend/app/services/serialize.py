@@ -133,6 +133,7 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
             "payer": patient.insurance_payer,
             "member_id": patient.insurance_member_id,
             "group_number": patient.insurance_group_number,
+            "notes": patient.insurance_notes,
         },
         "emergency_contact": {
             "name": patient.emergency_contact_name,

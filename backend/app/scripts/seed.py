@@ -1544,6 +1544,7 @@ def _t2dm(course: Course, owner: User, mrn: str) -> Patient:
         payer="Blue Cross", member="BC-10057", group="FAC-ELP",
         em_name="Elsa Einstein", em_phone="915-555-0100", em_rel="Spouse",
     )
+    chart.insurance_notes = "Prior authorization required for empagliflozin; coverage is pending payer review."
     _fill_t2dm(chart)
     return chart
 

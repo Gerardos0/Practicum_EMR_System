@@ -73,6 +73,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     insurance_payer: Mapped[str | None] = mapped_column(String(120))
     insurance_member_id: Mapped[str | None] = mapped_column(String(60))
     insurance_group_number: Mapped[str | None] = mapped_column(String(60))
+    insurance_notes: Mapped[str | None] = mapped_column(Text)
     emergency_contact_name: Mapped[str | None] = mapped_column(String(120))
     emergency_contact_phone: Mapped[str | None] = mapped_column(String(40))
     emergency_contact_relationship: Mapped[str | None] = mapped_column(String(60))
