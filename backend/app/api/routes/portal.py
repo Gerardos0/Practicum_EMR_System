@@ -49,6 +49,8 @@ async def portal_chart(
         for item in patient.medications
         if item.status == "active"
     ]
+    labs = sorted(patient.labs, key=lambda lab: lab.name.casefold())
+    labs.sort(key=lambda lab: lab.collected_at, reverse=True)
     result = {
         "patient": {
             "name": f"{patient.first_name} {patient.last_name}",
@@ -64,7 +66,7 @@ async def portal_chart(
                 "flag": lab.flag,
                 "collected_at": lab.collected_at,
             }
-            for lab in patient.labs
+            for lab in labs
         ],
         "last_visit": {
             "date": patient.encounter.date if patient.encounter else None,
