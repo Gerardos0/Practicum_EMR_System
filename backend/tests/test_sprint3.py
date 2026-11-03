@@ -279,7 +279,12 @@ async def test_answer_key_replaces_and_stays_hidden(client, db_session):
         f"/api/v1/cases/{master_id}/answer-key",
         headers=instructor,
         params={"role": "instructor"},
-        json={"diagnoses": [{"code": "I10", "label": "Essential hypertension", "rationale": "Only this one."}], "planPoints": ["Recheck in four weeks"], "rationale": "Replaced."},
+        json={
+            "diagnoses": [{"code": "I10", "label": "Essential hypertension", "rationale": "Only this one."}],
+            "expectedCptCodes": first["expectedCptCodes"],
+            "planPoints": ["Recheck in four weeks"],
+            "rationale": "Replaced.",
+        },
     )
     assert replaced.status_code == 200, replaced.text
     assert len(replaced.json()["diagnoses"]) == 1

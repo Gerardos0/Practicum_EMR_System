@@ -5,6 +5,7 @@ import ReplayOutlined from "@mui/icons-material/ReplayOutlined";
 import ScienceOutlined from "@mui/icons-material/ScienceOutlined";
 import { Link as RouterLink } from "react-router-dom";
 import { listPatients, type PatientRow } from "../../api/patients";
+import { caseloadHref, matchesCaseload } from "../patients/caseload";
 import { useSession } from "../auth/AuthContext";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
@@ -24,11 +25,11 @@ export default function StudentDashboard() {
 
   const rows = patients.data ?? [];
   const now = Date.now();
-  const assessment = rows.filter((r) => r.patient.mode === "assessment");
-  const practice = rows.filter((r) => r.patient.mode === "practice");
-  const inProgress = rows.filter((r) => r.patient.status.encounter === "In progress" || r.patient.status.encounter === "Checked in" || r.patient.status.encounter === "Roomed");
-  const returned = rows.filter((r) => r.latestNote?.status === "returned");
-  const pending = rows.filter((r) => r.latestNote?.status === "pending_review");
+  const assessment = rows.filter((r) => matchesCaseload(r, "assigned"));
+  const practice = rows.filter((r) => matchesCaseload(r, "practice"));
+  const inProgress = rows.filter((r) => matchesCaseload(r, "in-clinic"));
+  const returned = rows.filter((r) => matchesCaseload(r, "returned"));
+  const pending = rows.filter((r) => matchesCaseload(r, "awaiting"));
   const flagged = rows.filter((r) => r.patient.labs.some((l) => l.flag));
   const recentNotes = [...rows]
     .filter((r) => r.latestNote)
@@ -47,35 +48,35 @@ export default function StudentDashboard() {
           label="Assigned patients"
           value={assessment.length}
           tone="navy"
-          to="/patients"
+          to={caseloadHref("assigned")}
           icon={<PeopleAltOutlined fontSize="small" />}
         />
         <StatCard
           label="In clinic now"
           value={inProgress.length}
           tone="orange"
-          to="/patients"
+          to={caseloadHref("in-clinic")}
           icon={<PeopleAltOutlined fontSize="small" />}
         />
         <StatCard
           label="Returned notes"
           value={returned.length}
           tone="orangeSoft"
-          to={returned.length > 0 ? "/patients" : undefined}
+          to={caseloadHref("returned")}
           icon={<ReplayOutlined fontSize="small" />}
         />
         <StatCard
           label="Awaiting review"
           value={pending.length}
           tone="navySoft"
-          to={pending.length > 0 ? "/patients" : undefined}
+          to={caseloadHref("awaiting")}
           icon={<AssignmentOutlined fontSize="small" />}
         />
         <StatCard
           label="Practice cases"
           value={practice.length}
           tone="navy"
-          to="/patients?mode=practice"
+          to={caseloadHref("practice")}
           icon={<ScienceOutlined fontSize="small" />}
         />
       </StatGrid>
