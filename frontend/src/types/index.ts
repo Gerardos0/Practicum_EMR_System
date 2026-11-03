@@ -175,6 +175,10 @@ export interface IcdCode {
   label: string;
 }
 
+export interface CptSelection extends IcdCode {
+  diagnosisCodes: string[];
+}
+
 export interface NoteComment {
   id: string;
   authorId: string;
@@ -210,7 +214,7 @@ export interface ClinicalNote {
   version: number;
   content: Record<string, string>;
   diagnoses: IcdCode[];
-  cptCodes?: IcdCode[];
+  cptCodes?: CptSelection[];
   bodyLocked?: boolean;
   rubricScores?: RubricScores | null;
   routedToId?: string;

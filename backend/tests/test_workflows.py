@@ -547,6 +547,49 @@ async def test_note_sign_version_and_cosign(client):
 
 
 @pytest.mark.asyncio
+async def test_cpt_diagnosis_links_are_optional_and_legacy_codes_load(client):
+    student, _ = await login(client, "daniel.reyes@miners.utep.edu")
+    course = await course_id(client, student, "PHAR 5320")
+    patient = await patient_by_mrn(client, student, course, "student", "TR-20001")
+    created = await client.post(
+        f"/api/v1/patients/{patient['id']}/notes",
+        headers=student,
+        params={"role": "student"},
+        json={"templateId": "pharmacy_soap", "discipline": "pharmacy"},
+    )
+    assert created.status_code == 200, created.text
+    note_id = created.json()["id"]
+
+    linked = await client.patch(
+        f"/api/v1/notes/{note_id}",
+        headers=student,
+        params={"role": "student"},
+        json={
+            "expectedVersion": created.json()["version"],
+            "cptCodes": [{"code": "99213", "label": "Office visit", "diagnosisCodes": ["I10", "E11.9"]}],
+        },
+    )
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["cptCodes"][0]["diagnosisCodes"] == ["I10", "E11.9"]
+
+    legacy = await client.patch(
+        f"/api/v1/notes/{note_id}",
+        headers=student,
+        params={"role": "student"},
+        json={"expectedVersion": linked.json()["version"], "cptCodes": [{"code": "99212", "label": "Office visit"}]},
+    )
+    assert legacy.status_code == 200, legacy.text
+    assert legacy.json()["cptCodes"][0]["diagnosisCodes"] == []
+    signed = await client.post(
+        f"/api/v1/notes/{note_id}/sign",
+        headers=student,
+        params={"role": "student"},
+        json={"expectedVersion": legacy.json()["version"]},
+    )
+    assert signed.status_code == 200, signed.text
+
+
+@pytest.mark.asyncio
 async def test_return_and_resubmit(client):
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     sam_headers, _ = await login(client, "sam.torres@miners.utep.edu")

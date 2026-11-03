@@ -195,6 +195,12 @@ class IcdCode(APIModel):
     label: str
 
 
+class CptSelection(APIModel):
+    code: str
+    label: str
+    diagnosis_codes: list[str] = Field(default_factory=list)
+
+
 class NoteCommentOut(APIModel):
     id: str
     author_id: str
@@ -230,7 +236,7 @@ class NoteOut(APIModel):
     version: int
     content: dict[str, str]
     diagnoses: list[IcdCode]
-    cpt_codes: list[IcdCode] = []
+    cpt_codes: list[CptSelection] = Field(default_factory=list)
     body_locked: bool = False
     rubric_scores: dict | None = None
     routed_to_id: str | None = None
@@ -253,7 +259,7 @@ class DraftPatch(APIModel):
     template_id: NoteTemplate | None = None
     content: dict[str, str] | None = None
     diagnoses: list[IcdCode] | None = None
-    cpt_codes: list[IcdCode] | None = None
+    cpt_codes: list[CptSelection] | None = None
     routed_to_id: uuid.UUID | None = None
 
 
@@ -404,12 +410,14 @@ class AnswerDiagnosis(APIModel):
 
 class AnswerKeyIn(APIModel):
     diagnoses: list[AnswerDiagnosis] = []
+    expected_cpt_codes: list[IcdCode] = Field(default_factory=list)
     plan_points: list[str] = []
     rationale: str = ""
 
 
 class AnswerKeyOut(APIModel):
     diagnoses: list[AnswerDiagnosis] = []
+    expected_cpt_codes: list[IcdCode] = Field(default_factory=list)
     plan_points: list[str] = []
     rationale: str = ""
     updated_at: datetime | None = None
@@ -498,7 +506,7 @@ class ScoreWrite(APIModel):
 class InstructorEdit(APIModel):
     content: dict[str, str] | None = None
     diagnoses: list[IcdCode] | None = None
-    cpt_codes: list[IcdCode] | None = None
+    cpt_codes: list[CptSelection] | None = None
 
 
 class PortalAccess(APIModel):
