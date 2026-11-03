@@ -43,7 +43,11 @@ export default function LoginPage() {
         const roles = uniqueRoles(result.user);
         const only = roles.length === 1 ? roles[0] : undefined;
         const singleCourse = result.user.roles.length === 1 && result.user.roles[0].courseIds.length === 1;
-        if (only === "admin" || only === "patient" || singleCourse) {
+        if (only === "patient") {
+          navigate(homePathFor("patient"), { replace: true });
+          return;
+        }
+        if (only === "admin" || singleCourse) {
           navigate(homePathFor(only!), { replace: true });
           return;
         }

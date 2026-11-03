@@ -44,7 +44,7 @@ export default function ChangePasswordPage() {
     changePassword(currentPassword, newPassword)
       .then(() => {
         clearPasswordChange();
-        navigate(courseId ? homePathFor(activeRole) : "/select-course", { replace: true });
+        navigate(activeRole === "patient" ? homePathFor("patient") : courseId ? homePathFor(activeRole) : "/select-course", { replace: true });
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setBusy(false));
