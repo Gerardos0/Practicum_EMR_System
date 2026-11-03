@@ -23,6 +23,9 @@ class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     inactivity_days: Mapped[int] = mapped_column(Integer, default=7, server_default="7")
     rubric_file_name: Mapped[str | None] = mapped_column(String(255))
     grading_guide: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    guardrail_profile: Mapped[str] = mapped_column(String(30), default="practicum", server_default="practicum")
+    guardrail_mode: Mapped[str | None] = mapped_column(String(20))
+    ai_assist: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class CourseMembership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -126,6 +129,10 @@ class Medication(UUIDPrimaryKeyMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
     discontinued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     prescribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    rxcui: Mapped[str | None] = mapped_column(String(20))
+    generic_name: Mapped[str | None] = mapped_column(String(120))
+    brand_names: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
+    flags: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
 
 
 class Problem(UUIDPrimaryKeyMixin, Base):
@@ -175,6 +182,8 @@ class ClinicalNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     encounter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("encounters.id"))
     template_id: Mapped[str] = mapped_column(String(40))
     sensitive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sensitivity: Mapped[str] = mapped_column(String(20), default="standard", server_default="standard")
+    content_cipher: Mapped[str | None] = mapped_column(Text)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     discipline_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("disciplines.id"))
     mode: Mapped[str] = mapped_column(String(20))
@@ -204,6 +213,7 @@ class NoteComment(UUIDPrimaryKeyMixin, Base):
     note_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinical_notes.id", ondelete="CASCADE"), index=True)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     body: Mapped[str] = mapped_column(Text)
+    body_cipher: Mapped[str | None] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(String(20))
     section_id: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -217,6 +227,7 @@ class NoteAddendum(UUIDPrimaryKeyMixin, Base):
     note_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinical_notes.id", ondelete="CASCADE"), index=True)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     body: Mapped[str] = mapped_column(Text)
+    body_cipher: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     author: Mapped[User] = relationship(lazy="selectin")
@@ -229,6 +240,7 @@ class SavedNoteTemplate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     discipline: Mapped[str] = mapped_column(String(40))
     course_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("courses.id"), index=True)
     sensitive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sensitivity: Mapped[str] = mapped_column(String(20), default="standard", server_default="standard")
     sections: Mapped[list[Any]] = mapped_column(JSONB)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 

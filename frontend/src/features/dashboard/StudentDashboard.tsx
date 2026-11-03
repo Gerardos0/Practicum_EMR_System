@@ -33,6 +33,7 @@ export default function StudentDashboard() {
   const returned = rows.filter((r) => matchesCaseload(r, "returned"));
   const pending = rows.filter((r) => matchesCaseload(r, "awaiting"));
   const flagged = rows.filter((r) => r.patient.labs.some((l) => l.flag));
+  const doseFlags = rows.filter((r) => (r.openFlagCount ?? 0) > 0);
   const recentNotes = [...rows]
     .filter((r) => r.latestNote)
     .sort((a, b) => new Date(b.latestNote!.updatedAt).getTime() - new Date(a.latestNote!.updatedAt).getTime())
@@ -72,6 +73,13 @@ export default function StudentDashboard() {
           value={pending.length}
           tone="navySoft"
           to={caseloadHref("awaiting")}
+          icon={<AssignmentOutlined fontSize="small" />}
+        />
+        <StatCard
+          label="Items to check"
+          value={doseFlags.length}
+          tone="orange"
+          to={caseloadHref("flags")}
           icon={<AssignmentOutlined fontSize="small" />}
         />
         <StatCard

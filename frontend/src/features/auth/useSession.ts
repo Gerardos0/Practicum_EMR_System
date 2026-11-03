@@ -9,7 +9,7 @@ export interface AuthCtx {
   assignment: RoleAssignment | null;
   discipline: Discipline | undefined;
   courseId: string | undefined;
-  signIn: (user: User, accessToken: string, mustChangePassword: boolean) => void;
+  signIn: (user: User, accessToken: string, mustChangePassword: boolean, refreshToken?: string) => void;
   signOut: () => void;
   clearPasswordChange: () => void;
   switchRole: (role: Role) => void;

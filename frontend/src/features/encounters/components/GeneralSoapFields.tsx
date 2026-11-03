@@ -113,11 +113,12 @@ export function RosEditor({ content, readOnly, onField }: { content: Record<stri
 }
 
 export function AssessmentEditor({
-  diagnoses, readOnly, onDiagnoses,
+  diagnoses, readOnly, onDiagnoses, chartDiagnoses = [],
 }: {
   diagnoses: IcdCode[];
   readOnly?: boolean;
   onDiagnoses?: (next: IcdCode[]) => void;
+  chartDiagnoses?: IcdCode[];
 }) {
   const [options, setOptions] = useState<IcdCode[]>([]);
   const [query, setQuery] = useState("");
@@ -135,7 +136,9 @@ export function AssessmentEditor({
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
   }, [term, searching]);
-  const shownOptions = searching ? options : [];
+  const shownOptions = searching
+    ? [...chartDiagnoses, ...options.filter((row) => !chartDiagnoses.some((item) => item.code === row.code))]
+    : chartDiagnoses;
 
   const move = (index: number, delta: number) => {
     const target = index + delta;

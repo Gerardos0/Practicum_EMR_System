@@ -166,6 +166,9 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
         return
     phar = await _course(db, "PHAR 5320", "Pharmacotherapy Skills Lab", "Fall 2026", "SOAP-note-rubric.pdf")
     pt = await _course(db, "PHYT 6310", "Clinical Practice I", "Fall 2026", "PT-daily-note-rubric.pdf")
+    intro = await _course(
+        db, "PHAR 5101", "Intro to Pharmacy", "Fall 2026", "SOAP-note-rubric.pdf", guardrail_profile="intro_pharmacy",
+    )
     hashed = hash_password(password)
     daniel = await _person(db, "daniel.reyes@miners.utep.edu", "Daniel", "Reyes", "800123456", "4412", hashed)
     clarissa = await _person(db, "clarissa.dominguez@miners.utep.edu", "Clarissa", "Dominguez", "800654321", "9087", hashed)
@@ -189,15 +192,20 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
     await _member(db, gerardo, phar, roles["instructor"], None)
     await _member(db, gerardo, pt, roles["instructor"], None)
     await _member(db, joe, phar, roles["instructor"], None)
+    await _member(db, daniel, intro, roles["student"], pharmacy)
+    await _member(db, gerardo, intro, roles["instructor"], None)
+    await _member(db, joe, intro, roles["instructor"], None)
     await _charts(db, phar, pt, ana, sam, luis, gerardo, daniel, clarissa)
     await _more_demo(db, phar, daniel, clarissa, ana, gerardo, pharmacy, therapy)
     await _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, therapy, hashed)
 
 
-async def _course(db, code: str, title: str, term: str, rubric: str) -> Course:
+async def _course(db, code: str, title: str, term: str, rubric: str, *, guardrail_profile: str = "practicum") -> Course:
     course = await db.scalar(select(Course).where(Course.code == code, Course.term == term))
     if course is None:
-        course = Course(code=code, title=title, term=term, rubric_file_name=rubric)
+        course = Course(
+            code=code, title=title, term=term, rubric_file_name=rubric, guardrail_profile=guardrail_profile,
+        )
         db.add(course)
         await db.flush()
     return course

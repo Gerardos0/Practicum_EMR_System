@@ -6,9 +6,14 @@ from app.schemas.common import APIModel
 
 class Token(APIModel):
     access_token: str = Field(serialization_alias="access_token")
+    refresh_token: str = Field(serialization_alias="refresh_token")
     token_type: str = Field(default="bearer", serialization_alias="token_type")
     must_change_password: bool
     user: PublicUser
+
+
+class RefreshRequest(APIModel):
+    refresh_token: str = Field(min_length=20, max_length=200)
 
 
 class ChangePasswordRequest(APIModel):

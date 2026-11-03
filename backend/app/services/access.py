@@ -111,3 +111,26 @@ def require_course(role: str, course_id: uuid.UUID, user: User, rows: list[Cours
 
 def full_name(user: User) -> str:
     return f"{user.first_name} {user.last_name}"
+
+
+def may_read_note(role: str, memberships: list[CourseMembership], course_id: uuid.UUID, note) -> bool:
+    """Protected and psychiatry notes stay with the same discipline, or with an admin.
+
+    A teaching seat with no discipline still covers the course. That keeps instructors
+    who are not pinned to one profession able to open a protected note.
+    """
+    kind = getattr(note, "sensitivity", None) or "standard"
+    protected = kind in {"psychiatry", "protected"} or bool(getattr(note, "sensitive", False))
+    if not protected:
+        return True
+    if role == "admin":
+        return True
+    if not can(role, "note:view_sensitive"):
+        return False
+    discipline = note.discipline.code if getattr(note, "discipline", None) is not None else None
+    for row in memberships:
+        if row.course_id != course_id or row.role.code != role:
+            continue
+        if row.discipline is None or (discipline is not None and row.discipline.code == discipline):
+            return True
+    return False

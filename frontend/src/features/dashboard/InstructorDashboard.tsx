@@ -16,10 +16,7 @@ import EmptyState from "../../components/EmptyState";
 import { Panel, StatCard, StatGrid } from "./components/DashboardParts";
 import { DAY_MS, patientName, since } from "./dashboardFormat";
 import { utep } from "../../theme/tokens";
-
-function actionLabel(action: string) {
-  return action.replace(/[._]/g, " ");
-}
+import { actionLabel } from "../admin/auditLabels";
 
 export default function InstructorDashboard() {
   const { activeRole, courseId } = useSession();
@@ -121,7 +118,7 @@ export default function InstructorDashboard() {
               {recent.map((e) => (
                 <Box component="li" key={e.id} sx={{ display: "grid", gap: 0.15 }}>
                   <Typography sx={{ fontSize: 14, fontWeight: 600, color: utep.navy }}>
-                    {e.actorName} · {actionLabel(e.action)}
+                    {e.actorName} · {actionLabel(e.action, e.detail)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {e.entity} · {formatRelativeShort(e.timestamp)}

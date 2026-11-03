@@ -1,5 +1,8 @@
 """External vocabularies. Lexicomp is not called unless a URL is configured."""
 
+import json
+from pathlib import Path
+
 import httpx
 from fastapi import HTTPException, status
 
@@ -57,6 +60,49 @@ async def search_medications(term: str) -> list[dict[str, str]]:
     return results
 
 
+async def medication_details(rxcui: str) -> dict:
+    identifier = rxcui.strip()
+    if not identifier.isdigit():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose a medication from the list.")
+    url = f"https://rxnav.nlm.nih.gov/REST/rxcui/{identifier}/related.json"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            response = await client.get(url, params={"tty": "IN+BN"})
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Medication details are unavailable right now.") from exc
+    generic = ""
+    brands: list[str] = []
+    for group in payload.get("relatedGroup", {}).get("conceptGroup") or []:
+        tty = group.get("tty")
+        for concept in group.get("conceptProperties") or []:
+            name = (concept.get("name") or "").strip()
+            if not name:
+                continue
+            if tty == "IN" and not generic:
+                generic = name
+            elif tty == "BN" and name not in brands:
+                brands.append(name)
+    return {"rxcui": identifier, "genericName": generic, "brandNames": brands[:8]}
+
+
+def _teaching_text(medications: list[str]) -> str:
+    path = Path(__file__).resolve().parents[1] / "data" / "teaching_interactions.json"
+    pairs = json.loads(path.read_text())
+    folded = [name.casefold() for name in medications if name and name.strip()]
+    notes: list[str] = []
+    for pair in pairs:
+        drugs = [str(item).casefold() for item in pair.get("drugs") or []]
+        if drugs and all(any(drug in name for name in folded) for drug in drugs):
+            note = str(pair.get("note") or "").strip()
+            if note:
+                notes.append(note)
+    if not notes:
+        return "Teaching interaction check. No pairs in the teaching set matched these medications."
+    return "Teaching interaction check. " + " ".join(notes)
+
+
 def search_cpt(term: str) -> list[dict[str, str]]:
     query = term.strip().lower()
     rows = CPT_CODES
@@ -81,7 +127,7 @@ async def lexicomp_interactions(medications: list[str]) -> dict:
     api_url = (settings.LEXICOMP_API_URL or "").strip()
     api_key = (settings.LEXICOMP_API_KEY or "").strip()
     if not api_url or not api_key:
-        return {"configured": False, "text": None}
+        return {"configured": False, "text": _teaching_text(medications)}
     names = [name.strip() for name in medications if name and name.strip()]
     try:
         async with httpx.AsyncClient(timeout=8) as client:

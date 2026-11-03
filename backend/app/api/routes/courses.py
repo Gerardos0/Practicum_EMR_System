@@ -15,6 +15,7 @@ from app.models.user import Discipline, Role, User
 from app.schemas.clinical import (
     CourseCreate,
     CourseOut,
+    CoursePolicyPatch,
     CourseStatusPatch,
     InactivityDaysPatch,
     EnrollmentCreate,
@@ -416,6 +417,36 @@ async def set_inactivity_days(
         course_id=course.id,
         ip_address=_ip(request),
         detail=str(body.days),
+    )
+    await db.commit()
+    return course_out(course, [str(person.id) for person in await _instructors(db, course.id)])
+
+
+@router.patch("/{course_id}/policy", response_model=CourseOut, response_model_exclude_none=True)
+async def set_course_policy(
+    course_id: uuid.UUID, body: CoursePolicyPatch, db: DbSession, user: CurrentUser, request: Request
+):
+    rows = await memberships_for(db, user.id)
+    _require_admin(user, rows)
+    require("admin", "course:manage_status", "Your role can't change course settings.")
+    course = await db.get(Course, course_id)
+    if course is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Course not found.")
+    if "guardrail_profile" in body.model_fields_set and body.guardrail_profile is not None:
+        course.guardrail_profile = body.guardrail_profile
+    if "guardrail_mode" in body.model_fields_set:
+        course.guardrail_mode = body.guardrail_mode
+    if "ai_assist" in body.model_fields_set and body.ai_assist is not None:
+        course.ai_assist = body.ai_assist
+    await log_event(
+        db,
+        action="course.policy",
+        entity_type="course",
+        entity_id=str(course.id),
+        actor_user_id=user.id,
+        course_id=course.id,
+        ip_address=_ip(request),
+        detail=body.guardrail_mode or body.guardrail_profile or "",
     )
     await db.commit()
     return course_out(course, [str(person.id) for person in await _instructors(db, course.id)])

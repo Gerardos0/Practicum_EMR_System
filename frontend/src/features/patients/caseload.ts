@@ -33,6 +33,13 @@ export const CASELOAD_VIEWS = [
     emptyBody: "Submitted notes waiting for an instructor appear here.",
   },
   {
+    id: "flags",
+    label: "Items to check",
+    description: "Charts that still have a dose warning.",
+    emptyTitle: "No dose warnings",
+    emptyBody: "Unclear or extreme doses show up here until they are corrected or cleared.",
+  },
+  {
     id: "practice",
     label: "Practice cases",
     description: "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions.",
@@ -70,5 +77,7 @@ export function matchesCaseload(row: PatientRow, view: CaseloadView): boolean {
       return row.latestNote?.status === "returned";
     case "awaiting":
       return row.latestNote?.status === "pending_review";
+    case "flags":
+      return (row.openFlagCount ?? 0) > 0;
   }
 }

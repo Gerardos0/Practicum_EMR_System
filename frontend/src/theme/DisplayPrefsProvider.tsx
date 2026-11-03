@@ -4,7 +4,7 @@ import { createAppTheme, type DisplayPrefs } from "./theme";
 import { DisplayPrefsContext } from "./useDisplayPrefs";
 
 const KEY = "emr.displayPrefs";
-const defaults: DisplayPrefs = { textScale: 1, highContrast: false };
+const defaults: DisplayPrefs = { textScale: 1, highContrast: false, navCollapsed: false };
 
 function load(): DisplayPrefs {
   try {

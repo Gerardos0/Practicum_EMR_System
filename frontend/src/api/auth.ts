@@ -3,12 +3,14 @@ import { ApiError, request } from "./client";
 
 export interface LoginResult {
   accessToken: string;
+  refreshToken?: string;
   mustChangePassword: boolean;
   user: User;
 }
 
 interface TokenResponse {
   access_token: string;
+  refresh_token?: string;
   mustChangePassword: boolean;
   user: User;
 }
@@ -27,6 +29,7 @@ export async function login(email: string, password: string): Promise<LoginResul
     const body = await request<TokenResponse>("/auth/login", { method: "POST", form, auth: false });
     return {
       accessToken: body.access_token,
+      refreshToken: body.refresh_token,
       mustChangePassword: body.mustChangePassword,
       user: body.user,
     };
@@ -36,6 +39,10 @@ export async function login(email: string, password: string): Promise<LoginResul
     }
     throw error;
   }
+}
+
+export async function logout(refreshToken: string): Promise<void> {
+  await request<void>("/auth/logout", { method: "POST", json: { refreshToken }, auth: false });
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {

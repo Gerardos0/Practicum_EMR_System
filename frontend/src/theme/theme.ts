@@ -4,6 +4,7 @@ import { fontFamily, utep } from "./tokens";
 export interface DisplayPrefs {
   textScale: 1 | 1.15 | 1.3;
   highContrast: boolean;
+  navCollapsed: boolean;
 }
 
 export function createAppTheme({ textScale, highContrast }: DisplayPrefs) {

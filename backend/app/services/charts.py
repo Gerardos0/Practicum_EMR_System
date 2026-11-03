@@ -190,7 +190,7 @@ async def _replace_children(db: AsyncSession, patient: Patient, snap: dict) -> N
         (
             "medications",
             Medication,
-            ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost", "status", "prescribed", "discontinued_at"),
+            ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost", "status", "prescribed", "discontinued_at", "rxcui", "generic_name", "brand_names", "flags"),
         ),
         ("problems", Problem, ("code", "description", "since")),
         ("labs", LabResult, ("name", "value", "unit", "reference_range", "flag", "collected_at")),
@@ -250,6 +250,10 @@ def chart_snapshot(patient: Patient) -> dict:
                 "status": m.status,
                 "prescribed": m.prescribed,
                 "discontinued_at": m.discontinued_at.isoformat() if m.discontinued_at else None,
+                "rxcui": m.rxcui,
+                "generic_name": m.generic_name,
+                "brand_names": list(m.brand_names or []),
+                "flags": list(m.flags or []),
             }
             for m in patient.medications
         ],
@@ -369,6 +373,8 @@ async def assign_case(
                 name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
                 indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
                 status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+                rxcui=item.rxcui, generic_name=item.generic_name, brand_names=list(item.brand_names or []),
+                flags=list(item.flags or []),
             )
         )
     for item in source.problems:
