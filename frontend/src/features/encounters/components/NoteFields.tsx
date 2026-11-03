@@ -3,6 +3,8 @@ import { Autocomplete, Box, Button, Chip, InputAdornment, Stack, TextField, Typo
 import type { IcdCode, NoteComment, NoteTemplateId, Patient } from "../../../types";
 import { searchIcd10 } from "../../../api/reference";
 import { TEMPLATES, type TemplateField } from "../noteTemplates";
+import { legacyProse } from "../generalSoap";
+import { AssessmentEditor, HpiEditor, NarrativeButton, ProblemPlanEditor, RosEditor } from "./GeneralSoapFields";
 import DictationButton from "../../../components/DictationButton";
 import MedRecTable, { parseMedRec } from "./MedRecTable";
 import FeedbackThread from "./FeedbackThread";
@@ -91,7 +93,7 @@ export default function NoteFields({
           <Stack spacing={2}>
             {section.fields.map((f) => (
               <Field
-                key={f.id} field={f} patient={patient} value={content[f.id] ?? ""} diagnoses={diagnoses}
+                key={f.id} templateId={templateId} field={f} patient={patient} content={content} value={content[f.id] ?? ""} diagnoses={diagnoses}
                 readOnly={readOnly} error={errors?.has(f.id)} onField={onField} onDiagnoses={onDiagnoses}
               />
             ))}
@@ -99,17 +101,50 @@ export default function NoteFields({
         </Box>
         );
       })}
+      {templateId === "general_soap" && <NarrativeButton patient={patient} content={content} diagnoses={diagnoses} />}
     </Stack>
   );
 }
 
 function Field({
-  field: f, patient, value, diagnoses, readOnly, error, onField, onDiagnoses,
+  templateId, field: f, patient, content, value, diagnoses, readOnly, error, onField, onDiagnoses,
 }: {
-  field: TemplateField; patient: Patient; value: string; diagnoses: IcdCode[];
+  templateId: NoteTemplateId; field: TemplateField; patient: Patient; content: Record<string, string>; value: string; diagnoses: IcdCode[];
   readOnly?: boolean; error?: boolean; onField?: Setter; onDiagnoses?: (d: IcdCode[]) => void;
 }) {
   const label = f.label;
+  const structured = templateId === "general_soap";
+
+  if (structured && f.id === "hpi") {
+    return (
+      <Stack spacing={1.5}>
+        <HpiEditor content={content} readOnly={readOnly} onField={onField} />
+        {readOnly ? <ReadBlock label="Additional HPI">{value ? <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{value}</Typography> : null}</ReadBlock> : (
+          <TextField label="Additional HPI" helperText="Free text is kept so older notes still show their history." fullWidth multiline minRows={3} value={value} onChange={(e) => onField?.(f.id, e.target.value)} />
+        )}
+      </Stack>
+    );
+  }
+
+  if (structured && f.id === "ros") {
+    const earlier = legacyProse(value);
+    return (
+      <Stack spacing={1.5}>
+        {earlier && <ReadBlock label="Earlier review of systems"><Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{earlier}</Typography></ReadBlock>}
+        <RosEditor content={content} readOnly={readOnly} onField={onField} />
+      </Stack>
+    );
+  }
+
+  if (structured && f.id === "plan") {
+    const earlier = legacyProse(value);
+    return (
+      <Stack spacing={1.5}>
+        {earlier && <ReadBlock label="Earlier plan text"><Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{earlier}</Typography></ReadBlock>}
+        <ProblemPlanEditor content={content} diagnoses={diagnoses} readOnly={readOnly} onField={onField} />
+      </Stack>
+    );
+  }
 
   if (f.kind === "medrec") {
     return (
@@ -121,10 +156,11 @@ function Field({
   }
 
   if (f.kind === "icd10") {
+    if (structured) return <AssessmentEditor diagnoses={diagnoses} readOnly={readOnly} onDiagnoses={onDiagnoses} />;
     if (readOnly) {
       return (
         <ReadBlock label={f.label}>
-          {diagnoses.length ? diagnoses.map((d) => <Typography key={d.code} variant="body2"><b>{d.code}</b> {d.label}</Typography>) : null}
+          {diagnoses.length ? diagnoses.map((d) => <Typography key={d.code} variant="body2"><b>{d.code}</b> {d.label}{d.rationale ? ` — ${d.rationale}` : ""}</Typography>) : null}
         </ReadBlock>
       );
     }

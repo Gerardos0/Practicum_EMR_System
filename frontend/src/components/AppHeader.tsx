@@ -39,10 +39,13 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
     ? courses
     : courses.filter((c) => roleCourseIds.includes(c.id));
   const initials = user.fullName.split(" ").map((w) => w[0]).slice(0, 2).join("");
-  const canSearch = activeRole !== "patient";
-  const courseLabel = course.data
-    ? `${course.data.code}: ${course.data.title}${course.data.term ? `, ${course.data.term}` : ""}`
-    : " ";
+  const isAdmin = activeRole === "admin";
+  const canSearch = activeRole !== "patient" && !isAdmin;
+  const courseLabel = isAdmin
+    ? "Program administration"
+    : course.data
+      ? `${course.data.code}: ${course.data.title}${course.data.term ? `, ${course.data.term}` : ""}`
+      : " ";
 
   const search = (e: FormEvent) => {
     e.preventDefault();
@@ -99,13 +102,13 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
                   navigate(qs ? `/patients?${qs}` : "/patients", { replace: true });
                 }}
                 sx={{ flex: 1, fontSize: 14 }}
-                placeholder={activeRole === "student" ? "Search name or MRN" : "Search patient, MRN, or student"}
+                placeholder={activeRole === "student" ? "Search name, MRN, or date of birth" : "Search patient, MRN, date of birth, or student"}
                 inputProps={{ "aria-label": "Search patients" }}
               />
             </Box>
           )}
 
-          {courseId && roleCourses.length > 1 && (
+          {!isAdmin && courseId && roleCourses.length > 1 && (
             <Select
               size="small" value={courseId} inputProps={{ "aria-label": "Course" }}
               onChange={(e) => {

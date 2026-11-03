@@ -42,6 +42,7 @@ class CourseOut(APIModel):
     title: str
     term: str
     status: CourseStatus
+    inactivity_days: int = 7
     instructor_ids: list[str]
     rubric_file_name: str | None = None
     grading_guide: dict | None = None
@@ -55,6 +56,14 @@ class CourseCreate(APIModel):
 
 class CourseStatusPatch(APIModel):
     status: CourseStatus
+
+
+class InactivityDaysPatch(APIModel):
+    days: int = Field(ge=1, le=90)
+
+
+class PresenceIn(APIModel):
+    active: bool = False
 
 
 class AllergyOut(APIModel):
@@ -73,6 +82,7 @@ class MedicationOut(APIModel):
     frequency: str
     indication: str | None = None
     adherence: str | None = None
+    access_cost: str | None = None
     status: str = "active"
     prescribed: bool = False
     discontinued_at: datetime | None = None
@@ -100,6 +110,8 @@ class VitalOut(APIModel):
     label: str
     value: str
     recorded_at: datetime | None = None
+    recorded_by_name: str | None = None
+    status: str = "recorded"
 
 
 class EncounterOut(APIModel):
@@ -193,6 +205,7 @@ class AssignCase(APIModel):
 class IcdCode(APIModel):
     code: str
     label: str
+    rationale: str = ""
 
 
 class CptSelection(APIModel):
@@ -329,6 +342,12 @@ class RosterImportResult(APIModel):
     temporary_passwords: list[TempPassword] = []
 
 
+class EnrollmentCreate(APIModel):
+    user_id: uuid.UUID
+    role: Literal["student", "instructor", "course_coordinator"]
+    discipline: DisciplineCode
+
+
 class CaseAllergyIn(APIModel):
     substance: str = ""
     reaction: str | None = None
@@ -343,6 +362,7 @@ class CaseMedicationIn(APIModel):
     frequency: str = ""
     indication: str | None = None
     adherence: str | None = None
+    access_cost: str | None = None
     prescribed: bool = False
 
 
@@ -396,9 +416,28 @@ class CaseIn(APIModel):
     bed: str | None = None
 
 
+class PlantedTrigger(APIModel):
+    finding: str = ""
+    explanation: str = ""
+
+
 class CaseOut(PatientOut):
     created_by_name: str | None = None
     updated_at: datetime
+    grading_guide: dict | None = None
+    triggers: list[PlantedTrigger] = []
+
+
+class TriggersIn(APIModel):
+    triggers: list[PlantedTrigger] = []
+
+
+class TriggersOut(APIModel):
+    triggers: list[PlantedTrigger] = []
+
+
+class CaseCopyIn(APIModel):
+    course_id: uuid.UUID
 
 
 class AnswerDiagnosis(APIModel):
@@ -448,6 +487,7 @@ class MedicationWrite(APIModel):
     frequency: str = ""
     indication: str | None = None
     adherence: str | None = None
+    access_cost: str | None = None
     prescribed: bool = False
 
 

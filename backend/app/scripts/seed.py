@@ -175,6 +175,9 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
     luis = await _person(db, "luis.ortega@miners.utep.edu", "Luis", "Ortega", "800333333", None, hashed)
     if roles["admin"] not in gerardo.roles:
         gerardo.roles.append(roles["admin"])
+    program_admin = await _person(db, "clarissa.dominguez@utep.edu", "Clarissa", "Dominguez", None, None, hashed)
+    if roles["admin"] not in program_admin.roles:
+        program_admin.roles.append(roles["admin"])
     pharmacy = disciplines["pharmacy"]
     therapy = disciplines["physical_therapy"]
     await _member(db, daniel, phar, roles["student"], pharmacy)

@@ -91,6 +91,7 @@ export function Panel({ title, subtitle, action, accent, children }: PanelProps)
 const VISIT: Record<EncounterStatus, { bgcolor: string; color: string }> = {
   "In progress": { bgcolor: "#E8F1FF", color: "#175CD3" },
   "Checked in": { bgcolor: "#E6F7F4", color: "#0E7C66" },
+  Roomed: { bgcolor: "#E6F7F4", color: "#0E7C66" },
   Scheduled: { bgcolor: "#F2F4F7", color: "#46536A" },
   "Checked out": { bgcolor: "#F2F4F7", color: "#46536A" },
   Closed: { bgcolor: "#F2F4F7", color: "#46536A" },

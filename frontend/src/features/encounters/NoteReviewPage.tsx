@@ -5,7 +5,7 @@ import {
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { commentOnNote, cosignNote, getNote, instructorEditNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
-import { getCourse } from "../../api/courses";
+import { getChartGradingGuide } from "../../api/cases";
 import { useSession } from "../auth/AuthContext";
 import { useAsync } from "../../utils/useAsync";
 import { formatDateTime } from "../../utils/format";
@@ -22,12 +22,13 @@ import CourseRubricPanel from "./components/CourseRubricPanel";
 import AnswerKeyPanel from "./components/AnswerKeyPanel";
 import { templateName } from "./noteTemplates";
 import ScoreForm from "./components/ScoreForm";
+import TriggersPanel from "./components/TriggersPanel";
 import type { IcdCode } from "../../types";
 
 export default function NoteReviewPage() {
   const { noteId = "" } = useParams();
   const navigate = useNavigate();
-  const { activeRole, courseId } = useSession();
+  const { activeRole } = useSession();
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,7 +41,11 @@ export default function NoteReviewPage() {
     const patient = await getPatient(activeRole, note.patientId);
     return { note, patient };
   }, [noteId, activeRole]);
-  const course = useAsync(() => getCourse(courseId), [courseId]);
+  const guide = useAsync(async () => {
+    const id = load.data?.patient.id;
+    if (!id) return { criteria: [], source: "course" as const };
+    return getChartGradingGuide(activeRole, id);
+  }, [activeRole, load.data?.patient.id]);
 
   if (load.error) return <PageError error={load.error} />;
   if (!load.data) return <LinearProgress aria-label="Loading note" />;
@@ -147,6 +152,7 @@ export default function NoteReviewPage() {
 
         <Paper sx={{ p: 2.5, position: { lg: "sticky" }, top: { lg: 88 }, gridColumn: { md: "2", lg: "2" } }}>
           <AnswerKeyPanel role={activeRole} patientId={patient.id} />
+          {note.status !== "cosigned" && <TriggersPanel role={activeRole} patientId={patient.id} />}
         </Paper>
 
         <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 }, gridColumn: { xs: "1", md: "1 / -1", lg: "3" } }}>
@@ -154,7 +160,7 @@ export default function NoteReviewPage() {
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>Your review</Typography>
             <NoteProgress note={note} />
 
-            <CourseRubricPanel guide={course.data?.gradingGuide} fileName={course.data?.rubricFileName} />
+            <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />
 
             {note.feedback.length > 0 && (
               <Box sx={{ mt: 2 }}><FeedbackThread items={note.feedback} /></Box>
@@ -181,10 +187,10 @@ export default function NoteReviewPage() {
             )}
             {(pending || note.status === "cosigned") && (
               <ScoreForm
-                key={(course.data?.gradingGuide?.criteria ?? []).map((item) => item.id).join()}
+                key={(guide.data?.criteria ?? []).map((item) => item.id).join()}
                 role={activeRole}
                 note={note}
-                guide={course.data?.gradingGuide}
+                guide={guide.data}
                 onSaved={(updated) => load.setData({ note: updated, patient })}
               />
             )}

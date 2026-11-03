@@ -58,10 +58,11 @@ export default function SelectCoursePage() {
       <Box component="main" sx={{ maxWidth: 640, mx: "auto", px: 2, py: 5 }}>
         <Typography component="h1" variant="h5">Welcome, {user.fullName.split(" ")[0]}</Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Choose the course you're working in today.
+          {activeRole === "admin"
+            ? "Administration is separate from teaching."
+            : "Choose the course you're working in today."}
           {activeRole === "student" && " You'll see the patients and cases assigned to that class."}
           {(activeRole === "instructor" || activeRole === "course_coordinator") && " You'll review notes and teach that class."}
-          {activeRole === "admin" && " You'll manage rosters and activity for that class."}
         </Typography>
 
         {roles.length > 1 && (
@@ -78,6 +79,15 @@ export default function SelectCoursePage() {
           </Box>
         )}
 
+        {activeRole === "admin" ? (
+          <Box>
+            <Typography color="text.secondary" sx={{ mb: 2, maxWidth: "48ch" }}>
+              Add classes, enroll students, and add instructors. Case building and grading stay on the instructor screens.
+            </Typography>
+            <Button variant="contained" size="large" onClick={() => navigate("/admin")}>Open administration</Button>
+          </Box>
+        ) : (
+        <>
         <Stack spacing={1.5} role="radiogroup" aria-label="Courses">
           {available.map((c) => {
             const selected = picked === c.id;
@@ -118,6 +128,8 @@ export default function SelectCoursePage() {
         <Button variant="contained" size="large" sx={{ mt: 3 }} disabled={!picked || opening} onClick={go}>
           {!picked ? "Select a course to continue" : opening ? "Opening…" : "Open course"}
         </Button>
+        </>
+        )}
       </Box>
     </Box>
   );

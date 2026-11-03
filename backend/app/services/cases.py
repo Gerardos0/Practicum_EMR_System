@@ -1,14 +1,15 @@
 """Authoring for case masters. Copies are separate rows and are never updated here."""
 
+import copy
 import uuid
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clinical_sections import locks_or_default, prefill_or_default
-from app.models.clinical import Encounter, Patient
+from app.models.clinical import CaseAnswerKey, Course, Encounter, Patient
 from app.models.user import User
 from app.schemas.clinical import CaseIn
 from app.services.audit import log_event
@@ -142,16 +143,6 @@ async def update_case(
     if "bed" in body.model_fields_set:
         patient.bed = (body.bed or "").strip() or None
     await _replace_children(db, patient, _children(body))
-    if body.section_locks is not None or body.prefill_sections is not None:
-        await db.execute(
-            update(Patient)
-            .where(
-                Patient.case_key == patient.case_key,
-                Patient.id != patient.id,
-                Patient.deleted_at.is_(None),
-            )
-            .values(section_locks=patient.section_locks, prefill_sections=patient.prefill_sections)
-        )
     patient.updated_at = utcnow()
     await log_event(
         db,
@@ -202,6 +193,7 @@ def _children(body: CaseIn) -> dict:
                 "frequency": row.frequency.strip(),
                 "indication": _blank(row.indication),
                 "adherence": _blank(row.adherence),
+                "access_cost": _blank(row.access_cost),
                 "prescribed": row.prescribed,
                 "status": "active",
             }
@@ -246,6 +238,239 @@ async def _unique_case_mrn(db: AsyncSession) -> str:
         if exists is None:
             return candidate
     raise HTTPException(status.HTTP_409_CONFLICT, "Couldn't allocate a unique MRN. Try again.")
+
+
+def teaches_course(rows, course_id: uuid.UUID) -> bool:
+    return any(
+        row.course_id == course_id and row.role.code in {"instructor", "course_coordinator"}
+        for row in rows
+    )
+
+
+async def grading_guide_for(db: AsyncSession, patient: Patient) -> dict:
+    """Case guide when the master has one. Otherwise the course guide."""
+    master = await _case_master(db, patient)
+    guide = master.grading_guide if master is not None else None
+    if guide and guide.get("criteria"):
+        return {"file_name": guide.get("file_name"), "criteria": list(guide["criteria"]), "source": "case"}
+    course = await db.get(Course, patient.course_id)
+    course_guide = course.grading_guide if course is not None else None
+    if course_guide and course_guide.get("criteria"):
+        return {
+            "file_name": course_guide.get("file_name"),
+            "criteria": list(course_guide["criteria"]),
+            "source": "course",
+        }
+    return {
+        "file_name": course.rubric_file_name if course is not None else None,
+        "criteria": [],
+        "source": "course",
+    }
+
+
+async def save_case_rubric(db: AsyncSession, patient: Patient, filename: str, payload: bytes) -> dict:
+    from app.services.rubric_import import guide_from_upload
+
+    if patient.mode != "case":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Rubrics belong to the case master.")
+    if len(payload) > 8_000_000:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Rubric files must be 8 MB or smaller.")
+    guide = guide_from_upload(filename or "rubric.pdf", payload)
+    patient.grading_guide = guide
+    patient.updated_at = utcnow()
+    return guide
+
+
+async def deny_triggers(
+    db: AsyncSession,
+    *,
+    user: User,
+    role: str,
+    rows,
+    course_id: uuid.UUID,
+    entity_id: str,
+    ip: str | None,
+) -> None:
+    from app.services.access import require_course
+    from app.services.answer_keys import can_read_answer_key
+
+    require_course(role, course_id, user, rows)
+    if can_read_answer_key(role):
+        return
+    await log_event(
+        db,
+        action="triggers.view",
+        entity_type="patient",
+        entity_id=entity_id,
+        actor_user_id=user.id,
+        result="denied",
+        course_id=course_id,
+        ip_address=ip,
+        detail="Role cannot view planted triggers.",
+    )
+    await db.commit()
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't view planted triggers.")
+
+
+async def triggers_for(db: AsyncSession, patient: Patient) -> list[dict]:
+    master = await _case_master(db, patient)
+    if master is None:
+        return []
+    return [
+        {"finding": item.get("finding", ""), "explanation": item.get("explanation", "")}
+        for item in (master.planted_triggers or [])
+        if isinstance(item, dict) and str(item.get("finding") or "").strip()
+    ]
+
+
+async def save_triggers(db: AsyncSession, patient: Patient, items: list) -> list[dict]:
+    if patient.mode != "case":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Triggers belong to the case master.")
+    cleaned: list[dict] = []
+    for item in items:
+        finding = item.finding.strip()
+        if not finding:
+            continue
+        cleaned.append({"finding": finding[:240], "explanation": item.explanation.strip()[:2000]})
+    patient.planted_triggers = cleaned
+    patient.updated_at = utcnow()
+    return cleaned
+
+
+async def copy_case(
+    db: AsyncSession,
+    *,
+    patient: Patient,
+    destination_id: uuid.UUID,
+    actor: User,
+    rows,
+    ip: str | None,
+) -> Patient:
+    """New master in another course. Student charts, notes, and scores stay behind."""
+    if destination_id == patient.course_id:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Pick a different course.")
+    if not teaches_course(rows, destination_id):
+        await log_event(
+            db,
+            action="case.copy",
+            entity_type="patient",
+            entity_id=str(patient.id),
+            actor_user_id=actor.id,
+            result="denied",
+            course_id=destination_id,
+            ip_address=ip,
+            detail="Not an instructor in the destination course.",
+        )
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only copy a case into a course you teach.")
+    await ensure_destination_open(db, destination_id)
+    await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+    clone = Patient(
+        mrn=await _unique_case_mrn(db),
+        first_name=patient.first_name,
+        last_name=patient.last_name,
+        preferred_name=patient.preferred_name,
+        dob=patient.dob,
+        sex_at_birth=patient.sex_at_birth,
+        pronouns=patient.pronouns,
+        course_id=destination_id,
+        mode="case",
+        case_key=str(uuid.uuid4()),
+        owner_id=None,
+        created_by=actor,
+        chief_complaint=patient.chief_complaint,
+        hpi=patient.hpi,
+        past_medical_history=patient.past_medical_history,
+        surgical_history=patient.surgical_history,
+        family_history=patient.family_history,
+        social_history=patient.social_history,
+        lifecycle=patient.lifecycle,
+        encounter_status=patient.encounter_status,
+        care_setting=patient.care_setting,
+        program=patient.program,
+        is_training=True,
+        section_locks=dict(patient.section_locks or {}),
+        prefill_sections=list(patient.prefill_sections or []),
+        grading_guide=copy.deepcopy(patient.grading_guide) if patient.grading_guide else None,
+        planted_triggers=copy.deepcopy(list(patient.planted_triggers or [])),
+        unit=patient.unit,
+        room=patient.room,
+        bed=patient.bed,
+        encounter=Encounter(
+            type=patient.encounter.type if patient.encounter else "Office visit",
+            date=date.today(),
+        ),
+    )
+    db.add(clone)
+    await db.flush()
+    await _copy_children(db, patient, clone)
+    key = await db.scalar(select(CaseAnswerKey).where(CaseAnswerKey.patient_id == patient.id))
+    if key is not None:
+        db.add(
+            CaseAnswerKey(
+                patient_id=clone.id,
+                diagnoses=list(key.diagnoses or []),
+                plan_points=list(key.plan_points or []),
+                rationale=key.rationale or "",
+                updated_by_id=actor.id,
+            )
+        )
+    await log_event(
+        db,
+        action="case.copy",
+        entity_type="patient",
+        entity_id=str(clone.id),
+        actor_user_id=actor.id,
+        course_id=destination_id,
+        ip_address=ip,
+        detail=f"From {patient.mrn} into course {destination_id}",
+    )
+    return await _reload(db, clone)
+
+
+async def _case_master(db: AsyncSession, patient: Patient) -> Patient | None:
+    if patient.mode == "case":
+        return patient
+    if patient.source_patient_id is None:
+        return None
+    master = await db.get(Patient, patient.source_patient_id)
+    if master is None or master.deleted_at is not None or master.mode != "case":
+        return None
+    return master
+
+
+async def ensure_destination_open(db: AsyncSession, course_id: uuid.UUID) -> None:
+    from app.services.access import ensure_course_open
+
+    await ensure_course_open(db, course_id)
+
+
+async def _copy_children(db: AsyncSession, source: Patient, clone: Patient) -> None:
+    from app.models.clinical import Allergy, LabResult, Medication, Problem, Vital
+
+    for item in source.allergies:
+        db.add(Allergy(
+            patient_id=clone.id, substance=item.substance, reaction=item.reaction,
+            severity=item.severity, category=item.category,
+        ))
+    for item in source.medications:
+        db.add(Medication(
+            patient_id=clone.id, name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
+            indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
+            status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+        ))
+    for item in source.problems:
+        db.add(Problem(patient_id=clone.id, code=item.code, description=item.description, since=item.since))
+    for item in source.labs:
+        db.add(LabResult(
+            patient_id=clone.id, name=item.name, value=item.value, unit=item.unit,
+            reference_range=item.reference_range, flag=item.flag, collected_at=item.collected_at,
+        ))
+    for item in source.vitals:
+        db.add(Vital(
+            patient_id=clone.id, label=item.label, value=item.value,
+            recorded_at=item.recorded_at, recorded_by_name=item.recorded_by_name, status=item.status or "recorded",
+        ))
 
 
 async def _reload(db: AsyncSession, patient: Patient) -> Patient:

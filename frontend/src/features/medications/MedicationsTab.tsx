@@ -14,7 +14,7 @@ import { canEditSection } from "../chart/access";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
 
-const blank = { name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", prescribed: false };
+const blank = { name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "", prescribed: false };
 
 export default function MedicationsTab({ patient, onChange }: { patient: Patient; onChange: (patient: Patient) => void }) {
   const { activeRole } = useSession();
@@ -46,7 +46,12 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
   const save = async () => {
     setError("");
     try {
-      const body = { ...form, indication: form.indication || undefined, adherence: form.adherence || undefined };
+      const body = {
+        ...form,
+        indication: form.indication || undefined,
+        adherence: form.adherence || undefined,
+        accessCost: form.accessCost || undefined,
+      };
       const next = editingId
         ? await updateMedication(activeRole, patient.id, editingId, body)
         : await addMedication(activeRole, patient.id, body);
@@ -90,10 +95,11 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
               renderInput={(params) => <TextField {...params} label="Name" helperText="Names come from RxNorm. The Lexicomp catalog is separate." />}
             />
             <TextField label="Dose" value={form.dose} onChange={(e) => setForm({ ...form, dose: e.target.value })} />
-            <TextField label="Route" value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} />
+            <TextField label="How taken" value={form.route} onChange={(e) => setForm({ ...form, route: e.target.value })} />
             <TextField label="Frequency" value={form.frequency} onChange={(e) => setForm({ ...form, frequency: e.target.value })} />
-            <TextField label="Indication" value={form.indication} onChange={(e) => setForm({ ...form, indication: e.target.value })} />
             <TextField label="Adherence" value={form.adherence} onChange={(e) => setForm({ ...form, adherence: e.target.value })} />
+            <TextField label="Access or cost" value={form.accessCost} onChange={(e) => setForm({ ...form, accessCost: e.target.value })} />
+            <TextField label="Indication" value={form.indication} onChange={(e) => setForm({ ...form, indication: e.target.value })} />
           </Box>
           <Button sx={{ mt: 1.5 }} variant="contained" onClick={save}>{editingId ? "Save change" : "Add medication"}</Button>
         </Paper>
@@ -108,7 +114,8 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
           setEditingId(row.id);
           setForm({
             name: row.name, dose: row.dose, route: row.route, frequency: row.frequency,
-            indication: row.indication ?? "", adherence: row.adherence ?? "", prescribed: Boolean(row.prescribed),
+            indication: row.indication ?? "", adherence: row.adherence ?? "", accessCost: row.accessCost ?? "",
+            prescribed: Boolean(row.prescribed),
           });
         }}
         onDiscontinue={(row) => run(() => discontinueMedication(activeRole, patient.id, row.id!))}
@@ -182,7 +189,8 @@ function MedTable({
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Medication</TableCell><TableCell>Dose</TableCell><TableCell>Route</TableCell><TableCell>Frequency</TableCell><TableCell />
+              <TableCell>Medication</TableCell><TableCell>Dose</TableCell><TableCell>How taken</TableCell>
+              <TableCell>Frequency</TableCell><TableCell>Adherence</TableCell><TableCell>Access or cost</TableCell><TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
@@ -192,6 +200,8 @@ function MedTable({
                 <TableCell>{row.dose}</TableCell>
                 <TableCell>{row.route}</TableCell>
                 <TableCell>{row.frequency}</TableCell>
+                <TableCell>{row.adherence}</TableCell>
+                <TableCell>{row.accessCost}</TableCell>
                 <TableCell align="right">
                   {editable && onEdit && <Button size="small" onClick={() => onEdit(row)}>Edit</Button>}
                   {editable && onDiscontinue && <Button size="small" onClick={() => onDiscontinue(row)}>Discontinue</Button>}

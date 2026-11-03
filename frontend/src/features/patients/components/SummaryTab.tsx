@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Alert, Box, Button, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import type { AllergyCategory, ClinicalNote, EncounterStatus, Patient } from "../../../types";
 import { listAppointments } from "../../../api/scheduling";
-import { addAllergy, addVital, removeAllergy } from "../../../api/chart";
+import { addAllergy, addVital, markVitalEnteredInError, removeAllergy } from "../../../api/chart";
+import VitalsChart from "./VitalsChart";
 import { useSession } from "../../auth/AuthContext";
 import { can } from "../../../utils/permissions";
 import { canEditSection } from "../../chart/access";
@@ -11,12 +12,14 @@ import { formatDate, formatDateTime } from "../../../utils/format";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";
 
-const FLOW: EncounterStatus[] = ["Scheduled", "Checked in", "In progress", "Checked out"];
+const FLOW: EncounterStatus[] = ["Scheduled", "Checked in", "Roomed", "In progress", "Checked out"];
 const ADVANCE_LABEL: Partial<Record<EncounterStatus, string>> = {
   "Checked in": "Check in",
+  Roomed: "Room patient",
   "In progress": "Start visit",
   "Checked out": "Check out",
 };
+const VITAL_LABELS = ["BP", "Pulse", "Pain", "Temperature", "Respiratory rate", "SpO2", "Weight"];
 
 interface Props {
   patient: Patient;
@@ -162,7 +165,11 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
             return (
               <Box key={category.id} sx={{ mb: 1.5 }}>
                 <Typography variant="subtitle2">{category.label}</Typography>
-                <Typography variant="body2">{rows.length ? rows.map((item) => item.substance).join(", ") : "None documented"}</Typography>
+                <Typography variant="body2">
+                  {rows.length
+                    ? rows.map((item) => item.reaction ? `${item.substance} (${item.reaction})` : item.substance).join(", ")
+                    : "None documented"}
+                </Typography>
                 {canEditSection(activeRole, p, "allergies") && rows.map((item) => item.id && (
                   <Button key={item.id} size="small" color="error" onClick={async () => {
                     try { onChange(await removeAllergy(activeRole, p.id, item.id!)); } catch (e) { setError((e as Error).message); }
@@ -174,6 +181,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           {canEditSection(activeRole, p, "allergies") && (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <TextField size="small" label="Substance" value={allergy.substance} onChange={(e) => setAllergy({ ...allergy, substance: e.target.value })} />
+              <TextField size="small" label="Reaction" value={allergy.reaction} onChange={(e) => setAllergy({ ...allergy, reaction: e.target.value })} />
               <TextField select size="small" label="Category" value={allergy.category} onChange={(e) => setAllergy({ ...allergy, category: e.target.value as AllergyCategory })}>
                 {CATEGORIES.map((item) => <MenuItem key={item.id} value={item.id}>{item.label}</MenuItem>)}
               </TextField>
@@ -189,10 +197,28 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         <Paper sx={card}>
           <Typography component="h2" variant="h6" sx={titleSx}>Current vitals</Typography>
           <LatestVitals patient={p} />
+          <Box sx={{ mt: 2 }}>
+            <VitalsChart patient={p} />
+          </Box>
+          <VitalsHistory
+            patient={p}
+            canMark={canEditSection(activeRole, p, "vitals")}
+            onMark={async (id) => {
+              try { onChange(await markVitalEnteredInError(activeRole, p.id, id)); }
+              catch (e) { setError((e as Error).message); }
+            }}
+          />
           {canEditSection(activeRole, p, "vitals") && (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
-              <TextField size="small" label="Label" value={vital.label} onChange={(e) => setVital({ ...vital, label: e.target.value })} />
-              <TextField size="small" label="Value" value={vital.value} onChange={(e) => setVital({ ...vital, value: e.target.value })} />
+              <Autocomplete
+                freeSolo
+                options={VITAL_LABELS}
+                inputValue={vital.label}
+                onInputChange={(_, value) => setVital({ ...vital, label: value })}
+                renderInput={(params) => <TextField {...params} size="small" label="Label" placeholder="Pain" />}
+                sx={{ minWidth: 160 }}
+              />
+              <TextField size="small" label="Value" placeholder={vital.label === "Pain" ? "0–10" : ""} value={vital.value} onChange={(e) => setVital({ ...vital, value: e.target.value })} />
               <Button variant="outlined" onClick={async () => {
                 try {
                   onChange(await addVital(activeRole, p.id, vital));
@@ -252,9 +278,57 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   );
 }
 
+function visibleVitals(patient: Patient) {
+  return patient.vitals.filter((item) => item.status !== "entered_in_error");
+}
+
+function VitalsHistory({
+  patient, canMark, onMark,
+}: {
+  patient: Patient;
+  canMark: boolean;
+  onMark: (id: string) => Promise<void>;
+}) {
+  const rows = [...patient.vitals].sort((a, b) => (b.recordedAt ?? "").localeCompare(a.recordedAt ?? ""));
+  if (rows.length === 0) return null;
+  return (
+    <Table size="small" sx={{ mt: 2 }} aria-label="Vitals history">
+      <TableHead>
+        <TableRow>
+          <TableCell>Vital</TableCell>
+          <TableCell>Value</TableCell>
+          <TableCell>Recorded</TableCell>
+          <TableCell />
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {rows.map((item) => {
+          const mistake = item.status === "entered_in_error";
+          return (
+            <TableRow key={item.id ?? `${item.label}-${item.recordedAt}`}>
+              <TableCell>{item.label}</TableCell>
+              <TableCell sx={{ textDecoration: mistake ? "line-through" : "none" }}>{item.value}</TableCell>
+              <TableCell>
+                {item.recordedAt ? formatDateTime(item.recordedAt) : "On file"}
+                {item.recordedByName ? ` · ${item.recordedByName}` : ""}
+                {mistake ? " · entered in error" : ""}
+              </TableCell>
+              <TableCell align="right">
+                {canMark && item.id && !mistake && (
+                  <Button size="small" color="error" onClick={() => onMark(item.id!)}>Entered in error</Button>
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
 function LatestVitals({ patient }: { patient: Patient }) {
   const latest = new Map<string, (typeof patient.vitals)[number]>();
-  for (const item of patient.vitals) {
+  for (const item of visibleVitals(patient)) {
     const current = latest.get(item.label);
     const stamp = item.recordedAt ?? "";
     if (!current || stamp >= (current.recordedAt ?? "")) latest.set(item.label, item);

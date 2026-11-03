@@ -7,6 +7,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { listPatients } from "../../api/patients";
 import { listReviewQueue } from "../../api/notes";
 import { listAudit } from "../../api/audit";
+import { getAtRisk } from "../../api/courses";
 import { useSession } from "../auth/AuthContext";
 import { useAsync } from "../../utils/useAsync";
 import { formatRelativeShort } from "../../utils/format";
@@ -23,6 +24,7 @@ export default function InstructorDashboard() {
   const patients = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
   const queue = useAsync(() => listReviewQueue(courseId, activeRole), [courseId, activeRole]);
   const audit = useAsync(() => listAudit(courseId, activeRole), [courseId, activeRole]);
+  const risk = useAsync(() => getAtRisk(courseId, activeRole), [courseId, activeRole]);
 
   if (patients.loading && !patients.data) return <LinearProgress />;
 
@@ -34,7 +36,7 @@ export default function InstructorDashboard() {
   const returned = items.filter((q) => q.note.status === "returned");
   const stale = pending.filter((q) => now - new Date(q.note.updatedAt).getTime() >= DAY_MS);
   const flagged = rows.filter((r) => r.patient.labs.some((l) => l.flag));
-  const inClinic = rows.filter((r) => r.patient.status.encounter === "Checked in" || r.patient.status.encounter === "In progress");
+  const inClinic = rows.filter((r) => r.patient.status.encounter === "Checked in" || r.patient.status.encounter === "Roomed" || r.patient.status.encounter === "In progress");
   const recent = (audit.data ?? []).slice(0, 8);
 
   return (
@@ -129,6 +131,37 @@ export default function InstructorDashboard() {
           )}
         </Panel>
       </Box>
+
+      <Panel
+        title="Students to check in with"
+        subtitle={
+          risk.data
+            ? `A student is flagged for no chart activity for ${risk.data.days} days, or an assigned chart with no submitted note.`
+            : "A student is flagged for no chart activity for 7 days, or an assigned chart with no submitted note."
+        }
+        action={{ label: "Activity report", to: "/teaching" }}
+      >
+        {risk.loading && !risk.data ? <LinearProgress /> : (risk.data?.students.length ?? 0) === 0 ? (
+          <EmptyState title="No one is flagged">Students show up here after a week without opening a chart, or when an assigned chart has no submitted note.</EmptyState>
+        ) : (
+          <Table size="small" aria-label="Students to check in with">
+            <TableHead>
+              <TableRow>
+                <TableCell>Student</TableCell>
+                <TableCell>Why</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {risk.data?.students.slice(0, 12).map((student) => (
+                <TableRow key={student.userId}>
+                  <TableCell sx={{ fontWeight: 600 }}>{student.student}</TableCell>
+                  <TableCell>{student.reasons.join(". ")}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Panel>
 
       <Panel title="Patients with flagged labs" subtitle="High or low results on the current chart" action={{ label: "All patients", to: "/patients" }}>
         {flagged.length === 0 ? (

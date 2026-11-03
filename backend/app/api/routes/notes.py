@@ -321,7 +321,7 @@ async def review_queue(
     for note in notes:
         patient = await load_patient(db, note.patient_id)
         owner = f"{patient.owner.first_name} {patient.owner.last_name}" if patient.owner else None
-        items.append({"note": note_out(await _reload(db, note), include_scores=role != "student"), "patient": patient_out(patient, owner_name=owner)})
+        items.append({"note": note_out(await _reload(db, note), include_scores=role != "student"), "patient": patient_out(patient, owner_name=owner, viewer_role=role)})
     return items
 
 

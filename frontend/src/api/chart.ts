@@ -6,7 +6,11 @@ function chart(role: Role, patientId: string, path: string, method: string, json
 }
 
 export function recordPresence(role: Role, patientId: string): Promise<void> {
-  return request<void>(`/patients/${patientId}/presence`, { method: "POST", query: { role } });
+  return request<void>(`/patients/${patientId}/presence`, {
+    method: "POST",
+    query: { role },
+    json: { active: true },
+  });
 }
 
 export function addAllergy(role: Role, patientId: string, body: Omit<Allergy, "id">): Promise<Patient> {
@@ -70,6 +74,10 @@ export function reviewAdministration(role: Role, administrationId: string, decis
 
 export function addVital(role: Role, patientId: string, body: Pick<Vital, "label" | "value">): Promise<Patient> {
   return chart(role, patientId, "/vitals", "POST", body);
+}
+
+export function markVitalEnteredInError(role: Role, patientId: string, vitalId: string): Promise<Patient> {
+  return chart(role, patientId, `/vitals/${vitalId}/entered-in-error`, "POST");
 }
 
 export function addLab(role: Role, patientId: string, body: Omit<LabResult, "id">): Promise<Patient> {

@@ -1,4 +1,4 @@
-import type { Course, CourseStatus, User } from "../types";
+import type { ActivityRow, AtRiskReport, Course, CourseStatus, User } from "../types";
 import { ApiError, downloadFile, request } from "./client";
 
 export async function listCoursesForUser(): Promise<Course[]> {
@@ -36,6 +36,22 @@ export function downloadGrades(courseId: string, role: string, caseKey: string):
   return downloadFile(`/reports/courses/${courseId}/grades.xlsx`, "case-grades.xlsx", { role, case_key: caseKey });
 }
 
-export function downloadChartTime(courseId: string, role: string): Promise<void> {
-  return downloadFile(`/reports/courses/${courseId}/activity.xlsx`, "chart-time.xlsx", { role });
+export function getActivity(courseId: string, role: string, start: string, end: string): Promise<{ rows: ActivityRow[] }> {
+  return request(`/reports/courses/${courseId}/activity`, { query: { role, start, end } });
+}
+
+export function getAtRisk(courseId: string, role: string): Promise<AtRiskReport> {
+  return request(`/reports/courses/${courseId}/at-risk`, { query: { role } });
+}
+
+export function setInactivityDays(courseId: string, days: number): Promise<Course> {
+  return request(`/courses/${courseId}/inactivity-days`, { method: "PATCH", json: { days } });
+}
+
+export function downloadChartTime(courseId: string, role: string, start: string, end: string): Promise<void> {
+  return downloadFile(`/reports/courses/${courseId}/activity.xlsx`, "student-activity.xlsx", { role, start, end });
+}
+
+export function downloadAllActivity(start: string, end: string): Promise<void> {
+  return downloadFile("/reports/activity.xlsx", "student-activity.xlsx", { start, end });
 }

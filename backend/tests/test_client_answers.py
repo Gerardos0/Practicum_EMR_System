@@ -161,3 +161,120 @@ async def test_addendum_reopens_a_signed_note_for_grading(client):
     assert addendum.status_code == 200, addendum.text
     assert addendum.json()["status"] == "pending_review"
     assert addendum.json()["addenda"][0]["body"] == "Corrected the follow-up interval."
+
+
+@pytest.mark.asyncio
+async def test_admin_enrolls_existing_people_and_resets_a_password(client):
+    admin, session = await login(client, "clarissa.dominguez@utep.edu")
+    course = await course_id(client, admin, "PHYT 6310")
+    found = await client.get("/api/v1/users", headers=admin, params={"q": "Joe Mota"})
+    assert found.status_code == 200, found.text
+    joe = next(person for person in found.json() if person["email"] == "joe.mota@utep.edu")
+    daniel = next(
+        person for person in (await client.get("/api/v1/users", headers=admin, params={"q": "daniel.reyes"})).json()
+        if person["email"] == "daniel.reyes@miners.utep.edu"
+    )
+
+    instructor_seat = await client.post(
+        f"/api/v1/courses/{course}/enrollments",
+        headers=admin,
+        json={"userId": joe["id"], "role": "instructor", "discipline": "physical_therapy"},
+    )
+    assert instructor_seat.status_code == 200, instructor_seat.text
+    student_seat = await client.post(
+        f"/api/v1/courses/{course}/enrollments",
+        headers=admin,
+        json={"userId": daniel["id"], "role": "student", "discipline": "physical_therapy"},
+    )
+    assert student_seat.status_code == 200, student_seat.text
+    duplicate = await client.post(
+        f"/api/v1/courses/{course}/enrollments",
+        headers=admin,
+        json={"userId": joe["id"], "role": "instructor", "discipline": "physical_therapy"},
+    )
+    assert duplicate.status_code == 409
+
+    created = await client.post(
+        f"/api/v1/courses/{course}/roster/import",
+        headers=admin,
+        json={
+            "discipline": "physical_therapy",
+            "role": "instructor",
+            "rows": [{"fullName": "New Instructor", "email": "new.instructor@utep.edu", "universityId": ""}],
+        },
+    )
+    assert created.status_code == 200, created.text
+    assert created.json()["added"] == 1
+    assert created.json()["temporaryPasswords"][0]["email"] == "new.instructor@utep.edu"
+    created_account = next(
+        person for person in (await client.get("/api/v1/users", headers=admin, params={"q": "new.instructor"})).json()
+        if person["email"] == "new.instructor@utep.edu"
+    )
+    reset = await client.post(f"/api/v1/users/{created_account['id']}/reset-password", headers=admin)
+    assert reset.status_code == 200, reset.text
+    assert reset.json()["email"] == "new.instructor@utep.edu"
+    assert reset.json()["password"]
+    own = await client.post(f"/api/v1/users/{session['user']['id']}/reset-password", headers=admin)
+    assert own.status_code == 409
+
+    instructor, _ = await login(client, "joe.mota@utep.edu")
+    hidden = await client.get("/api/v1/users", headers=instructor, params={"q": "Daniel"})
+    assert hidden.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_can_edit_an_account_and_coordinators_stay_with_the_admin(client):
+    admin, _ = await login(client, "clarissa.dominguez@utep.edu")
+    course = await course_id(client, admin, "PHAR 5320")
+    daniel = next(
+        person for person in (await client.get("/api/v1/users", headers=admin, params={"q": "daniel.reyes"})).json()
+        if person["email"] == "daniel.reyes@miners.utep.edu"
+    )
+    edited = await client.patch(
+        f"/api/v1/users/{daniel['id']}",
+        headers=admin,
+        json={"fullName": "Daniel R Reyes", "email": daniel["email"], "universityId": "800123456"},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["fullName"] == "Daniel R Reyes"
+
+    instructor, _ = await login(client, "joe.mota@utep.edu")
+    denied = await client.patch(
+        f"/api/v1/users/{daniel['id']}",
+        headers=instructor,
+        json={"fullName": "Daniel Reyes", "email": daniel["email"], "universityId": "800123456"},
+    )
+    assert denied.status_code == 403
+
+    joe = next(
+        person for person in (await client.get("/api/v1/users", headers=admin, params={"q": "joe.mota"})).json()
+        if person["email"] == "joe.mota@utep.edu"
+    )
+    seated = await client.post(
+        f"/api/v1/courses/{course}/enrollments",
+        headers=admin,
+        json={"userId": joe["id"], "role": "course_coordinator", "discipline": "pharmacy"},
+    )
+    assert seated.status_code == 200, seated.text
+    removed = await client.delete(
+        f"/api/v1/courses/{course}/roster/{joe['id']}",
+        headers=instructor,
+        params={"role": "course_coordinator"},
+    )
+    assert removed.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_activity_log_is_available_without_a_course(client):
+    admin, _ = await login(client, "clarissa.dominguez@utep.edu")
+    everything = await client.get("/api/v1/audit", headers=admin, params={"role": "admin"})
+    assert everything.status_code == 200, everything.text
+    assert isinstance(everything.json(), list)
+
+    course = await course_id(client, admin, "PHAR 5320")
+    one_class = await client.get("/api/v1/audit", headers=admin, params={"role": "admin", "course_id": course})
+    assert one_class.status_code == 200, one_class.text
+
+    instructor, _ = await login(client, "joe.mota@utep.edu")
+    missing_course = await client.get("/api/v1/audit", headers=instructor, params={"role": "instructor"})
+    assert missing_course.status_code == 422

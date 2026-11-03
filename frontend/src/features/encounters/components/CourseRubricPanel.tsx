@@ -1,12 +1,15 @@
 import { Alert, Box, List, ListItem, ListItemText, Typography } from "@mui/material";
 import type { GradingGuide } from "../../../types";
 
-export default function CourseRubricPanel({ guide, fileName }: { guide?: GradingGuide | null; fileName?: string | null }) {
+export default function CourseRubricPanel({
+  guide, fileName, title,
+}: { guide?: GradingGuide | null; fileName?: string | null; title?: string }) {
   const criteria = guide?.criteria ?? [];
+  const heading = title ?? (guide?.source === "case" ? "Case rubric" : "Course rubric");
   if (criteria.length > 0) {
     return (
       <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 1, border: 1, borderColor: "divider", bgcolor: "rgba(14,34,80,0.03)" }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Course rubric</Typography>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{heading}</Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
           {guide?.file_name || fileName}
         </Typography>
