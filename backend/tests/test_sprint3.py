@@ -258,6 +258,7 @@ async def test_answer_key_replaces_and_stays_hidden(client, db_session):
             {"rank": 9, "code": "I10", "label": "Essential hypertension", "rationale": "Listed first."},
             {"rank": 1, "code": "E11.9", "label": "Type 2 diabetes mellitus without complications", "rationale": "Listed second."},
         ],
+        "expectedCptCodes": [{"code": "99213", "label": "Office visit, established patient, level 3"}],
         "planPoints": ["Confirm home readings", ""],
         "rationale": "Blood pressure is the lead problem.",
     }
@@ -271,6 +272,7 @@ async def test_answer_key_replaces_and_stays_hidden(client, db_session):
     body = saved.json()
     assert [item["rank"] for item in body["diagnoses"]] == [1, 2]
     assert body["diagnoses"][0]["code"] == "I10"
+    assert body["expectedCptCodes"] == [{"code": "99213", "label": "Office visit, established patient, level 3"}]
     assert body["planPoints"] == ["Confirm home readings"]
 
     replaced = await client.put(
@@ -313,6 +315,7 @@ async def test_answer_key_replaces_and_stays_hidden(client, db_session):
     instructor_key = await client.get(f"/api/v1/patients/{copy_id}/answer-key", headers=instructor, params={"role": "instructor"})
     assert instructor_key.status_code == 200, instructor_key.text
     assert instructor_key.json()["diagnoses"][0]["code"] == "I10"
+    assert instructor_key.json()["expectedCptCodes"] == body["expectedCptCodes"]
     admin_key = await client.get(f"/api/v1/cases/{master_id}/answer-key", headers=instructor, params={"role": "admin"})
     assert admin_key.status_code == 200, admin_key.text
     assert [item["rank"] for item in admin_key.json()["diagnoses"]] == [1]

@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -228,6 +228,7 @@ class CaseAnswerKey(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), unique=True)
     diagnoses: Mapped[list[Any]] = mapped_column(JSONB)
+    expected_cpt_codes: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"), nullable=False)
     plan_points: Mapped[list[Any]] = mapped_column(JSONB)
     rationale: Mapped[str] = mapped_column(Text, default="", server_default="")
     updated_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))

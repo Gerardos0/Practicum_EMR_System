@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert, Autocomplete, Box, Button, IconButton, Stack, TextField, Typography,
 } from "@mui/material";
@@ -6,6 +6,7 @@ import ArrowUpwardOutlined from "@mui/icons-material/ArrowUpwardOutlined";
 import ArrowDownwardOutlined from "@mui/icons-material/ArrowDownwardOutlined";
 import DeleteOutlined from "@mui/icons-material/DeleteOutlined";
 import { getAnswerKey, putAnswerKey, type AnswerKey } from "../../api/cases";
+import { listCpt } from "../../api/reference";
 import { ICD10 } from "../encounters/icd10";
 import { useAsync } from "../../utils/useAsync";
 import type { IcdCode, Role } from "../../types";
@@ -17,7 +18,7 @@ interface DiagnosisRow {
   rationale: string;
 }
 
-function fromKey(key: AnswerKey): { rows: DiagnosisRow[]; points: string[] } {
+function fromKey(key: AnswerKey): { rows: DiagnosisRow[]; expectedCptCodes: IcdCode[]; points: string[] } {
   return {
     rows: key.diagnoses.map((item) => ({
       id: crypto.randomUUID(),
@@ -25,6 +26,7 @@ function fromKey(key: AnswerKey): { rows: DiagnosisRow[]; points: string[] } {
       label: item.label,
       rationale: item.rationale,
     })),
+    expectedCptCodes: key.expectedCptCodes ?? [],
     points: key.planPoints.length ? key.planPoints : [""],
   };
 }
@@ -33,16 +35,23 @@ export default function AnswerKeyEditor({ role, caseId }: { role: Role; caseId: 
   const loaded = useAsync(() => getAnswerKey(role, caseId), [role, caseId]);
   const [rows, setRows] = useState<DiagnosisRow[]>([]);
   const [points, setPoints] = useState<string[]>([""]);
+  const [expectedCptCodes, setExpectedCptCodes] = useState<IcdCode[]>([]);
+  const [cptOptions, setCptOptions] = useState<IcdCode[]>([]);
   const [rationale, setRationale] = useState("");
   const [hydratedFor, setHydratedFor] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    listCpt().then(setCptOptions).catch(() => setCptOptions([]));
+  }, []);
+
   if (loaded.data && hydratedFor !== caseId) {
     const next = fromKey(loaded.data);
     setHydratedFor(caseId);
     setRows(next.rows);
+    setExpectedCptCodes(next.expectedCptCodes);
     setPoints(next.points);
     setRationale(loaded.data.rationale);
   }
@@ -69,10 +78,12 @@ export default function AnswerKeyEditor({ role, caseId }: { role: Role; caseId: 
           rationale: row.rationale,
         })),
         planPoints: points.map((point) => point.trim()).filter(Boolean),
+        expectedCptCodes,
         rationale,
       });
       const next = fromKey(key);
       setRows(next.rows);
+      setExpectedCptCodes(next.expectedCptCodes);
       setPoints(next.points);
       setRationale(key.rationale);
       setSaved("Answer key saved. Students still cannot see it.");
@@ -150,6 +161,19 @@ export default function AnswerKeyEditor({ role, caseId }: { role: Role; caseId: 
           </Button>
         </Box>
       </Stack>
+
+      <Autocomplete
+        multiple
+        options={[
+          ...expectedCptCodes.filter((current) => !cptOptions.some((option) => option.code === current.code)),
+          ...cptOptions,
+        ]}
+        value={expectedCptCodes}
+        getOptionLabel={(option) => `${option.code} ${option.label}`}
+        isOptionEqualToValue={(option, value) => option.code === value.code}
+        onChange={(_, value) => setExpectedCptCodes(value)}
+        renderInput={(params) => <TextField {...params} label="Expected CPT codes" placeholder="Search CPT codes" />}
+      />
 
       <Box>
         <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Plan points</Typography>

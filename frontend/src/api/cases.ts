@@ -68,6 +68,7 @@ export interface AnswerDiagnosis {
 
 export interface AnswerKey {
   diagnoses: AnswerDiagnosis[];
+  expectedCptCodes: { code: string; label: string }[];
   planPoints: string[];
   rationale: string;
   updatedAt?: string;
@@ -84,7 +85,7 @@ export async function getChartAnswerKey(role: Role, patientId: string): Promise<
 export async function putAnswerKey(
   role: Role,
   caseId: string,
-  body: { diagnoses: AnswerDiagnosis[]; planPoints: string[]; rationale: string },
+  body: { diagnoses: AnswerDiagnosis[]; expectedCptCodes: { code: string; label: string }[]; planPoints: string[]; rationale: string },
 ): Promise<AnswerKey> {
   return request<AnswerKey>(`/cases/${caseId}/answer-key`, { method: "PUT", query: { role }, json: body });
 }

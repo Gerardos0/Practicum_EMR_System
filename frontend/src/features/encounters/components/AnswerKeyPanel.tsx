@@ -17,7 +17,7 @@ export default function AnswerKeyPanel({ role, patientId }: { role: Role; patien
 }
 
 function KeyBody({ keyData }: { keyData: Awaited<ReturnType<typeof getChartAnswerKey>> }) {
-  const empty = keyData.diagnoses.length === 0 && keyData.planPoints.length === 0 && !keyData.rationale.trim();
+  const empty = keyData.diagnoses.length === 0 && (keyData.expectedCptCodes ?? []).length === 0 && keyData.planPoints.length === 0 && !keyData.rationale.trim();
   if (empty) {
     return <Typography variant="body2" color="text.secondary">No answer key for this case.</Typography>;
   }
@@ -29,6 +29,14 @@ function KeyBody({ keyData }: { keyData: Awaited<ReturnType<typeof getChartAnswe
           {item.rationale && <Typography variant="body2" color="text.secondary">{item.rationale}</Typography>}
         </Box>
       ))}
+      {keyData.expectedCptCodes?.length > 0 && (
+        <Box>
+          <Typography variant="subtitle2">Expected CPT codes</Typography>
+          {keyData.expectedCptCodes.map((item) => (
+            <Typography key={item.code} variant="body2">{item.code} {item.label}</Typography>
+          ))}
+        </Box>
+      )}
       {keyData.planPoints.length > 0 && (
         <Box>
           <Typography variant="subtitle2">Plan points</Typography>
