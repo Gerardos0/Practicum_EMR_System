@@ -1,6 +1,7 @@
 """Phase 4: active chart time, the student report, at-risk flags, delete, retrieve, and purge."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 from openpyxl import load_workbook
@@ -13,11 +14,11 @@ from tests.test_workflows import course_id, login, patient_by_mrn
 
 
 def _today() -> str:
-    return date.today().isoformat()
+    return datetime.now(ZoneInfo("America/Denver")).date().isoformat()
 
 
 def _yesterday() -> str:
-    return (date.today() - timedelta(days=1)).isoformat()
+    return (datetime.now(ZoneInfo("America/Denver")).date() - timedelta(days=1)).isoformat()
 
 
 async def _row(client, headers, course: str, role: str, user_id: str, start: str, end: str) -> dict:
