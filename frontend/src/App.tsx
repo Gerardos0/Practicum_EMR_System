@@ -23,6 +23,7 @@ import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import PatientPortalPage from "./features/portal/PatientPortalPage";
 import TeachingPage from "./features/teaching/TeachingPage";
+import AboutPage from "./features/about/AboutPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { homePathFor } from "./utils/permissions";
 
@@ -52,6 +53,7 @@ export default function App() {
 
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route element={<AppShell />}>
+                <Route path="/about" element={<AboutPage />} />
                 <Route element={<RequireAuth roles={["admin"]} needsCourse={false} />}>
                   <Route path="/admin" element={<AdminHomePage />} />
                   <Route path="/admin/courses" element={<CourseAdminPage />} />

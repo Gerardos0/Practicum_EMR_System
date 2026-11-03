@@ -10,6 +10,7 @@ import SchoolOutlined from "@mui/icons-material/SchoolOutlined";
 import QueryStatsOutlined from "@mui/icons-material/QueryStatsOutlined";
 import AssessmentOutlined from "@mui/icons-material/AssessmentOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
+import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import TextFieldsOutlined from "@mui/icons-material/TextFieldsOutlined";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -172,6 +173,15 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <Box sx={{ flexGrow: 1, minHeight: 24 }} />
 
+      <Button
+        component={NavLink}
+        to="/about"
+        startIcon={<GroupsOutlined fontSize="small" />}
+        onClick={onNavigate}
+        sx={itemSx}
+      >
+        About us
+      </Button>
       <DisplayPrefsButton />
       <Button startIcon={<LogoutOutlined fontSize="small" />} sx={itemSx} onClick={() => { signOut(); navigate("/"); }}>
         Sign out
