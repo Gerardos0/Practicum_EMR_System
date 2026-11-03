@@ -71,7 +71,7 @@ export default function ScoreForm({
       <TextField label="Overall feedback" value={overall} multiline minRows={3} onChange={(event) => setOverall(event.target.value)} />
       {error && <Typography variant="body2" color="error">{error}</Typography>}
       <Button variant="outlined" disabled={busy} onClick={save}>{busy ? "Saving scores..." : "Save scores"}</Button>
-      <Typography variant="caption" color="text.secondary">Students can see the rubric. They do not see these scores.</Typography>
+      <Typography variant="caption" color="text.secondary">Students do not see this rubric or these scores.</Typography>
     </Stack>
   );
 }

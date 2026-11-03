@@ -104,8 +104,8 @@ async def test_case_rubric_falls_back_to_the_course_and_hides_scores(client):
         params={"role": "student"},
     )
     assert fallback.status_code == 200, fallback.text
-    assert fallback.json()["source"] == "course"
-    assert [item["label"] for item in fallback.json()["criteria"]] == ["Course criterion"]
+    assert fallback.json()["criteria"] == []
+    assert fallback.json()["file_name"] is None
     assert "rubricScores" not in fallback.json()
 
     subjective = await _create(client, instructor, course, lastName="SubjectiveCase")
@@ -131,9 +131,13 @@ async def test_case_rubric_falls_back_to_the_course_and_hides_scores(client):
     right_guide = await client.get(
         f"/api/v1/patients/{right['id']}/grading-guide", headers=ana, params={"role": "student"},
     )
-    assert left_guide.json()["source"] == "case"
-    assert [item["label"] for item in left_guide.json()["criteria"]] == ["Subjective"]
-    assert [item["label"] for item in right_guide.json()["criteria"]] == ["Plan"]
+    assert left_guide.json()["criteria"] == []
+    assert right_guide.json()["criteria"] == []
+    staff_guide = await client.get(
+        f"/api/v1/patients/{left['id']}/grading-guide", headers=instructor, params={"role": "instructor"},
+    )
+    assert staff_guide.json()["source"] == "case"
+    assert [item["label"] for item in staff_guide.json()["criteria"]] == ["Subjective"]
     assert_no_hidden(left_guide.json())
 
     created = await client.post(

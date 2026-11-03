@@ -181,7 +181,7 @@ export default function CourseAdminPage() {
                       <Switch
                         checked={Boolean(course.aiAssist)}
                         disabled={busy}
-                        inputProps={{ "aria-label": `Section assist for ${course.code}` }}
+                        slotProps={{ input: { "aria-label": `Section assist for ${course.code}` } }}
                         onChange={(event) => savePolicy(course, { aiAssist: event.target.checked })}
                       />
                     </Stack>

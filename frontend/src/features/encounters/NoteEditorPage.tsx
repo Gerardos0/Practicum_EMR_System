@@ -24,7 +24,7 @@ import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
 import CourseRubricPanel from "./components/CourseRubricPanel";
-import { defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templateName, templatesFor, TEMPLATES } from "./noteTemplates";
+import { defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templateName, templatesFor, TEMPLATES, type NoteTemplate } from "./noteTemplates";
 import { suggestionsFor } from "./suggestionPacks";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -62,7 +62,7 @@ export default function NoteEditorPage() {
   const [doseFlags, setDoseFlags] = useState<{ code: string; message: string }[]>([]);
   const [doseAck, setDoseAck] = useState<string[]>([]);
   const guide = useAsync(
-    () => (patientId ? getChartGradingGuide(activeRole, patientId) : Promise.resolve({ criteria: [], source: "course" as const })),
+    () => (patientId && activeRole !== "student" ? getChartGradingGuide(activeRole, patientId) : Promise.resolve({ criteria: [], source: "course" as const })),
     [activeRole, patientId],
   );
   const version = useRef(0);
@@ -459,7 +459,7 @@ export default function NoteEditorPage() {
           <Paper sx={{ p: 2.5 }}>
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isAssessment ? "Submission" : "Practice note"}</Typography>
             <NoteProgress note={note} />
-            <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />
+            {activeRole !== "student" && <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />}
 
             {editable && (
               <Stack spacing={1.5} sx={{ mt: 2 }}>

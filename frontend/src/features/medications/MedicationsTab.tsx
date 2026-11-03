@@ -262,9 +262,9 @@ function MedTable({
               <TableRow key={row.id ?? row.name}>
                 <TableCell sx={{ fontWeight: 600 }}>
                   {row.name}{row.prescribed ? " (prescribed)" : ""}
-                  {row.genericName ? <Typography variant="caption" display="block">Generic: {row.genericName}</Typography> : null}
+                  {row.genericName ? <Typography variant="caption" sx={{ display: "block" }}>Generic: {row.genericName}</Typography> : null}
                   {(row.flags ?? []).map((flag) => (
-                    <Typography key={flag.code} variant="caption" color="warning.main" display="block">{flag.message}</Typography>
+                    <Typography key={flag.code} variant="caption" color="warning.main" sx={{ display: "block" }}>{flag.message}</Typography>
                   ))}
                 </TableCell>
                 <TableCell>{row.dose}</TableCell>

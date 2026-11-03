@@ -268,6 +268,8 @@ async def get_chart_grading_guide(
     patient = await load_patient(db, patient_id)
     rows = await memberships_for(db, user.id)
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    if role == "student":
+        return {"file_name": None, "criteria": [], "source": "course"}
     return await grading_guide_for(db, patient)
 
 
