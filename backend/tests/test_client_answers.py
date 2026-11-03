@@ -5,6 +5,7 @@ from docx import Document
 from openpyxl import load_workbook
 
 from app.services.case_import import template_workbook
+from app.clinical_sections import DELETED_CPT_CODES
 from app.services.reference_data import lexicomp_status, search_cpt
 from app.services.rubric_import import guide_from_upload
 from tests.test_workflows import course_id, login, patient_by_mrn
@@ -15,6 +16,7 @@ def test_cpt_list_has_no_prices_and_includes_office_codes():
     assert {"99211", "99212", "99213", "99214", "99215"} <= codes
     for row in search_cpt("99213"):
         assert set(row) == {"code", "label"}
+    assert not ({row["code"] for row in search_cpt("")} & set(DELETED_CPT_CODES))
 
 
 def test_lexicomp_is_unconfigured_without_a_url(monkeypatch):

@@ -1,8 +1,16 @@
 import asyncio
 import os
 from pathlib import Path
+from urllib.parse import quote_plus
 
-os.environ["DATABASE_URL"] = "postgresql+asyncpg://emr:emr@localhost:5432/emr_test"
+_TEST_DB_USER = os.getenv("EMR_TEST_DB_USER", "emr")
+_TEST_DB_PASSWORD = os.getenv("EMR_TEST_DB_PASSWORD", "emr")
+_TEST_DB_HOST = os.getenv("EMR_TEST_DB_HOST", "localhost")
+_TEST_DB_PORT = int(os.getenv("EMR_TEST_DB_PORT", "5432"))
+os.environ["DATABASE_URL"] = (
+    f"postgresql+asyncpg://{quote_plus(_TEST_DB_USER)}:{quote_plus(_TEST_DB_PASSWORD)}"
+    f"@{_TEST_DB_HOST}:{_TEST_DB_PORT}/emr_test"
+)
 os.environ["SEED_DEMO_PASSWORD"] = "practicum-demo"
 
 
@@ -11,7 +19,13 @@ def _prepare() -> None:
     from alembic import command
     from alembic.config import Config
 
-    conn = psycopg2.connect(dbname="emr", user="emr", password="emr", host="localhost")
+    conn = psycopg2.connect(
+        dbname="emr",
+        user=_TEST_DB_USER,
+        password=_TEST_DB_PASSWORD,
+        host=_TEST_DB_HOST,
+        port=_TEST_DB_PORT,
+    )
     conn.autocommit = True
     cursor = conn.cursor()
     cursor.execute("SELECT 1 FROM pg_database WHERE datname = 'emr_test'")

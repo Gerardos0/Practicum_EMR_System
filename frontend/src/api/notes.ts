@@ -1,4 +1,4 @@
-import type { ClinicalNote, Discipline, IcdCode, NoteTemplateId, Patient, Role } from "../types";
+import type { ClinicalNote, CptSelection, Discipline, IcdCode, NoteTemplateId, Patient, Role } from "../types";
 import { request } from "./client";
 
 export async function listNotesForPatient(role: Role, patientId: string): Promise<ClinicalNote[]> {
@@ -23,7 +23,7 @@ export interface DraftPatch {
   templateId?: NoteTemplateId;
   content?: Record<string, string>;
   diagnoses?: IcdCode[];
-  cptCodes?: IcdCode[];
+  cptCodes?: CptSelection[];
   routedToId?: string;
 }
 

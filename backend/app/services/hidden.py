@@ -9,6 +9,8 @@ HIDDEN_FOR_STUDENTS = {
     "answerKey",
     "expected_diagnoses",
     "expectedDiagnoses",
+    "expected_cpt_codes",
+    "expectedCptCodes",
     "plan_points",
     "planPoints",
     "triggers",

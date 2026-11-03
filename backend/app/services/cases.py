@@ -71,6 +71,10 @@ async def create_case(
         surgical_history=body.surgical_history.strip(),
         family_history=body.family_history.strip(),
         social_history=body.social_history.strip(),
+        insurance_payer=(body.insurance_payer or "").strip() or None,
+        insurance_member_id=(body.insurance_member_id or "").strip() or None,
+        insurance_group_number=(body.insurance_group_number or "").strip() or None,
+        insurance_notes=(body.insurance_notes or "").strip() or None,
         lifecycle=body.lifecycle,
         encounter_status=body.encounter_status,
         care_setting=body.care_setting,
@@ -124,6 +128,10 @@ async def update_case(
     patient.surgical_history = body.surgical_history.strip()
     patient.family_history = body.family_history.strip()
     patient.social_history = body.social_history.strip()
+    patient.insurance_payer = (body.insurance_payer or "").strip() or None
+    patient.insurance_member_id = (body.insurance_member_id or "").strip() or None
+    patient.insurance_group_number = (body.insurance_group_number or "").strip() or None
+    patient.insurance_notes = (body.insurance_notes or "").strip() or None
     patient.lifecycle = body.lifecycle
     patient.encounter_status = body.encounter_status
     patient.care_setting = body.care_setting

@@ -16,6 +16,10 @@ export interface CaseInput {
   surgicalHistory: string;
   familyHistory: string;
   socialHistory: string;
+  insurancePayer?: string;
+  insuranceMemberId?: string;
+  insuranceGroupNumber?: string;
+  insuranceNotes?: string;
   encounterType: string;
   careSetting: CareSetting;
   lifecycle: LifecycleStatus;
@@ -68,6 +72,7 @@ export interface AnswerDiagnosis {
 
 export interface AnswerKey {
   diagnoses: AnswerDiagnosis[];
+  expectedCptCodes: { code: string; label: string }[];
   planPoints: string[];
   rationale: string;
   updatedAt?: string;
@@ -106,7 +111,7 @@ export async function copyCase(role: Role, caseId: string, courseId: string): Pr
 export async function putAnswerKey(
   role: Role,
   caseId: string,
-  body: { diagnoses: AnswerDiagnosis[]; planPoints: string[]; rationale: string },
+  body: { diagnoses: AnswerDiagnosis[]; expectedCptCodes: { code: string; label: string }[]; planPoints: string[]; rationale: string },
 ): Promise<AnswerKey> {
   return request<AnswerKey>(`/cases/${caseId}/answer-key`, { method: "PUT", query: { role }, json: body });
 }

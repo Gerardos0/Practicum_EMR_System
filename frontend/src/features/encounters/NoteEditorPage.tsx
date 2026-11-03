@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  Alert, Autocomplete, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
   Divider, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import type { ClinicalNote, IcdCode, NoteTemplateId, Patient, User } from "../../types";
+import type { ClinicalNote, CptSelection, IcdCode, NoteTemplateId, Patient, User } from "../../types";
 import { getPatient } from "../../api/patients";
 import { addAddendum, createDraft, getNote, listNotesForPatient, saveDraft, signNote } from "../../api/notes";
 import { listInstructors } from "../../api/courses";
@@ -42,7 +42,7 @@ export default function NoteEditorPage() {
   const [templateId, setTemplateId] = useState<NoteTemplateId>(defaultTemplateFor(discipline));
   const [content, setContent] = useState<Record<string, string>>({});
   const [diagnoses, setDiagnoses] = useState<IcdCode[]>([]);
-  const [cptCodes, setCptCodes] = useState<IcdCode[]>([]);
+  const [cptCodes, setCptCodes] = useState<CptSelection[]>([]);
   const [cptOptions, setCptOptions] = useState<IcdCode[]>([]);
   const [routedToId, setRoutedToId] = useState("");
 
@@ -294,11 +294,43 @@ export default function NoteEditorPage() {
             onChange={(event) => {
               const selected = event.target.value as unknown as string[];
               markDirty();
-              setCptCodes(cptOptions.filter((item) => selected.includes(item.code)));
+              setCptCodes(selected.flatMap((code) => {
+                const option = cptOptions.find((item) => item.code === code);
+                const previous = cptCodes.find((item) => item.code === code);
+                if (!option) return previous ? [previous] : [];
+                return [{ ...option, diagnosisCodes: previous?.diagnosisCodes ?? [] }];
+              }));
             }}
           >
+            {cptCodes.filter((item) => !cptOptions.some((option) => option.code === item.code)).map((item) => (
+              <MenuItem key={item.code} value={item.code} disabled>{item.code} {item.label} (legacy)</MenuItem>
+            ))}
             {cptOptions.map((item) => <MenuItem key={item.code} value={item.code}>{item.code} {item.label}</MenuItem>)}
           </TextField>
+          <Stack spacing={1} sx={{ mt: 1.5 }}>
+            {cptCodes.map((cpt) => (
+              <Box key={cpt.code}>
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={diagnoses}
+                  value={diagnoses.filter((diagnosis) => cpt.diagnosisCodes.includes(diagnosis.code))}
+                  getOptionLabel={(option) => `${option.code} ${option.label}`}
+                  isOptionEqualToValue={(option, value) => option.code === value.code}
+                  onChange={(_, selected) => {
+                    markDirty();
+                    setCptCodes((current) => current.map((item) => item.code === cpt.code
+                      ? { ...item, diagnosisCodes: selected.map((diagnosis) => diagnosis.code) }
+                      : item));
+                  }}
+                  renderInput={(params) => <TextField {...params} label={`Diagnoses for ${cpt.code}`} />}
+                />
+                {cpt.diagnosisCodes.length === 0 && (
+                  <Typography variant="caption" color="text.secondary">No linked diagnosis (optional).</Typography>
+                )}
+              </Box>
+            ))}
+          </Stack>
 
           {(note.status === "signed" || note.status === "cosigned" || (note.status === "returned" && note.bodyLocked)) && (
             <>

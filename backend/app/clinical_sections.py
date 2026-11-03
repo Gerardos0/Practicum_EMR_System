@@ -38,6 +38,7 @@ ALLERGY_CATEGORIES = ("medication", "food", "environmental")
 
 # Office and related E/M codes. The full CPT set is copyrighted by the AMA and is not included.
 # Amounts are intentionally absent.
+DELETED_CPT_CODES = ("99441", "99442", "99443")  # Deleted in 2025; replacements need customer approval.
 CPT_CODES: list[dict[str, str]] = [
     {"code": "99211", "label": "Office visit, established patient, level 1"},
     {"code": "99212", "label": "Office visit, established patient, level 2"},
@@ -56,9 +57,6 @@ CPT_CODES: list[dict[str, str]] = [
     {"code": "99233", "label": "Subsequent hospital care, level 3"},
     {"code": "99238", "label": "Hospital discharge, 30 minutes or less"},
     {"code": "99239", "label": "Hospital discharge, more than 30 minutes"},
-    {"code": "99441", "label": "Telephone evaluation, 5–10 minutes"},
-    {"code": "99442", "label": "Telephone evaluation, 11–20 minutes"},
-    {"code": "99443", "label": "Telephone evaluation, 21–30 minutes"},
 ]
 
 

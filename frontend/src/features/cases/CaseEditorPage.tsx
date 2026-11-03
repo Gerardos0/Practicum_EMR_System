@@ -31,6 +31,10 @@ interface Draft {
   surgicalHistory: string;
   familyHistory: string;
   socialHistory: string;
+  insurancePayer: string;
+  insuranceMemberId: string;
+  insuranceGroupNumber: string;
+  insuranceNotes: string;
   encounterType: string;
   careSetting: CareSetting;
   lifecycle: LifecycleStatus;
@@ -78,6 +82,7 @@ function emptyDraft(): Draft {
   return {
     firstName: "", lastName: "", preferredName: "", dob: "", sexAtBirth: "Female", pronouns: "",
     chiefComplaint: "", hpi: "", pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "",
+    insurancePayer: "", insuranceMemberId: "", insuranceGroupNumber: "", insuranceNotes: "",
     encounterType: "Office visit", careSetting: "Outpatient", lifecycle: "Active", encounterStatus: "Scheduled",
     program: "", allergies: [], medications: [], problems: [], labs: [], vitals: [],
     sectionLocks: { ...DEFAULT_LOCKS }, prefillSections: [], unit: "", room: "", bed: "",
@@ -104,6 +109,10 @@ function draftFrom(item: AuthoredCase): Draft {
     surgicalHistory: item.surgicalHistory,
     familyHistory: item.familyHistory,
     socialHistory: item.socialHistory,
+    insurancePayer: item.insurance?.payer ?? "",
+    insuranceMemberId: item.insurance?.memberId ?? "",
+    insuranceGroupNumber: item.insurance?.groupNumber ?? "",
+    insuranceNotes: item.insurance?.notes ?? "",
     encounterType: item.encounter.type,
     careSetting: item.status.careSetting,
     lifecycle: item.status.lifecycle,
@@ -166,6 +175,10 @@ export default function CaseEditorPage() {
       surgicalHistory: draft.surgicalHistory,
       familyHistory: draft.familyHistory,
       socialHistory: draft.socialHistory,
+      insurancePayer: draft.insurancePayer.trim() || undefined,
+      insuranceMemberId: draft.insuranceMemberId.trim() || undefined,
+      insuranceGroupNumber: draft.insuranceGroupNumber.trim() || undefined,
+      insuranceNotes: draft.insuranceNotes.trim() || undefined,
       encounterType: draft.encounterType,
       careSetting: draft.careSetting,
       lifecycle: draft.lifecycle,
@@ -250,6 +263,16 @@ export default function CaseEditorPage() {
           <TextField label="Family history" value={draft.familyHistory} onChange={(e) => set({ familyHistory: e.target.value })} fullWidth multiline minRows={2} />
           <TextField label="Social history" value={draft.socialHistory} onChange={(e) => set({ socialHistory: e.target.value })} fullWidth multiline minRows={2} />
         </Stack>
+      </Paper>
+
+      <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Insurance scenario</Typography>
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+          <TextField label="Payer" value={draft.insurancePayer} onChange={(e) => set({ insurancePayer: e.target.value })} />
+          <TextField label="Member ID" value={draft.insuranceMemberId} onChange={(e) => set({ insuranceMemberId: e.target.value })} />
+          <TextField label="Group number" value={draft.insuranceGroupNumber} onChange={(e) => set({ insuranceGroupNumber: e.target.value })} />
+          <TextField label="Insurance notes" value={draft.insuranceNotes} onChange={(e) => set({ insuranceNotes: e.target.value })} multiline minRows={2} />
+        </Box>
       </Paper>
 
       <Paper sx={{ p: { xs: 2, md: 2.5 } }}>

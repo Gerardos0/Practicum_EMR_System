@@ -148,6 +148,13 @@ export interface Encounter {
   date: string;
 }
 
+export interface Insurance {
+  payer?: string | null;
+  memberId?: string | null;
+  groupNumber?: string | null;
+  notes?: string | null;
+}
+
 export interface Patient {
   id: string;
   mrn: string;
@@ -178,6 +185,7 @@ export interface Patient {
   surgicalHistory: string;
   socialHistory: string;
   encounter: Encounter;
+  insurance?: Insurance;
   sectionLocks?: Record<string, boolean>;
   prefillSections?: string[];
   unit?: string;
@@ -200,6 +208,10 @@ export interface IcdCode {
   code: string;
   label: string;
   rationale?: string;
+}
+
+export interface CptSelection extends IcdCode {
+  diagnosisCodes: string[];
 }
 
 export interface NoteComment {
@@ -239,7 +251,7 @@ export interface ClinicalNote {
   version: number;
   content: Record<string, string>;
   diagnoses: IcdCode[];
-  cptCodes?: IcdCode[];
+  cptCodes?: CptSelection[];
   bodyLocked?: boolean;
   rubricScores?: RubricScores | null;
   routedToId?: string;

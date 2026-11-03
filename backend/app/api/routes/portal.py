@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.clinical import ClinicalNote
 from app.services.access import memberships_for, require, require_held_role
+from app.services.audit import log_event
 from app.services.charts import load_patient
 
 router = APIRouter(prefix="/portal", tags=["portal"])
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/portal", tags=["portal"])
 async def portal_chart(
     db: DbSession,
     user: CurrentUser,
+    request: Request,
     role: Annotated[str, Query()] = "patient",
 ):
     rows = await memberships_for(db, user.id)
@@ -47,7 +49,9 @@ async def portal_chart(
         for item in patient.medications
         if item.status == "active"
     ]
-    return {
+    labs = sorted(patient.labs, key=lambda lab: lab.name.casefold())
+    labs.sort(key=lambda lab: lab.collected_at, reverse=True)
+    result = {
         "patient": {
             "name": f"{patient.first_name} {patient.last_name}",
             "dob": patient.dob,
@@ -62,7 +66,7 @@ async def portal_chart(
                 "flag": lab.flag,
                 "collected_at": lab.collected_at,
             }
-            for lab in patient.labs
+            for lab in labs
         ],
         "last_visit": {
             "date": patient.encounter.date if patient.encounter else None,
@@ -72,3 +76,14 @@ async def portal_chart(
         "prescribed_medications": [item for item in medications if item["prescribed"]],
         "medication_list": medications,
     }
+    await log_event(
+        db,
+        action="portal.view",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        actor_user_id=user.id,
+        course_id=patient.course_id,
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return result

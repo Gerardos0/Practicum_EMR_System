@@ -63,6 +63,7 @@ async def upsert_answer_key(db: AsyncSession, patient: Patient, body: AnswerKeyI
         row = CaseAnswerKey(
             patient_id=patient.id,
             diagnoses=diagnoses,
+            expected_cpt_codes=_expected_cpt_codes(body),
             plan_points=points,
             rationale=body.rationale.strip(),
             updated_by_id=actor.id,
@@ -70,6 +71,7 @@ async def upsert_answer_key(db: AsyncSession, patient: Patient, body: AnswerKeyI
         db.add(row)
     else:
         row.diagnoses = diagnoses
+        row.expected_cpt_codes = _expected_cpt_codes(body)
         row.plan_points = points
         row.rationale = body.rationale.strip()
         row.updated_by_id = actor.id
@@ -106,11 +108,20 @@ def _diagnoses(body: AnswerKeyIn) -> list[dict]:
     return cleaned
 
 
+def _expected_cpt_codes(body: AnswerKeyIn) -> list[dict]:
+    return [
+        {"code": item.code.strip(), "label": item.label.strip()}
+        for item in body.expected_cpt_codes
+        if item.code.strip() and item.label.strip()
+    ]
+
+
 def _out(row: CaseAnswerKey | None) -> dict:
     if row is None:
-        return {"diagnoses": [], "plan_points": [], "rationale": ""}
+        return {"diagnoses": [], "expected_cpt_codes": [], "plan_points": [], "rationale": ""}
     return {
         "diagnoses": list(row.diagnoses or []),
+        "expected_cpt_codes": list(row.expected_cpt_codes or []),
         "plan_points": list(row.plan_points or []),
         "rationale": row.rationale or "",
         "updated_at": row.updated_at,
