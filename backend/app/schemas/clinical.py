@@ -209,6 +209,11 @@ class IcdCode(APIModel):
     rationale: str = ""
 
 
+class ExpectedCptCode(APIModel):
+    code: str
+    label: str
+
+
 class CptSelection(APIModel):
     code: str
     label: str
@@ -454,14 +459,14 @@ class AnswerDiagnosis(APIModel):
 
 class AnswerKeyIn(APIModel):
     diagnoses: list[AnswerDiagnosis] = []
-    expected_cpt_codes: list[IcdCode] = Field(default_factory=list)
+    expected_cpt_codes: list[ExpectedCptCode] = Field(default_factory=list)
     plan_points: list[str] = []
     rationale: str = ""
 
 
 class AnswerKeyOut(APIModel):
     diagnoses: list[AnswerDiagnosis] = []
-    expected_cpt_codes: list[IcdCode] = Field(default_factory=list)
+    expected_cpt_codes: list[ExpectedCptCode] = Field(default_factory=list)
     plan_points: list[str] = []
     rationale: str = ""
     updated_at: datetime | None = None
