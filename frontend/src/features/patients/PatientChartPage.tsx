@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Box, Breadcrumbs, Button, LinearProgress, Link, Paper, Typography } from "@mui/material";
+import { Alert, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Link, Paper, TextField, Typography } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
+import { grantPortalAccess } from "../../api/users";
 import { recordPresence, updatePlacement } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/AuthContext";
@@ -36,6 +37,13 @@ export default function PatientChartPage() {
   const { user, activeRole } = useSession();
   const [statusOpen, setStatusOpen] = useState(false);
   const [placement, setPlacement] = useState({ unit: "", room: "", bed: "" });
+  const [portalAccessOpen, setPortalAccessOpen] = useState(false);
+  const [portalEmail, setPortalEmail] = useState("");
+  const [portalFullName, setPortalFullName] = useState("");
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [portalError, setPortalError] = useState("");
+  const [portalGranted, setPortalGranted] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
   const notes = useAsync(() => listNotesForPatient(activeRole, patientId), [patientId, activeRole]);
@@ -96,6 +104,21 @@ export default function PatientChartPage() {
         ownerName={p.ownerName}
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
+
+      {can(activeRole, "user:manage_access") && (
+        <Box sx={{ my: 2 }}>
+          <Button size="small" variant="outlined" onClick={() => {
+            setPortalEmail("");
+            setPortalFullName(`${p.firstName} ${p.lastName}`);
+            setPortalError("");
+            setPortalGranted(false);
+            setTemporaryPassword("");
+            setPortalAccessOpen(true);
+          }}>
+            Grant portal access
+          </Button>
+        </Box>
+      )}
 
       {can(activeRole, "patient:update_status") && (
         <Paper sx={{ p: 2, my: 2, display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
@@ -187,6 +210,65 @@ export default function PatientChartPage() {
           onSave={async (status) => patient.setData(await updatePatientStatus(activeRole, p.id, status))}
         />
       )}
+
+      <Dialog open={portalAccessOpen} onClose={() => !portalBusy && setPortalAccessOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Grant portal access</DialogTitle>
+        <DialogContent>
+          {portalError && <Alert severity="error" sx={{ mb: 2 }}>{portalError}</Alert>}
+          {portalGranted ? (
+            temporaryPassword ? (
+              <Alert severity="success">
+                Portal access granted. Copy this temporary password now: <strong>{temporaryPassword}</strong>
+              </Alert>
+            ) : (
+              <Alert severity="success">Portal access granted. The existing account was linked; no temporary password was generated.</Alert>
+            )
+          ) : (
+            <Box sx={{ display: "grid", gap: 2, pt: 1 }}>
+              <TextField
+                label="Email" type="email" required autoFocus fullWidth
+                value={portalEmail} onChange={(event) => setPortalEmail(event.target.value)}
+              />
+              <TextField
+                label="Full name" required fullWidth
+                value={portalFullName} onChange={(event) => setPortalFullName(event.target.value)}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {portalGranted ? (
+            <Button onClick={() => setPortalAccessOpen(false)}>Close</Button>
+          ) : (
+            <>
+              <Button onClick={() => setPortalAccessOpen(false)} disabled={portalBusy}>Cancel</Button>
+              <Button
+                variant="contained"
+                disabled={portalBusy || !portalEmail.trim() || !portalFullName.trim()}
+                onClick={async () => {
+                  setPortalBusy(true);
+                  setPortalError("");
+                  try {
+                    const result = await grantPortalAccess({
+                      email: portalEmail.trim(),
+                      fullName: portalFullName.trim(),
+                      patientId: p.id,
+                    });
+                    setTemporaryPassword(result.temporaryPassword ?? "");
+                    setPortalGranted(true);
+                  } catch (error) {
+                    setPortalError((error as Error).message);
+                  } finally {
+                    setPortalBusy(false);
+                  }
+                }}
+              >
+                {portalBusy ? "Granting…" : "Grant access"}
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
