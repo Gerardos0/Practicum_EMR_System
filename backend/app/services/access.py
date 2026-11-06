@@ -37,7 +37,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "report:export_teaching",
     ],
     "front_desk": [],
-    "patient": ["portal:view"],
+    "patient": ["portal:view", "portal:edit"],
 }
 
 CLINICAL_ROLES = set(ROLE_PERMISSIONS)
