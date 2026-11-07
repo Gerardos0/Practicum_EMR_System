@@ -5,6 +5,7 @@ import { formatDate } from "../../utils/format";
 import { trainingStripe, utep } from "../../theme/tokens";
 import PageError from "../../components/PageError";
 import { usePageHeading } from "../../components/PageHeading";
+import PatientIntakeForm from "./PatientIntakeForm";
 
 interface PortalChart {
   patient: { name: string; dob: string; mrn: string };
@@ -50,7 +51,7 @@ export default function PatientPortalPage({ previewMode = false }: { previewMode
       <Box>
         <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>{data.patient.name}</Typography>
         <Typography variant="body2" color="text.secondary">
-          DOB {formatDate(data.patient.dob)} · MRN {data.patient.mrn}. This view is read only.
+          DOB {formatDate(data.patient.dob)} · MRN {data.patient.mrn}. Your chart is read only. You can update your own information below.
         </Typography>
       </Box>
       <Paper sx={{ p: 2.5 }}>
@@ -78,6 +79,7 @@ export default function PatientPortalPage({ previewMode = false }: { previewMode
           </Typography>
         ))}
       </Paper>
+      {!previewMode && <PatientIntakeForm />}
     </Stack>
   );
 
