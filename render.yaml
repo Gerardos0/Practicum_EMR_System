@@ -15,7 +15,7 @@ services:
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: NOTE_CONTENT_KEY
-        generateValue: true
+        sync: false
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGIN_REGEX
