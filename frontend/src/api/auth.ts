@@ -15,13 +15,8 @@ interface TokenResponse {
   user: User;
 }
 
-const ALLOWED = /@(miners\.)?utep\.edu$/i;
-
 export async function login(email: string, password: string): Promise<LoginResult> {
   const trimmed = email.trim();
-  if (!ALLOWED.test(trimmed)) {
-    throw new ApiError(400, "Use your UTEP email address (@utep.edu or @miners.utep.edu).");
-  }
   const form = new URLSearchParams();
   form.set("username", trimmed);
   form.set("password", password);
