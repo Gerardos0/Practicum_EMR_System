@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { DisplayPrefsProvider } from "./theme/DisplayPrefsProvider";
-import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { AuthProvider } from "./features/auth/AuthContext";
+import { useAuth } from "./features/auth/useSession";
 import RequireAuth from "./features/auth/RequireAuth";
 import LoginPage from "./features/auth/LoginPage";
 import ChangePasswordPage from "./features/auth/ChangePasswordPage";
@@ -22,6 +23,7 @@ import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import PatientPortalPage from "./features/portal/PatientPortalPage";
 import TeachingPage from "./features/teaching/TeachingPage";
+import AboutPage from "./features/about/AboutPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { homePathFor } from "./utils/permissions";
 
@@ -51,6 +53,7 @@ export default function App() {
 
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route element={<AppShell />}>
+                <Route path="/about" element={<AboutPage />} />
                 <Route element={<RequireAuth roles={["admin"]} needsCourse={false} />}>
                   <Route path="/admin" element={<AdminHomePage />} />
                   <Route path="/admin/courses" element={<CourseAdminPage />} />

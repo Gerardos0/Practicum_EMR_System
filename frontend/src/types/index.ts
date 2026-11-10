@@ -53,6 +53,10 @@ export interface Course {
   instructorIds: string[];
   rubricFileName?: string;
   gradingGuide?: GradingGuide | null;
+  guardrailProfile?: "intro_pharmacy" | "practicum" | "clinical_other";
+  guardrailMode?: "off" | "advisory" | "acknowledge" | "block" | null;
+  aiAssist?: boolean;
+  aiProviderConfigured?: boolean;
 }
 
 export interface GradingCriterion {
@@ -114,6 +118,12 @@ export interface Medication {
   status?: "active" | "discontinued" | "entered_in_error";
   prescribed?: boolean;
   discontinuedAt?: string;
+  rxcui?: string;
+  genericName?: string;
+  brandNames?: string[];
+  flags?: { code: string; message: string }[];
+  acknowledgedFlags?: string[];
+  clearFlags?: boolean;
 }
 
 export interface LabResult {
@@ -191,6 +201,7 @@ export interface Patient {
   unit?: string;
   room?: string;
   bed?: string;
+  hasPhoto?: boolean;
 }
 
 export type NoteStatus = "draft" | "signed" | "pending_review" | "returned" | "cosigned";
@@ -242,7 +253,7 @@ export interface ClinicalNote {
   id: string;
   patientId: string;
   encounterId: string;
-  templateId: NoteTemplateId;
+  templateId: string;
   authorId: string;
   authorName: string;
   authorDiscipline: Discipline;

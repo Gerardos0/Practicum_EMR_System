@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Box, LinearProgress, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import PeopleAltOutlined from "@mui/icons-material/PeopleAltOutlined";
@@ -8,16 +9,14 @@ import { listPatients } from "../../api/patients";
 import { listReviewQueue } from "../../api/notes";
 import { listAudit } from "../../api/audit";
 import { getAtRisk } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import { formatRelativeShort } from "../../utils/format";
 import EmptyState from "../../components/EmptyState";
-import { DAY_MS, Panel, StatCard, StatGrid, patientName, since } from "./components/DashboardParts";
+import { Panel, StatCard, StatGrid } from "./components/DashboardParts";
+import { DAY_MS, patientName, since } from "./dashboardFormat";
 import { utep } from "../../theme/tokens";
-
-function actionLabel(action: string) {
-  return action.replace(/[._]/g, " ");
-}
+import { actionLabel } from "../admin/auditLabels";
 
 export default function InstructorDashboard() {
   const { activeRole, courseId } = useSession();
@@ -25,12 +24,12 @@ export default function InstructorDashboard() {
   const queue = useAsync(() => listReviewQueue(courseId, activeRole), [courseId, activeRole]);
   const audit = useAsync(() => listAudit(courseId, activeRole), [courseId, activeRole]);
   const risk = useAsync(() => getAtRisk(courseId, activeRole), [courseId, activeRole]);
+  const [now] = useState(() => Date.now());
 
   if (patients.loading && !patients.data) return <LinearProgress />;
 
   const rows = patients.data ?? [];
   const items = queue.data ?? [];
-  const now = Date.now();
 
   const pending = items.filter((q) => q.note.status === "pending_review");
   const returned = items.filter((q) => q.note.status === "returned");
@@ -119,7 +118,7 @@ export default function InstructorDashboard() {
               {recent.map((e) => (
                 <Box component="li" key={e.id} sx={{ display: "grid", gap: 0.15 }}>
                   <Typography sx={{ fontSize: 14, fontWeight: 600, color: utep.navy }}>
-                    {e.actorName} · {actionLabel(e.action)}
+                    {e.actorName} · {actionLabel(e.action, e.detail)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {e.entity} · {formatRelativeShort(e.timestamp)}

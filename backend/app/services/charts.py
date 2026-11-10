@@ -9,7 +9,7 @@ from app.models.clinical import (
     Allergy, Appointment, ClinicalNote, CourseMembership, Encounter, LabResult, Medication, Patient, Problem, Vital,
 )
 from app.models.user import Role, User
-from app.services.access import can, full_name, require, require_course
+from app.services.access import can, ensure_student_may_enter, full_name, require, require_course
 from app.services.audit import log_event
 
 LIFECYCLE = {"Active", "Inactive", "Prospective", "Discharged from practice", "Archived", "Deceased"}
@@ -26,6 +26,7 @@ async def load_patient(db: AsyncSession, patient_id: uuid.UUID) -> Patient:
 
 async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: str, rows, *, request_ip: str | None) -> None:
     require_course(role, patient.course_id, user, rows)
+    await ensure_student_may_enter(db, role, patient.course_id)
     if patient.mode == "case" and not can(role, "case:author"):
         await log_event(
             db,
@@ -189,7 +190,7 @@ async def _replace_children(db: AsyncSession, patient: Patient, snap: dict) -> N
         (
             "medications",
             Medication,
-            ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost", "status", "prescribed", "discontinued_at"),
+            ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost", "status", "prescribed", "discontinued_at", "rxcui", "generic_name", "brand_names", "flags"),
         ),
         ("problems", Problem, ("code", "description", "since")),
         ("labs", LabResult, ("name", "value", "unit", "reference_range", "flag", "collected_at")),
@@ -249,6 +250,10 @@ def chart_snapshot(patient: Patient) -> dict:
                 "status": m.status,
                 "prescribed": m.prescribed,
                 "discontinued_at": m.discontinued_at.isoformat() if m.discontinued_at else None,
+                "rxcui": m.rxcui,
+                "generic_name": m.generic_name,
+                "brand_names": list(m.brand_names or []),
+                "flags": list(m.flags or []),
             }
             for m in patient.medications
         ],
@@ -351,6 +356,8 @@ async def assign_case(
         unit=source.unit,
         room=source.room,
         bed=source.bed,
+        photo=source.photo,
+        photo_content_type=source.photo_content_type,
         encounter=Encounter(
             type=source.encounter.type if source.encounter else "Office visit",
             date=date.today(),
@@ -366,6 +373,8 @@ async def assign_case(
                 name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
                 indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
                 status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+                rxcui=item.rxcui, generic_name=item.generic_name, brand_names=list(item.brand_names or []),
+                flags=list(item.flags or []),
             )
         )
     for item in source.problems:

@@ -1,6 +1,6 @@
 import { Box, Button, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
-import { useSession } from "../features/auth/AuthContext";
+import { useSession } from "../features/auth/useSession";
 import { homePathFor } from "../utils/permissions";
 
 export default function NotFoundPage() {

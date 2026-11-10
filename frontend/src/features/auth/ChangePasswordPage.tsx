@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { changePassword } from "../../api/auth";
 import { homePathFor } from "../../utils/permissions";
 import { trainingStripe, utep } from "../../theme/tokens";
-import { useSession } from "./AuthContext";
+import { useSession } from "./useSession";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();

@@ -5,13 +5,13 @@ import {
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listReviewQueue } from "../../api/notes";
 import { getCourse } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import { templateName } from "./noteTemplates";
 import type { NoteStatus } from "../../types";
 
@@ -35,17 +35,21 @@ export default function ReviewQueuePage() {
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const { activeRole, courseId } = useSession();
+  const incoming = (location.state as { flash?: string } | null)?.flash ?? "";
   const [flash, setFlash] = useState("");
+  const [seenFlash, setSeenFlash] = useState("");
+  if (incoming && incoming !== seenFlash) {
+    setSeenFlash(incoming);
+    setFlash(incoming);
+  }
   const filter = tabFromSearch(params.get("status"));
   const queue = useAsync(() => listReviewQueue(courseId, activeRole), [courseId, activeRole]);
   const course = useAsync(() => getCourse(courseId), [courseId]);
 
   useEffect(() => {
-    const msg = (location.state as { flash?: string } | null)?.flash;
-    if (!msg) return;
-    setFlash(msg);
+    if (!incoming) return;
     navigate(".", { replace: true, state: null });
-  }, [location.state, navigate]);
+  }, [incoming, navigate]);
 
   const rows = (queue.data ?? []).filter((q) => QUEUE_STATUSES.has(q.note.status));
   const items = rows.filter((q) => filter === "all" || q.note.status === filter);

@@ -14,6 +14,7 @@ TEACHING_PERMISSIONS = [
     "patient:reset_practice",
     "encounter:advance",
     "note:cosign",
+    "note:view_sensitive",
     "referral:create",
     "audit:view",
     "case:author",
@@ -35,6 +36,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "user:manage_access",
         "report:run",
         "report:export_teaching",
+        "note:view_sensitive",
     ],
     "front_desk": [],
     "patient": ["portal:view", "portal:edit"],
@@ -70,6 +72,14 @@ async def memberships_for(db: AsyncSession, user_id: uuid.UUID) -> list[CourseMe
     return list(result.all())
 
 
+async def ensure_student_may_enter(db: AsyncSession, role: str, course_id: uuid.UUID) -> None:
+    if role != "student":
+        return
+    course = await db.get(Course, course_id)
+    if course is not None and course.status == "ended":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This course has ended.")
+
+
 async def ensure_course_open(db: AsyncSession, course_id: uuid.UUID) -> Course:
     course = await db.get(Course, course_id)
     if course is None:
@@ -101,3 +111,26 @@ def require_course(role: str, course_id: uuid.UUID, user: User, rows: list[Cours
 
 def full_name(user: User) -> str:
     return f"{user.first_name} {user.last_name}"
+
+
+def may_read_note(role: str, memberships: list[CourseMembership], course_id: uuid.UUID, note) -> bool:
+    """Protected and psychiatry notes stay with the same discipline, or with an admin.
+
+    A teaching seat with no discipline still covers the course. That keeps instructors
+    who are not pinned to one profession able to open a protected note.
+    """
+    kind = getattr(note, "sensitivity", None) or "standard"
+    protected = kind in {"psychiatry", "protected"} or bool(getattr(note, "sensitive", False))
+    if not protected:
+        return True
+    if role == "admin":
+        return True
+    if not can(role, "note:view_sensitive"):
+        return False
+    discipline = note.discipline.code if getattr(note, "discipline", None) is not None else None
+    for row in memberships:
+        if row.course_id != course_id or row.role.code != role:
+            continue
+        if row.discipline is None or (discipline is not None and row.discipline.code == discipline):
+            return True
+    return False

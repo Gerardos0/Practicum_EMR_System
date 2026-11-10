@@ -5,7 +5,7 @@ import { validateRosterRow } from "./parseRoster";
 
 function validateStaffRow(row: { fullName: string; email: string; universityId: string }) {
   if (!row.fullName) return { ...row, problem: "Missing name" };
-  if (!/@(miners\.)?utep\.edu$/.test(row.email)) return { ...row, problem: "Email must be @miners.utep.edu or @utep.edu" };
+  if (!row.email) return { ...row, problem: "Email is required" };
   return { ...row, problem: undefined };
 }
 
@@ -33,7 +33,7 @@ export default function AddPersonForm({ role, onSubmit }: AddPersonFormProps) {
     if (validated.problem) {
       const field = validated.problem === "Missing name"
         ? "fullName"
-        : validated.problem === "Email must be @miners.utep.edu or @utep.edu"
+        : validated.problem === "Email is required"
           ? "email"
           : "universityId";
       setProblems({ [field]: validated.problem });

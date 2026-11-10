@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Autocomplete, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  Alert, Autocomplete, Box, Breadcrumbs, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  FormControlLabel,
   Divider, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import type { ClinicalNote, CptSelection, IcdCode, NoteTemplateId, Patient, User } from "../../types";
+import type { ClinicalNote, CptSelection, IcdCode, Patient, User } from "../../types";
 import { getPatient } from "../../api/patients";
-import { addAddendum, createDraft, getNote, listNotesForPatient, saveDraft, signNote } from "../../api/notes";
-import { listInstructors } from "../../api/courses";
+import { addAddendum, checkInsertedDose, createDraft, getNote, listNotesForPatient, saveDraft, signNote, suggestSection } from "../../api/notes";
+import { getCourse, listInstructors } from "../../api/courses";
+import { listNoteTemplates } from "../../api/templates";
 import { getChartGradingGuide } from "../../api/cases";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { formatDate, formatTime } from "../../utils/format";
 import { listCpt } from "../../api/reference";
 import { useAsync } from "../../utils/useAsync";
@@ -22,7 +24,8 @@ import NoteProgress from "./components/NoteProgress";
 import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
 import CourseRubricPanel from "./components/CourseRubricPanel";
-import { TEMPLATES, defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templatesFor } from "./noteTemplates";
+import { defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templateName, templatesFor, TEMPLATES, type NoteTemplate } from "./noteTemplates";
+import { suggestionsFor } from "./suggestionPacks";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -39,7 +42,8 @@ export default function NoteEditorPage() {
   const [instructors, setInstructors] = useState<User[]>([]);
   const [loadError, setLoadError] = useState<Error>();
 
-  const [templateId, setTemplateId] = useState<NoteTemplateId>(defaultTemplateFor(discipline));
+  const [templateId, setTemplateId] = useState<string>(defaultTemplateFor(discipline));
+  const savedTemplates = useAsync(() => listNoteTemplates(activeRole, courseId), [activeRole, courseId]);
   const [content, setContent] = useState<Record<string, string>>({});
   const [diagnoses, setDiagnoses] = useState<IcdCode[]>([]);
   const [cptCodes, setCptCodes] = useState<CptSelection[]>([]);
@@ -47,14 +51,30 @@ export default function NoteEditorPage() {
   const [routedToId, setRoutedToId] = useState("");
 
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [pending, setPending] = useState(false);
   const [savedAt, setSavedAt] = useState<string>();
   const [error, setError] = useState("");
   const [showErrors, setShowErrors] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const course = useAsync(() => (courseId ? getCourse(courseId) : Promise.resolve(undefined)), [courseId]);
+  const [suggestion, setSuggestion] = useState("");
+  const [doseNotice, setDoseNotice] = useState("");
+  const [doseFlags, setDoseFlags] = useState<{ code: string; message: string }[]>([]);
+  const [doseAck, setDoseAck] = useState<string[]>([]);
   const guide = useAsync(
-    () => (patientId ? getChartGradingGuide(activeRole, patientId) : Promise.resolve({ criteria: [], source: "course" as const })),
+    () => (patientId && activeRole !== "student" ? getChartGradingGuide(activeRole, patientId) : Promise.resolve({ criteria: [], source: "course" as const })),
     [activeRole, patientId],
   );
+  const version = useRef(0);
+  const hydrate = (n: ClinicalNote) => {
+    setNote(n);
+    version.current = n.version;
+    setTemplateId(n.templateId);
+    setContent(n.content);
+    setDiagnoses(n.diagnoses);
+    setCptCodes(n.cptCodes ?? []);
+    setRoutedToId(n.routedToId ?? "");
+  };
 
   useEffect(() => {
     let alive = true;
@@ -94,19 +114,10 @@ export default function NoteEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, noteId]);
 
-  const version = useRef(0);
-  const hydrate = (n: ClinicalNote) => {
-    setNote(n);
-    version.current = n.version;
-    setTemplateId(n.templateId);
-    setContent(n.content);
-    setDiagnoses(n.diagnoses);
-    setCptCodes(n.cptCodes ?? []);
-    setRoutedToId(n.routedToId ?? "");
-  };
-
   const latest = useRef({ templateId, content, diagnoses, cptCodes, routedToId });
-  latest.current = { templateId, content, diagnoses, cptCodes, routedToId };
+  useEffect(() => {
+    latest.current = { templateId, content, diagnoses, cptCodes, routedToId };
+  }, [templateId, content, diagnoses, cptCodes, routedToId]);
   const changeSeq = useRef(0);
   const savedSeq = useRef(0);
   const saving = useRef(false);
@@ -127,6 +138,7 @@ export default function NoteEditorPage() {
       }, activeRole);
       version.current = res.version;
       savedSeq.current = seq;
+      setPending(changeSeq.current !== seq);
       setSavedAt(res.updatedAt);
       setSaveState("saved");
       return true;
@@ -147,6 +159,7 @@ export default function NoteEditorPage() {
 
   const markDirty = () => {
     changeSeq.current += 1;
+    setPending(true);
     setSaveState((s) => (s === "error" ? s : "idle"));
   };
 
@@ -204,14 +217,25 @@ export default function NoteEditorPage() {
   const isAssessment = note.mode === "assessment";
   const reviewer = instructors.find((i) => i.id === (note.routedToId ?? routedToId));
   const errorSet = undefined;
-  const choices = templatesFor(discipline);
+  const choices: NoteTemplate[] = [
+    ...templatesFor(discipline),
+    ...(savedTemplates.data ?? [])
+      .filter((row) => row.discipline === discipline)
+      .map((row) => ({
+        id: row.id,
+        name: row.sensitive ? `${row.name} (sensitive)` : row.name,
+        disciplines: [row.discipline],
+        sections: row.sections,
+      })),
+  ];
+  const current = choices.find((item) => item.id === templateId);
 
   return (
     <Stack spacing={2}>
       <Breadcrumbs aria-label="Breadcrumb">
         <Link component={RouterLink} to="/patients" underline="hover">My patients</Link>
         <Link component={RouterLink} to={`/patients/${patient.id}`} underline="hover">{patient.lastName}, {patient.firstName}</Link>
-        <Typography color="text.primary">{TEMPLATES[templateId].name}</Typography>
+        <Typography color="text.primary">{current?.name ?? templateName(templateId)}</Typography>
       </Breadcrumbs>
 
       <PatientBanner patient={patient} compact />
@@ -221,7 +245,7 @@ export default function NoteEditorPage() {
         <Paper component="article" aria-label="Note" sx={{ p: { xs: 2, md: 3 } }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", mb: 2.5 }}>
             <Box sx={{ flex: 1, minWidth: 220 }}>
-              <Typography component="h2" variant="h5">{TEMPLATES[templateId].name}</Typography>
+              <Typography component="h2" variant="h5">{current?.name ?? templateName(templateId)}</Typography>
               <Typography variant="body2" color="text.secondary">
                 {patient.encounter.type}, {note.authorName}
               </Typography>
@@ -231,11 +255,11 @@ export default function NoteEditorPage() {
               <TextField
                 select size="small" label="Template" value={templateId} sx={{ minWidth: 240 }}
                 onChange={(e) => {
-                  const next = e.target.value as NoteTemplateId;
+                  const next = e.target.value;
                   markDirty();
                   setTemplateId(next);
-                  // Keep student edits; only fill empty fields for the new template.
-                  const seeded = prefillFromPatient(next, patient);
+                  const chosen = choices.find((item) => item.id === next);
+                  const seeded = prefillFromPatient(next, patient, chosen);
                   setContent((prev) => {
                     const merged = { ...seeded };
                     for (const [k, v] of Object.entries(prev)) {
@@ -279,11 +303,98 @@ export default function NoteEditorPage() {
             </Typography>
           </Box>
 
+          {editable && course.data?.aiAssist && course.data?.aiProviderConfigured && (
+            <Alert severity="info" sx={{ mb: 2 }} action={
+              <Button color="inherit" size="small" onClick={async () => {
+                const section = (TEMPLATES[templateId as keyof typeof TEMPLATES]?.sections[0]?.id) || "N";
+                try {
+                  const result = await suggestSection(activeRole, note.id, section);
+                  setSuggestion(result.suggestion);
+                  setDoseFlags([]);
+                  setDoseAck([]);
+                } catch (e) {
+                  setError((e as Error).message);
+                }
+              }}>Suggest</Button>
+            }>
+              {suggestion || "Ask for a suggestion for the first section. Nothing is saved until you insert it."}
+              {suggestion && (
+                <Button sx={{ ml: 1 }} size="small" onClick={async () => {
+                  const section = TEMPLATES[templateId as keyof typeof TEMPLATES]?.sections[0];
+                  const field = section?.fields[0]?.id;
+                  if (!field || !note) return;
+                  try {
+                    const check = await checkInsertedDose(activeRole, note.id, suggestion, doseAck);
+                    if (check.blocked) {
+                      setDoseFlags(check.flags);
+                      setError(check.flags[0]?.message || "This dose is blocked for this class.");
+                      return;
+                    }
+                    if (check.needsAcknowledgement) {
+                      setDoseFlags(check.flags);
+                      setError("Confirm the dose warning before inserting it.");
+                      return;
+                    }
+                    markDirty();
+                    setContent((prev) => ({ ...prev, [field]: prev[field] ? `${prev[field]}\n${suggestion}` : suggestion }));
+                    setDoseNotice(check.flags.map((flag) => flag.message).join(" "));
+                    setSuggestion("");
+                    setDoseFlags([]);
+                    setDoseAck([]);
+                    setError("");
+                  } catch (e) {
+                    setError((e as Error).message);
+                  }
+                }}>Insert</Button>
+              )}
+              {doseFlags.length > 0 && (
+                <FormControlLabel
+                  sx={{ display: "flex", mt: 1 }}
+                  control={
+                    <Checkbox
+                      checked={doseAck.length > 0}
+                      onChange={(event) => setDoseAck(event.target.checked ? doseFlags.map((flag) => flag.code) : [])}
+                    />
+                  }
+                  label="I reviewed this dose warning"
+                />
+              )}
+            </Alert>
+          )}
+          {doseNotice && <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setDoseNotice("")}>{doseNotice}</Alert>}
+          {editable && (
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap" }}>
+              {suggestionsFor(discipline).map((line) => (
+                <Button key={line} size="small" variant="outlined" onClick={() => {
+                  const template = TEMPLATES[templateId as keyof typeof TEMPLATES];
+                  const field = template?.sections[0]?.fields.find((item) => item.kind === "textarea")?.id;
+                  if (!field) return;
+                  markDirty();
+                  setContent((prev) => ({ ...prev, [field]: prev[field] ? `${prev[field]} ${line}` : line }));
+                }}>{line.slice(0, 42)}</Button>
+              ))}
+            </Stack>
+          )}
+
           <NoteFields
             templateId={templateId} patient={patient} content={content} diagnoses={diagnoses}
             readOnly={!editable} errors={errorSet}
             comments={note.feedback.filter((item) => item.sectionId)}
             onField={setField} onDiagnoses={(d) => { markDirty(); setDiagnoses(d); }}
+            onFill={(sectionId) => {
+              const template = TEMPLATES[templateId as keyof typeof TEMPLATES];
+              const draft = prefillFromPatient(templateId, patient, template);
+              const section = template?.sections.find((item) => item.id === sectionId);
+              if (!section) return;
+              markDirty();
+              setContent((prev) => {
+                const next = { ...prev };
+                for (const field of section.fields) {
+                  if (!next[field.id]?.trim() && draft[field.id]) next[field.id] = draft[field.id];
+                }
+                return next;
+              });
+            }}
           />
 
           <TextField
@@ -348,7 +459,7 @@ export default function NoteEditorPage() {
           <Paper sx={{ p: 2.5 }}>
             <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isAssessment ? "Submission" : "Practice note"}</Typography>
             <NoteProgress note={note} />
-            <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />
+            {activeRole !== "student" && <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />}
 
             {editable && (
               <Stack spacing={1.5} sx={{ mt: 2 }}>
@@ -367,7 +478,7 @@ export default function NoteEditorPage() {
                 <Typography variant="caption" color="text.secondary" role="status" aria-live="polite">
                   {saveState === "saving" && "Saving…"}
                   {saveState === "saved" && savedAt && `Draft saved at ${formatTime(savedAt)}`}
-                  {saveState === "idle" && (changeSeq.current !== savedSeq.current ? "Unsaved changes" : "Drafts save automatically")}
+                  {saveState === "idle" && (pending ? "Unsaved changes" : "Drafts save automatically")}
                   {saveState === "error" && "Not saved. See the message above."}
                 </Typography>
               </Stack>

@@ -15,6 +15,7 @@ export type Action =
   | "encounter:advance"
   | "note:author"
   | "note:cosign"
+  | "note:view_sensitive"
   | "referral:create"
   | "roster:import"
   | "audit:view"
@@ -32,7 +33,7 @@ export type Action =
 
 const teaching: Action[] = [
   "patient:create", "patient:update_status", "patient:reset_practice",
-  "encounter:advance", "note:cosign", "referral:create", "audit:view", "case:author", "report:export_teaching",
+  "encounter:advance", "note:cosign", "note:view_sensitive", "referral:create", "audit:view", "case:author", "report:export_teaching",
 ];
 
 const matrix: Record<Role, Action[]> = {
@@ -42,7 +43,7 @@ const matrix: Record<Role, Action[]> = {
   admin: [
     "roster:import", "audit:view", "instructor:manage", "instructor:remove",
     "course:create", "course:manage_status", "course:manage_access", "user:manage_access",
-    "report:run", "report:export_teaching",
+    "report:run", "report:export_teaching", "note:view_sensitive",
   ],
   front_desk: [],
   patient: ["portal:view", "portal:edit"],

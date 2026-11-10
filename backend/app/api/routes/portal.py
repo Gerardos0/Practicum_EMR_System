@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
-from app.models.clinical import ClinicalNote, Patient
+from app.models.clinical import ClinicalNote, Encounter, Patient
 from app.schemas.intake import IntakeData, IntakeIdentity, PortalIntakeOut
 from app.services.access import ensure_course_open, memberships_for, require, require_held_role
 from app.services.audit import log_event
@@ -49,14 +49,19 @@ async def portal_chart(
         .where(
             ClinicalNote.patient_id == patient.id,
             ClinicalNote.archived.is_(False),
+            ClinicalNote.sensitive.is_(False),
             ClinicalNote.status.in_(("signed", "cosigned")),
         )
         .order_by(ClinicalNote.signed_at.desc())
     )
     summary = None
+    visit = None
     if note is not None:
         parts = [f"{key}: {value}" for key, value in (note.content or {}).items() if str(value).strip()]
         summary = "\n".join(parts) if parts else None
+        visit = await db.get(Encounter, note.encounter_id)
+    if visit is None:
+        visit = patient.encounter
     medications = [
         {
             "name": item.name,
@@ -88,9 +93,14 @@ async def portal_chart(
             for lab in labs
         ],
         "last_visit": {
-            "date": patient.encounter.date if patient.encounter else None,
-            "type": patient.encounter.type if patient.encounter else None,
+            "date": note.signed_at.date().isoformat() if note is not None and note.signed_at else (visit.date if visit is not None else None),
+            "type": visit.type if visit is not None else None,
             "summary": summary,
+        },
+        "insurance": {
+            "payer": patient.insurance_payer,
+            "member_id": patient.insurance_member_id,
+            "group_number": patient.insurance_group_number,
         },
         "prescribed_medications": [item for item in medications if item["prescribed"]],
         "medication_list": medications,

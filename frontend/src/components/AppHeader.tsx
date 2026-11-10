@@ -3,18 +3,19 @@ import {
   AppBar, Box, Chip, Divider, FormControlLabel, IconButton, InputBase, Menu, MenuItem, Select,
   Switch, ToggleButton, ToggleButtonGroup, Toolbar, Tooltip, Typography,
 } from "@mui/material";
+import MenuOpenRounded from "@mui/icons-material/MenuOpenRounded";
 import MenuRounded from "@mui/icons-material/MenuRounded";
 import SearchRounded from "@mui/icons-material/SearchRounded";
 import TextIncreaseOutlined from "@mui/icons-material/TextIncreaseOutlined";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useSession } from "../features/auth/AuthContext";
+import { useSession } from "../features/auth/useSession";
 import { getCourse, listCoursesForUser } from "../api/courses";
-import { useDisplayPrefs } from "../theme/DisplayPrefsProvider";
+import { useDisplayPrefs } from "../theme/useDisplayPrefs";
 import { trainingStripe, utep } from "../theme/tokens";
 import { disciplineLabel, roleLabel } from "../utils/labels";
 import { courseIdsForRole, homePathFor, uniqueRoles } from "../utils/permissions";
 import { useAsync } from "../utils/useAsync";
-import { usePageHeadingValue } from "./PageHeading";
+import { usePageHeadingValue } from "./usePageHeading";
 import type { Role } from "../types";
 
 const pickerSx = {
@@ -37,7 +38,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
   const roleCourseIds = courseIdsForRole(user, activeRole);
   const roleCourses = activeRole === "admin"
     ? courses
-    : courses.filter((c) => roleCourseIds.includes(c.id));
+    : courses.filter((c) => roleCourseIds.includes(c.id) && (activeRole !== "student" || c.status !== "ended"));
   const initials = user.fullName.split(" ").map((w) => w[0]).slice(0, 2).join("");
   const isAdmin = activeRole === "admin";
   const canSearch = activeRole !== "patient" && !isAdmin;
@@ -66,9 +67,16 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
         <Toolbar sx={{ gap: 1.5, flexWrap: "wrap", py: 1.5, px: { xs: 2, md: 3 }, minHeight: { md: 76 } }}>
           <IconButton
             aria-label="Open navigation" onClick={onOpenNav}
-            sx={{ display: { md: "none" }, color: utep.navy }}
+            sx={{ display: { md: "none" }, color: utep.navy, minWidth: 44, minHeight: 44 }}
           >
             <MenuRounded />
+          </IconButton>
+          <IconButton
+            aria-label={prefs.navCollapsed ? "Expand navigation" : "Collapse navigation"}
+            onClick={() => setPrefs({ navCollapsed: !prefs.navCollapsed })}
+            sx={{ display: { xs: "none", md: "inline-flex" }, color: utep.navy, minWidth: 44, minHeight: 44 }}
+          >
+            {prefs.navCollapsed ? <MenuRounded /> : <MenuOpenRounded />}
           </IconButton>
 
           <Box sx={{ flex: "1 1 220px", minWidth: 0 }}>
@@ -88,8 +96,12 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
                 bgcolor: "#fff", borderRadius: "999px", color: "text.secondary",
               }}
             >
-              <SearchRounded fontSize="small" />
+              <SearchRounded fontSize="small" aria-hidden />
+              <Typography component="label" htmlFor="patient-search" sx={{ fontSize: 13, fontWeight: 700, color: utep.navy }}>
+                Search
+              </Typography>
               <InputBase
+                id="patient-search"
                 value={q} onChange={(e) => {
                   const value = e.target.value;
                   setQ(value);

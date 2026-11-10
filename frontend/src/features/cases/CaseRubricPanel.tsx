@@ -13,7 +13,7 @@ export default function CaseRubricPanel({ role, caseId, initial }: { role: Role;
     <>
       <Typography component="h2" variant="h6">Case rubric</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Students see these criteria on this case. If you leave this blank, the course rubric is used instead. Scores stay off the student view.
+        Students do not see this rubric. If you leave it blank, the instructor uses the course rubric when grading. Scores stay off the student view.
       </Typography>
       <input
         ref={fileInput}

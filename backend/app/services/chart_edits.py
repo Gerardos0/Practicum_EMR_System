@@ -13,6 +13,8 @@ from app.models.user import User
 from app.services.access import can, full_name
 from app.services.audit import log_event
 from app.services.charts import utcnow
+from app.services.dose_check import check_dose
+from app.services.guardrails import guardrail_mode
 
 
 def _locked(patient: Patient, section: str) -> bool:
@@ -76,16 +78,49 @@ async def delete_allergy(db, patient: Patient, actor: User, role: str, allergy_i
     await _touch(db, patient, actor, ip, "allergy.delete", name)
 
 
+def _names(body: dict, fallback: str = "") -> tuple[str, str | None, list[str]]:
+    generic = (body.get("generic_name") or "").strip() or None
+    brands = [str(item).strip() for item in (body.get("brand_names") or []) if str(item).strip()]
+    rxcui = (body.get("rxcui") or "").strip() or None
+    return generic or fallback, rxcui, brands
+
+
+async def _dose_flags(db, patient: Patient, role: str, dose: str, drug_name: str, body: dict) -> list[dict]:
+    if body.get("clear_flags") and can(role, "note:cosign"):
+        await log_event(
+            db,
+            action="medication.flag_cleared",
+            entity_type="patient",
+            entity_id=str(patient.id),
+            actor_user_id=body.get("_actor_id"),
+            course_id=patient.course_id,
+            detail=drug_name,
+        )
+        return []
+    mode = await guardrail_mode(db, patient.course_id)
+    flags = [] if mode == "off" else check_dose(dose, drug_name)
+    if role == "student" and flags:
+        acknowledged = set(body.get("acknowledged_flags") or [])
+        if mode == "block":
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, flags[0]["message"])
+        if mode == "acknowledge" and any(flag["code"] not in acknowledged for flag in flags):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Confirm the dose warning before saving.")
+    return flags
+
+
 async def add_medication(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
     if not _can_edit_section(role, patient, "medications"):
         _deny("medications")
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Name the medication.")
+    generic, rxcui, brands = _names(body, name)
+    dose = (body.get("dose") or "").strip()
+    flags = await _dose_flags(db, patient, role, dose, generic or name, {**body, "_actor_id": actor.id})
     patient.medications.append(
         Medication(
             name=name,
-            dose=(body.get("dose") or "").strip(),
+            dose=dose,
             route=(body.get("route") or "").strip(),
             frequency=(body.get("frequency") or "").strip(),
             indication=(body.get("indication") or "").strip() or None,
@@ -93,6 +128,10 @@ async def add_medication(db, patient: Patient, actor: User, role: str, body: dic
             access_cost=(body.get("access_cost") or "").strip() or None,
             prescribed=bool(body.get("prescribed")),
             status="active",
+            rxcui=rxcui,
+            generic_name=generic if generic != name else (body.get("generic_name") or "").strip() or None,
+            brand_names=brands,
+            flags=flags,
         )
     )
     await _touch(db, patient, actor, ip, "medication.add", name)
@@ -110,6 +149,14 @@ async def update_medication(db, patient: Patient, actor: User, role: str, medica
             setattr(row, field, value or None if field in {"indication", "adherence", "access_cost"} else value)
     if "prescribed" in body:
         row.prescribed = bool(body["prescribed"])
+    if "rxcui" in body:
+        row.rxcui = (body.get("rxcui") or "").strip() or None
+    if "generic_name" in body:
+        row.generic_name = (body.get("generic_name") or "").strip() or None
+    if isinstance(body.get("brand_names"), list):
+        row.brand_names = [str(item).strip() for item in body["brand_names"] if str(item).strip()]
+    drug = row.generic_name or row.name
+    row.flags = await _dose_flags(db, patient, role, row.dose or "", drug, {**body, "_actor_id": actor.id})
     await _touch(db, patient, actor, ip, "medication.update", row.name)
 
 

@@ -4,9 +4,10 @@ import {
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { createCase, getCase, updateCase, type CaseInput } from "../../api/cases";
-import { useSession } from "../auth/AuthContext";
+import { savePatientPhoto } from "../../api/patients";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
 import AnswerKeyEditor from "./AnswerKeyEditor";
 import CaseRubricPanel from "./CaseRubricPanel";
@@ -144,6 +145,7 @@ export default function CaseEditorPage() {
   const existing = useAsync(() => (isNew ? Promise.resolve(undefined) : getCase(activeRole, caseId)), [isNew, caseId, activeRole]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [error, setError] = useState("");
+  const [photoMessage, setPhotoMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadedId, setLoadedId] = useState("");
 
@@ -220,6 +222,29 @@ export default function CaseEditorPage() {
     }
   };
 
+  const uploadPhoto = async (file?: File) => {
+    if (!file || !existing.data) return;
+    setError("");
+    setPhotoMessage("");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Use a JPEG, PNG, or WebP photo.");
+      return;
+    }
+    if (file.size > 1_000_000) {
+      setError("The photo must be 1 MB or smaller.");
+      return;
+    }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    bytes.forEach((value) => { binary += String.fromCharCode(value); });
+    try {
+      await savePatientPhoto(activeRole, existing.data.id, file.type, btoa(binary));
+      setPhotoMessage("Photo saved on this case. Charts already assigned keep the earlier photo.");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   if (existing.error) return <PageError error={existing.error} />;
   if (!isNew && !existing.data) return <LinearProgress aria-label="Loading case" />;
 
@@ -236,6 +261,23 @@ export default function CaseEditorPage() {
         </Typography>
       </Box>
       {error && <Alert severity="error">{error}</Alert>}
+      {photoMessage && <Alert severity="success">{photoMessage}</Alert>}
+      {!isNew && (
+        <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+          <Typography component="h2" variant="h6" sx={{ mb: 1 }}>Patient photo</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            One JPEG, PNG, or WebP up to 1 MB. The chart shows initials when there is no photo.
+          </Typography>
+          <Button variant="outlined" component="label">
+            Choose photo
+            <input
+              hidden type="file" accept="image/jpeg,image/png,image/webp"
+              aria-label="Patient photo"
+              onChange={(e) => { void uploadPhoto(e.target.files?.[0]); e.target.value = ""; }}
+            />
+          </Button>
+        </Paper>
+      )}
 
       <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Demographics</Typography>

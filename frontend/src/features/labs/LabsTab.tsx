@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Box, Button, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import type { Patient } from "../../types";
 import { addLab } from "../../api/chart";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { canEditSection } from "../chart/access";
 import EmptyState from "../../components/EmptyState";
 import { formatDate } from "../../utils/format";

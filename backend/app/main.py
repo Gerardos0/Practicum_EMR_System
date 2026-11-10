@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.headers import SecurityHeadersMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes import audit, auth, cases, courses, notes, patients, portal, reference, reports, scheduling, users
+from app.api.routes import audit, auth, cases, courses, notes, patients, portal, reference, reports, scheduling, templates, users
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal, get_db
 from app.services.audit import log_event
@@ -30,6 +32,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -49,6 +52,7 @@ app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reference.router, prefix=settings.API_V1_PREFIX)
+app.include_router(templates.router, prefix=settings.API_V1_PREFIX)
 app.include_router(portal.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")

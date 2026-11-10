@@ -9,7 +9,7 @@ import { login } from "../../api/auth";
 import { takeSignedOutNotice } from "../../api/client";
 import { homePathFor, uniqueRoles } from "../../utils/permissions";
 import { trainingStripe, utep } from "../../theme/tokens";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "./useSession";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ export default function LoginPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError("Enter your UTEP email to continue.");
+      setError("Enter your email to continue.");
       return;
     }
     if (!password) {
@@ -35,7 +35,7 @@ export default function LoginPage() {
     setError("");
     login(email, password)
       .then((result) => {
-        signIn(result.user, result.accessToken, result.mustChangePassword);
+        signIn(result.user, result.accessToken, result.mustChangePassword, result.refreshToken);
         if (result.mustChangePassword) {
           navigate("/change-password", { replace: true });
           return;
@@ -71,7 +71,7 @@ export default function LoginPage() {
         <Paper component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>
           <Typography id="login-title" component="h1" variant="h5" sx={{ mb: 0.5 }}>Sign in</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            For UTEP health sciences students and faculty. Every patient here is simulated training data — never real PHI.
+            For authorized EMR accounts. Every patient here is simulated training data — never real PHI.
           </Typography>
 
           {notice && <Alert severity="info" sx={{ mb: 2 }}>{notice}</Alert>}
@@ -80,8 +80,8 @@ export default function LoginPage() {
           <Box component="form" noValidate onSubmit={submit}>
             <Stack spacing={2}>
               <TextField
-                label="UTEP email" type="email" autoComplete="username" autoFocus fullWidth
-                placeholder="you@miners.utep.edu" value={email} onChange={(e) => setEmail(e.target.value)}
+                label="Email" type="email" autoComplete="username" autoFocus fullWidth
+                placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
               />
               <TextField
                 label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password"

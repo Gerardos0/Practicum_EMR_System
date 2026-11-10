@@ -21,9 +21,12 @@ def test_cpt_list_has_no_prices_and_includes_office_codes():
 
 def test_lexicomp_is_unconfigured_without_a_url(monkeypatch):
     monkeypatch.setattr("app.services.reference_data.settings.LEXICOMP_URL", None)
+    monkeypatch.setattr("app.services.reference_data.settings.LEXICOMP_API_URL", None)
+    monkeypatch.setattr("app.services.reference_data.settings.LEXICOMP_API_KEY", None)
     status = lexicomp_status()
     assert status["configured"] is False
     assert status["url"] is None
+    assert status["detail"] == "The interaction check is unavailable."
 
 
 def test_word_rubric_becomes_criteria():

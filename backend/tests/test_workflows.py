@@ -24,9 +24,28 @@ async def patient_by_mrn(client, headers, course: str, role: str, mrn: str) -> d
 
 
 @pytest.mark.asyncio
-async def test_login_rejects_non_utep_email(client):
+async def test_login_accepts_non_utep_email_format_but_rejects_unknown_account(client):
     response = await client.post("/api/v1/auth/login", data={"username": "ada@example.com", "password": "whatever"})
-    assert response.status_code == 400
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_roster_import_allows_non_utep_email_addresses(client):
+    headers, _ = await login(client, "gerardo.sillas@utep.edu")
+    course = await course_id(client, headers, "PHAR 5320")
+
+    response = await client.post(
+        f"/api/v1/courses/{course}/roster/import",
+        headers=headers,
+        json={
+            "discipline": "pharmacy",
+            "role": "student",
+            "rows": [{"fullName": "Test Student", "email": "student@example.com", "universityId": "800123456"}],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["added"] == 1
 
 
 @pytest.mark.asyncio
@@ -322,8 +341,8 @@ async def test_ended_course_rejects_writes(client):
         params={"role": "student"},
         json=payload,
     )
-    assert blocked.status_code == 409
-    assert blocked.json()["detail"] == "This course has ended and cannot be edited."
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == "This course has ended."
 
 
 @pytest.mark.asyncio

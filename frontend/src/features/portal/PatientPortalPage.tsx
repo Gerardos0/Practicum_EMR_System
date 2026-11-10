@@ -4,7 +4,7 @@ import { useAsync } from "../../utils/useAsync";
 import { formatDate } from "../../utils/format";
 import { trainingStripe, utep } from "../../theme/tokens";
 import PageError from "../../components/PageError";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import PatientIntakeForm from "./PatientIntakeForm";
 
 interface PortalChart {
@@ -13,6 +13,7 @@ interface PortalChart {
   last_visit: { date?: string; type?: string; summary?: string | null };
   prescribed_medications: { name: string; dose: string; route: string; frequency: string }[];
   medication_list: { name: string; dose: string; route: string; frequency: string; prescribed: boolean }[];
+  insurance?: { payer?: string | null; member_id?: string | null; group_number?: string | null };
 }
 
 const PREVIEW_CHART: PortalChart = {
@@ -34,6 +35,7 @@ const PREVIEW_CHART: PortalChart = {
     { name: "Lisinopril", dose: "10 mg", route: "oral", frequency: "once daily", prescribed: true },
     { name: "Vitamin D3", dose: "1000 IU", route: "oral", frequency: "once daily", prescribed: false },
   ],
+  insurance: { payer: "University plan", member_id: "M-2048", group_number: "UTEP" },
 };
 
 export default function PatientPortalPage({ previewMode = false }: { previewMode?: boolean }) {
@@ -54,6 +56,14 @@ export default function PatientPortalPage({ previewMode = false }: { previewMode
           DOB {formatDate(data.patient.dob)} · MRN {data.patient.mrn}. Your chart is read only. You can update your own information below.
         </Typography>
       </Box>
+      {data.insurance?.payer && (
+        <Paper sx={{ p: 2.5 }}>
+          <Typography component="h2" variant="h6">Coverage</Typography>
+          <Typography variant="body2">Payer: {data.insurance.payer}</Typography>
+          {data.insurance.member_id && <Typography variant="body2">Member ID: {data.insurance.member_id}</Typography>}
+          {data.insurance.group_number && <Typography variant="body2">Group: {data.insurance.group_number}</Typography>}
+        </Paper>
+      )}
       <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6">Last visit</Typography>
         <Typography variant="body2" color="text.secondary">{data.last_visit.type || "No visit on file"}{data.last_visit.date ? ` · ${formatDate(data.last_visit.date)}` : ""}</Typography>

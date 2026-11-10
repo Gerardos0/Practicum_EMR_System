@@ -6,7 +6,7 @@ import { listAppointments } from "../../../api/scheduling";
 import { addAllergy, addVital, markVitalEnteredInError, removeAllergy } from "../../../api/chart";
 import VitalsChart from "./VitalsChart";
 import PatientReportedCard from "./PatientReportedCard";
-import { useSession } from "../../auth/AuthContext";
+import { useSession } from "../../auth/useSession";
 import { can } from "../../../utils/permissions";
 import { canEditSection } from "../../chart/access";
 import { formatDate, formatDateTime } from "../../../utils/format";
@@ -46,6 +46,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   const [allergy, setAllergy] = useState({ substance: "", category: "medication" as AllergyCategory, reaction: "" });
   const [vital, setVital] = useState({ label: "", value: "" });
   const [error, setError] = useState("");
+  const [now] = useState(() => Date.now());
 
   const idx = FLOW.indexOf(p.status.encounter);
   const next = idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : undefined;
@@ -111,7 +112,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   })();
 
   const upcoming = [...(appts.data ?? [])].sort((a, b) => a.when.localeCompare(b.when));
-  const nextAppointment = upcoming.find((item) => new Date(item.when).getTime() >= Date.now()) ?? upcoming[0];
+  const nextAppointment = upcoming.find((item) => new Date(item.when).getTime() >= now) ?? upcoming[0];
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>

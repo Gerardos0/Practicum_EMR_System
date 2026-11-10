@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Box, Button, Drawer, Menu, MenuItem, Switch, Typography } from "@mui/material";
+import { Box, Button, Drawer, Menu, MenuItem, Switch, Tooltip, Typography } from "@mui/material";
 import DashboardOutlined from "@mui/icons-material/DashboardOutlined";
 import FactCheckOutlined from "@mui/icons-material/FactCheckOutlined";
 import PeopleAltOutlined from "@mui/icons-material/PeopleAltOutlined";
@@ -10,12 +10,13 @@ import SchoolOutlined from "@mui/icons-material/SchoolOutlined";
 import QueryStatsOutlined from "@mui/icons-material/QueryStatsOutlined";
 import AssessmentOutlined from "@mui/icons-material/AssessmentOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
+import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import TextFieldsOutlined from "@mui/icons-material/TextFieldsOutlined";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useSession } from "../features/auth/AuthContext";
+import { useSession } from "../features/auth/useSession";
 import { listReviewQueue } from "../api/notes";
-import { useDisplayPrefs } from "../theme/DisplayPrefsProvider";
+import { useDisplayPrefs } from "../theme/useDisplayPrefs";
 import { useAsync } from "../utils/useAsync";
 import { utep } from "../theme/tokens";
 import type { Role } from "../types";
@@ -117,7 +118,7 @@ function DisplayPrefsButton() {
   );
 }
 
-function NavContent({ onNavigate }: { onNavigate?: () => void }) {
+function NavContent({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
   const navigate = useNavigate();
   const { signOut } = useSession();
   const items = useNav();
@@ -134,10 +135,12 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
         >
           UT
         </Box>
-        <Box>
-          <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>UTEP EMR</Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)" }}>Training system</Typography>
-        </Box>
+        {!collapsed && (
+          <Box>
+            <Typography sx={{ color: "#fff", fontWeight: 800, fontSize: 18, lineHeight: 1.2 }}>UTEP EMR</Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)" }}>Training system</Typography>
+          </Box>
+        )}
       </Box>
 
       <Box component="nav" aria-label="Main" sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
@@ -149,9 +152,11 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
             end={item.to === "/dashboard" || item.to === "/admin"}
             startIcon={item.icon}
             onClick={onNavigate}
-            sx={itemSx}
+            aria-label={item.label}
+            title={collapsed ? item.label : undefined}
+            sx={{ ...itemSx, px: collapsed ? 1 : 1.75, justifyContent: collapsed ? "center" : "flex-start" }}
           >
-            <Box component="span" sx={{ flex: 1, textAlign: "left" }}>{item.label}</Box>
+            {!collapsed && <Box component="span" sx={{ flex: 1, textAlign: "left" }}>{item.label}</Box>}
             {item.badge ? (
               <Box
                 component="span"
@@ -172,10 +177,24 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <Box sx={{ flexGrow: 1, minHeight: 24 }} />
 
-      <DisplayPrefsButton />
-      <Button startIcon={<LogoutOutlined fontSize="small" />} sx={itemSx} onClick={() => { signOut(); navigate("/"); }}>
-        Sign out
-      </Button>
+      <Tooltip title={collapsed ? "About us" : ""} placement="right">
+        <Button
+          component={NavLink}
+          to="/about"
+          startIcon={<GroupsOutlined fontSize="small" />}
+          onClick={onNavigate}
+          aria-label="About us"
+          sx={{ ...itemSx, px: collapsed ? 1 : 1.75, justifyContent: collapsed ? "center" : "flex-start" }}
+        >
+          {!collapsed && "About us"}
+        </Button>
+      </Tooltip>
+      {!collapsed && <DisplayPrefsButton />}
+      <Tooltip title={collapsed ? "Sign out" : ""} placement="right">
+        <Button startIcon={<LogoutOutlined fontSize="small" />} aria-label="Sign out" sx={{ ...itemSx, justifyContent: collapsed ? "center" : "flex-start" }} onClick={() => { signOut(); navigate("/"); }}>
+          {!collapsed && "Sign out"}
+        </Button>
+      </Tooltip>
     </Box>
   );
 }
@@ -186,20 +205,22 @@ interface Props {
 }
 
 export default function SideNav({ mobileOpen, onClose }: Props) {
-  const paperSx = { width: SIDENAV_WIDTH, boxSizing: "border-box", border: "none", bgcolor: utep.navy };
+  const { prefs } = useDisplayPrefs();
+  const width = prefs.navCollapsed ? 72 : SIDENAV_WIDTH;
+  const paperSx = { width, boxSizing: "border-box", border: "none", bgcolor: utep.navy };
   return (
     <>
       <Drawer
         variant="temporary" open={mobileOpen} onClose={onClose} ModalProps={{ keepMounted: true }}
-        sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": paperSx }}
+        sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { ...paperSx, width: SIDENAV_WIDTH } }}
       >
         <NavContent onNavigate={onClose} />
       </Drawer>
       <Drawer
         variant="permanent" open
-        sx={{ display: { xs: "none", md: "block" }, width: SIDENAV_WIDTH, flexShrink: 0, "& .MuiDrawer-paper": paperSx }}
+        sx={{ display: { xs: "none", md: "block" }, width, flexShrink: 0, "& .MuiDrawer-paper": paperSx }}
       >
-        <NavContent />
+        <NavContent collapsed={prefs.navCollapsed} />
       </Drawer>
     </>
   );

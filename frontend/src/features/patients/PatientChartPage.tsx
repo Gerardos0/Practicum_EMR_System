@@ -5,12 +5,12 @@ import { getPatient, updatePatientStatus } from "../../api/patients";
 import { grantPortalAccess } from "../../api/users";
 import { recordPresence, updatePlacement } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
 import { utep } from "../../theme/tokens";
 import PageError from "../../components/PageError";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import PatientBanner from "./components/PatientBanner";
 import StatusDialog from "./components/StatusDialog";
 import SummaryTab from "./components/SummaryTab";
@@ -134,7 +134,7 @@ export default function PatientChartPage() {
       <Box
         role="tablist"
         aria-label="Chart sections"
-        sx={{ display: "flex", gap: 0.75, flexDirection: { xs: "row", md: "column" }, flexWrap: "wrap" }}
+        sx={{ display: "flex", gap: 0.75, flexDirection: { xs: "row", md: "column" }, flexWrap: { xs: "nowrap", md: "wrap" }, overflowX: { xs: "auto", md: "visible" }, pb: { xs: 0.5, md: 0 } }}
       >
         {TABS.map((t) => {
           const selected = tab === t.id;
@@ -152,6 +152,8 @@ export default function PatientChartPage() {
                 cursor: "pointer",
                 px: 1.75,
                 py: 1,
+                minHeight: 44,
+                flexShrink: 0,
                 borderRadius: "999px",
                 fontWeight: 700,
                 fontSize: 14,

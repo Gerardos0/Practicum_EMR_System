@@ -1,6 +1,7 @@
 from datetime import date
 
 from app.clinical_sections import locks_or_default, prefill_or_default
+from app.core.config import settings
 from app.models.clinical import (
     Appointment,
     ClinicalNote,
@@ -10,6 +11,7 @@ from app.models.clinical import (
 )
 from app.models.user import User
 from app.services.access import full_name, memberships_for
+from app.services.note_crypto import reveal_content, reveal_text
 
 
 def _age(dob: date) -> int:
@@ -28,6 +30,10 @@ def course_out(course: Course, instructor_ids: list[str]) -> dict:
         "instructor_ids": instructor_ids,
         "rubric_file_name": course.rubric_file_name,
         "grading_guide": course.grading_guide,
+        "guardrail_profile": course.guardrail_profile or "practicum",
+        "guardrail_mode": course.guardrail_mode,
+        "ai_assist": bool(course.ai_assist),
+        "ai_provider_configured": bool((settings.AI_API_URL or "").strip()),
     }
 
 
@@ -83,6 +89,10 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
                 "status": m.status,
                 "prescribed": m.prescribed,
                 "discontinued_at": m.discontinued_at,
+                "rxcui": m.rxcui,
+                "generic_name": m.generic_name,
+                "brand_names": list(m.brand_names or []),
+                "flags": list(m.flags or []),
             }
             for m in patient.medications
             if m.status != "entered_in_error"
@@ -119,6 +129,7 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
         "unit": patient.unit,
         "room": patient.room,
         "bed": patient.bed,
+        "has_photo": bool(patient.photo),
         "family_history": patient.family_history,
         "surgical_history": patient.surgical_history,
         "social_history": patient.social_history,
@@ -156,7 +167,8 @@ def note_out(note: ClinicalNote, *, include_scores: bool = False) -> dict:
         "mode": note.mode,
         "status": note.status,
         "version": note.version,
-        "content": note.content or {},
+        "content": reveal_content(note),
+        "sensitivity": note.sensitivity or "standard",
         "diagnoses": note.diagnoses or [],
         "cpt_codes": note.cpt_codes or [],
         "body_locked": bool(note.body_locked),
@@ -171,7 +183,7 @@ def note_out(note: ClinicalNote, *, include_scores: bool = False) -> dict:
                 "id": str(item.id),
                 "author_id": str(item.author_id),
                 "author_name": full_name(item.author),
-                "body": item.body,
+                "body": reveal_text(item.body, item.body_cipher),
                 "kind": item.kind,
                 "section_id": item.section_id,
                 "created_at": item.created_at,
@@ -182,7 +194,7 @@ def note_out(note: ClinicalNote, *, include_scores: bool = False) -> dict:
             {
                 "id": str(item.id),
                 "author_name": full_name(item.author),
-                "body": item.body,
+                "body": reveal_text(item.body, item.body_cipher),
                 "created_at": item.created_at,
             }
             for item in sorted(note.addenda, key=lambda item: item.created_at)

@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
-import { Autocomplete, Box, Button, Chip, InputAdornment, Stack, TextField, Typography } from "@mui/material";
+import { Autocomplete, Box, Button, Chip, InputAdornment, LinearProgress, Stack, TextField, Typography } from "@mui/material";
 import type { IcdCode, NoteComment, NoteTemplateId, Patient } from "../../../types";
 import { searchIcd10 } from "../../../api/reference";
-import { TEMPLATES, type TemplateField } from "../noteTemplates";
+import { listNoteTemplates } from "../../../api/templates";
+import { useSession } from "../../auth/useSession";
+import { useAsync } from "../../../utils/useAsync";
+import { TEMPLATES, type NoteTemplate, type TemplateField } from "../noteTemplates";
 import { legacyProse } from "../generalSoap";
 import { AssessmentEditor, HpiEditor, NarrativeButton, ProblemPlanEditor, RosEditor } from "./GeneralSoapFields";
 import DictationButton from "../../../components/DictationButton";
-import MedRecTable, { parseMedRec } from "./MedRecTable";
+import MedRecTable from "./MedRecTable";
+import { parseMedRec } from "./medRec";
 import FeedbackThread from "./FeedbackThread";
 import { utep } from "../../../theme/tokens";
 
 type Setter = (id: string, next: string | ((prev: string) => string)) => void;
 
 interface Props {
-  templateId: NoteTemplateId;
+  templateId: string;
   patient: Patient;
   content: Record<string, string>;
   diagnoses: IcdCode[];
@@ -23,18 +27,28 @@ interface Props {
   onDiagnoses?: (d: IcdCode[]) => void;
   comments?: NoteComment[];
   onComment?: (sectionId: string, body: string) => Promise<void>;
+  onFill?: (sectionId: string) => void;
 }
 
 const SOAP = new Set(["S", "O", "A", "P"]);
 
 export default function NoteFields({
-  templateId, patient, content, diagnoses, readOnly, errors, onField, onDiagnoses, comments, onComment,
+  templateId, patient, content, diagnoses, readOnly, errors, onField, onDiagnoses, comments, onComment, onFill,
 }: Props) {
-  const template = TEMPLATES[templateId];
+  const { activeRole, courseId } = useSession();
+  const saved = useAsync(() => listNoteTemplates(activeRole, courseId), [activeRole, courseId]);
+  const builtin: NoteTemplate | undefined = templateId in TEMPLATES ? TEMPLATES[templateId as NoteTemplateId] : undefined;
+  const savedRow = (saved.data ?? []).find((row) => row.id === templateId);
+  const template: NoteTemplate | undefined = builtin ?? (savedRow
+    ? { id: savedRow.id, name: savedRow.name, disciplines: [savedRow.discipline], sections: savedRow.sections }
+    : undefined);
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [commentError, setCommentError] = useState("");
+
+  if (!template && (saved.loading || !saved.data)) return <LinearProgress aria-label="Loading template" />;
+  if (!template) return <Typography color="text.secondary">This template is no longer available.</Typography>;
 
   const send = async (sectionId: string) => {
     if (!onComment || !draft.trim()) return;
@@ -64,6 +78,9 @@ export default function NoteFields({
               </Box>
             )}
             <Typography id={`sec-${section.id}`} component="h3" variant="h6" sx={{ flex: 1 }}>{section.title}</Typography>
+            {onFill && !readOnly && (
+              <Button size="small" onClick={() => onFill(section.id)} sx={{ minHeight: 44 }}>Fill from chart</Button>
+            )}
             {onComment && (
               <Button type="button" size="small" onClick={() => { setOpenSection(section.id); setDraft(""); setCommentError(""); }}>
                 Comment on this section
@@ -109,7 +126,7 @@ export default function NoteFields({
 function Field({
   templateId, field: f, patient, content, value, diagnoses, readOnly, error, onField, onDiagnoses,
 }: {
-  templateId: NoteTemplateId; field: TemplateField; patient: Patient; content: Record<string, string>; value: string; diagnoses: IcdCode[];
+  templateId: string; field: TemplateField; patient: Patient; content: Record<string, string>; value: string; diagnoses: IcdCode[];
   readOnly?: boolean; error?: boolean; onField?: Setter; onDiagnoses?: (d: IcdCode[]) => void;
 }) {
   const label = f.label;
@@ -156,7 +173,7 @@ function Field({
   }
 
   if (f.kind === "icd10") {
-    if (structured) return <AssessmentEditor diagnoses={diagnoses} readOnly={readOnly} onDiagnoses={onDiagnoses} />;
+    if (structured) return <AssessmentEditor diagnoses={diagnoses} readOnly={readOnly} onDiagnoses={onDiagnoses} chartDiagnoses={chartDiagnoses(patient)} />;
     if (readOnly) {
       return (
         <ReadBlock label={f.label}>
@@ -167,6 +184,7 @@ function Field({
     return (
       <IcdSearch
         id={`field-${f.id}`} label={label} value={diagnoses} error={error}
+        chartDiagnoses={chartDiagnoses(patient)}
         onChange={(next) => onDiagnoses?.(next)}
       />
     );
@@ -193,22 +211,23 @@ function Field({
   );
 }
 
+function chartDiagnoses(patient: Patient): IcdCode[] {
+  return patient.problems.flatMap((problem) => problem.code ? [{ code: problem.code, label: problem.description }] : []);
+}
+
 function IcdSearch({
-  id, label, value, error, onChange,
+  id, label, value, error, onChange, chartDiagnoses: fromChart = [],
 }: {
-  id: string; label: string; value: IcdCode[]; error?: boolean; onChange: (next: IcdCode[]) => void;
+  id: string; label: string; value: IcdCode[]; error?: boolean; onChange: (next: IcdCode[]) => void; chartDiagnoses?: IcdCode[];
 }) {
   const [options, setOptions] = useState<IcdCode[]>([]);
   const [query, setQuery] = useState("");
   const [lookupError, setLookupError] = useState("");
 
+  const term = query.trim();
+  const searching = term.length >= 2;
   useEffect(() => {
-    const term = query.trim();
-    if (term.length < 2) {
-      setOptions([]);
-      setLookupError("");
-      return;
-    }
+    if (!searching) return;
     let alive = true;
     const timer = setTimeout(() => {
       searchIcd10(term)
@@ -216,11 +235,11 @@ function IcdSearch({
         .catch((e: Error) => { if (alive) { setOptions([]); setLookupError(e.message); } });
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
-  }, [query]);
+  }, [term, searching]);
 
   return (
     <Autocomplete
-      multiple options={options} value={value} filterOptions={(rows) => rows}
+      multiple options={searching ? [...fromChart, ...options.filter((row) => !fromChart.some((item) => item.code === row.code))] : fromChart} value={value} filterOptions={(rows) => rows}
       getOptionLabel={(option) => `${option.code} ${option.label}`}
       isOptionEqualToValue={(a, b) => a.code === b.code}
       onChange={(_, next) => onChange(next)}

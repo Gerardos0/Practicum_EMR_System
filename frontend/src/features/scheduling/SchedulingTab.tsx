@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import type { Patient } from "../../types";
 import { createReferral, listAppointments, listReferrals } from "../../api/scheduling";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { disciplineLabel } from "../../utils/labels";
 import { formatDate, formatDateTime } from "../../utils/format";

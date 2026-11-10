@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Box, Card, CardActionArea, CardContent, LinearProgress, Stack, Typography } from "@mui/material";
 import { listCoursesForUser } from "../../api/courses";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
 import RosterImportPage from "./RosterImportPage";
 

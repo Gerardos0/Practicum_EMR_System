@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
 import {
   Alert, Box, Button, Chip, LinearProgress, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow,
-  TextField, Typography,
+  MenuItem, Switch, TextField, Typography,
 } from "@mui/material";
-import { createCourse, downloadAllActivity, listCoursesForUser, setCourseStatus, setInactivityDays } from "../../api/courses";
+import { createCourse, downloadAllActivity, listCoursesForUser, setCoursePolicy, setCourseStatus, setInactivityDays } from "../../api/courses";
 import type { Course, CourseStatus } from "../../types";
 import { useAsync } from "../../utils/useAsync";
-import { useSession } from "../auth/AuthContext";
-import { usePageHeading } from "../../components/PageHeading";
+import { useSession } from "../auth/useSession";
+import { usePageHeading } from "../../components/usePageHeading";
+import NoteTemplateAuthor from "../encounters/components/NoteTemplateAuthor";
 
 const statusTone: Record<CourseStatus, "default" | "info" | "success" | "warning"> = {
   planned: "info",
@@ -36,6 +37,19 @@ export default function CourseAdminPage() {
     const month = String(day.getMonth() + 1).padStart(2, "0");
     return `${day.getFullYear()}-${month}-${String(day.getDate()).padStart(2, "0")}`;
   });
+
+  const savePolicy = async (course: Course, patch: Parameters<typeof setCoursePolicy>[1]) => {
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await setCoursePolicy(course.id, patch);
+      courses.setData((current) => current?.map((item) => item.id === updated.id ? updated : item));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const mutateStatus = async (course: Course, next: CourseStatus) => {
     setBusy(true);
@@ -121,7 +135,7 @@ export default function CourseAdminPage() {
         <Box sx={{ overflowX: "auto", p: 1 }}>
           <Table size="small">
             <TableHead>
-              <TableRow><TableCell>Code</TableCell><TableCell>Title</TableCell><TableCell>Term</TableCell><TableCell>Status</TableCell><TableCell>At-risk days</TableCell><TableCell align="right">Actions</TableCell></TableRow>
+              <TableRow><TableCell>Code</TableCell><TableCell>Title</TableCell><TableCell>Term</TableCell><TableCell>Status</TableCell><TableCell>At-risk days</TableCell><TableCell>Dose check</TableCell><TableCell align="right">Actions</TableCell></TableRow>
             </TableHead>
             <TableBody>
               {(courses.data ?? []).map((course) => (
@@ -142,11 +156,41 @@ export default function CourseAdminPage() {
                       sx={{ width: 88 }}
                     />
                   </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1}>
+                      <TextField
+                        select size="small" label="Profile" value={course.guardrailProfile ?? "practicum"} disabled={busy}
+                        onChange={(event) => savePolicy(course, { guardrailProfile: event.target.value as Course["guardrailProfile"] })}
+                        sx={{ minWidth: 140 }}
+                      >
+                        <MenuItem value="intro_pharmacy">Intro to Pharmacy</MenuItem>
+                        <MenuItem value="practicum">Practicum</MenuItem>
+                        <MenuItem value="clinical_other">Other clinical</MenuItem>
+                      </TextField>
+                      <TextField
+                        select size="small" label="Mode" value={course.guardrailMode ?? ""} disabled={busy}
+                        onChange={(event) => savePolicy(course, { guardrailMode: (event.target.value || null) as Course["guardrailMode"] })}
+                        sx={{ minWidth: 130 }}
+                      >
+                        <MenuItem value="">Profile default</MenuItem>
+                        <MenuItem value="off">Off</MenuItem>
+                        <MenuItem value="advisory">Advisory</MenuItem>
+                        <MenuItem value="acknowledge">Acknowledge</MenuItem>
+                        <MenuItem value="block">Block</MenuItem>
+                      </TextField>
+                      <Switch
+                        checked={Boolean(course.aiAssist)}
+                        disabled={busy}
+                        slotProps={{ input: { "aria-label": `Section assist for ${course.code}` } }}
+                        onChange={(event) => savePolicy(course, { aiAssist: event.target.checked })}
+                      />
+                    </Stack>
+                  </TableCell>
                   <TableCell align="right">{actions(course)}</TableCell>
                 </TableRow>
               ))}
               {!courses.loading && courses.data?.length === 0 && (
-                <TableRow><TableCell colSpan={6} sx={{ color: "text.secondary" }}>No courses yet.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} sx={{ color: "text.secondary" }}>No courses yet.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -168,6 +212,7 @@ export default function CourseAdminPage() {
           }}>Download Excel</Button>
         </Stack>
       </Paper>
+      <NoteTemplateAuthor role="admin" />
     </Stack>
   );
 }

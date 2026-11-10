@@ -1,6 +1,6 @@
 import { Alert, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import { getStaffIntake } from "../../../api/intake";
-import { useSession } from "../../auth/AuthContext";
+import { useSession } from "../../auth/useSession";
 import { formatDateTime } from "../../../utils/format";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";

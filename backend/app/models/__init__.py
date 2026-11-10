@@ -1,5 +1,6 @@
 # Import every model here so Alembic autogenerate can see them.
 from app.models.audit import AuditEvent  # noqa: F401
+from app.models.refresh_token import RefreshToken  # noqa: F401
 from app.models.clinical import (  # noqa: F401
     Allergy,
     Appointment,
@@ -17,6 +18,7 @@ from app.models.clinical import (  # noqa: F401
     Patient,
     PatientIntake,
     Problem,
+    SavedNoteTemplate,
     Referral,
     Vital,
 )

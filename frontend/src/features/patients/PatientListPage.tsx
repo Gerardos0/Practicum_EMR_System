@@ -3,26 +3,30 @@ import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
   LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
 } from "@mui/material";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import Check from "@mui/icons-material/Check";
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import { listPatients, resetPracticePatient, unassignCase, type PatientRow } from "../../api/patients";
-import { useSession } from "../auth/AuthContext";
+import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
 import { formatDate, formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
-import { usePageHeading } from "../../components/PageHeading";
+import { usePageHeading } from "../../components/usePageHeading";
 import AssignCaseDialog from "./components/AssignCaseDialog";
+import { CASELOAD_VIEWS, caseloadHref, caseloadViewMeta, matchesCaseload, parseCaseloadView } from "./caseload";
 import type { CaseMode } from "../../types";
 
 export default function PatientListPage() {
   const navigate = useNavigate();
   const { activeRole, courseId } = useSession();
   const isStudent = activeRole === "student";
-  usePageHeading(isStudent ? "My Patients" : "Patients");
   const [params, setParams] = useSearchParams();
   const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
   const query = params.get("q") ?? "";
+  const view = isStudent ? parseCaseloadView(params.get("view")) : undefined;
+  const viewMeta = view ? caseloadViewMeta(view) : undefined;
+  usePageHeading(viewMeta?.label ?? (isStudent ? "My Patients" : "Patients"));
   const [resetTarget, setResetTarget] = useState<PatientRow>();
   const [unassignTarget, setUnassignTarget] = useState<PatientRow>();
   const [assignOpen, setAssignOpen] = useState(false);
@@ -41,7 +45,7 @@ export default function PatientListPage() {
   }), [clinical]);
 
   const visible = clinical
-    .filter((r) => r.patient.mode === mode)
+    .filter((r) => (view ? matchesCaseload(r, view) : r.patient.mode === mode))
     .filter((r) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
@@ -91,6 +95,48 @@ export default function PatientListPage() {
         <Alert severity={flash.severity} onClose={() => setFlash(undefined)} sx={{ mb: 2 }}>{flash.text}</Alert>
       )}
       <Paper>
+        {view && viewMeta ? (
+          <Box sx={{ px: 2.5, pt: 2.5, pb: 1 }}>
+            <Typography sx={{ fontSize: 28, fontWeight: 500, color: "#202124", lineHeight: 1.2 }}>
+              Filter by category
+            </Typography>
+            <Typography sx={{ mt: 0.5, fontSize: 16, color: "#5F6368" }}>{viewMeta.description}</Typography>
+            <Box
+              role="navigation"
+              aria-label="Patient categories"
+              sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 2.5 }}
+            >
+              {CASELOAD_VIEWS.map((item) => {
+                const selected = item.id === view;
+                const count = clinical.filter((r) => matchesCaseload(r, item.id)).length;
+                return (
+                  <Chip
+                    key={item.id}
+                    component={RouterLink}
+                    to={caseloadHref(item.id, query)}
+                    clickable
+                    variant="outlined"
+                    icon={selected ? <Check /> : undefined}
+                    label={`${item.label} (${count})`}
+                    aria-current={selected ? "page" : undefined}
+                    sx={categoryChipSx(selected)}
+                  />
+                );
+              })}
+            </Box>
+            <Button
+              component={RouterLink}
+              to={query ? `/patients?q=${encodeURIComponent(query)}` : "/patients"}
+              sx={{
+                mt: 2.5, alignSelf: "flex-start", bgcolor: "#F1F3F4", color: "#3C4043",
+                borderRadius: "10px", px: 2.75, py: 1.25, minHeight: 48, fontSize: 15, fontWeight: 600,
+                "&:hover": { bgcolor: "#E8EAED" },
+              }}
+            >
+              All patients
+            </Button>
+          </Box>
+        ) : (
         <Tabs
           value={mode} onChange={(_, v) => setParams({ mode: v, ...(query ? { q: query } : {}) }, { replace: true })}
           sx={{ px: 1, borderBottom: 1, borderColor: "divider" }} aria-label="Case type"
@@ -98,7 +144,9 @@ export default function PatientListPage() {
           <Tab value="assessment" label={`${isStudent ? "Assigned cases" : "Assessment cases"} (${counts.assessment})`} />
           <Tab value="practice" label={`Practice patients (${counts.practice})`} />
         </Tabs>
+        )}
 
+        {!view && (
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 2, pt: 1.5, flexWrap: "wrap" }}>
           <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 220 }}>
             {mode === "assessment"
@@ -111,6 +159,7 @@ export default function PatientListPage() {
             <Button size="small" variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button>
           )}
         </Box>
+        )}
 
         {rows.loading && <LinearProgress sx={{ mt: 1 }} aria-label="Loading patients" />}
 
@@ -118,10 +167,10 @@ export default function PatientListPage() {
           {rows.loading ? null : visible.length === 0 ? (
             <Box sx={{ p: 2 }}>
               <EmptyState
-                title={query ? "No patients match that search" : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
-                action={!query && mode === "assessment" && canAssign ? <Button variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button> : undefined}
+                title={query ? "No patients match that search" : viewMeta ? viewMeta.emptyTitle : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
+                action={!query && !view && mode === "assessment" && canAssign ? <Button variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button> : undefined}
               >
-                {query ? "Try a last name, a date of birth, or the full MRN." : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
+                {query ? "Try a last name, a date of birth, or the full MRN." : viewMeta ? viewMeta.emptyBody : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
               </EmptyState>
             </Box>
           ) : (
@@ -256,6 +305,27 @@ export default function PatientListPage() {
       )}
     </Box>
   );
+}
+
+const CATEGORY_BLUE = "#1A73E8";
+
+function categoryChipSx(selected: boolean) {
+  return {
+    height: 42,
+    borderRadius: "999px",
+    px: 0.25,
+    fontSize: 15,
+    fontWeight: 600,
+    textDecoration: "none",
+    bgcolor: "#fff",
+    color: selected ? CATEGORY_BLUE : "#3C4043",
+    borderColor: selected ? CATEGORY_BLUE : "#DADCE0",
+    "& .MuiChip-icon": { color: CATEGORY_BLUE, fontSize: 20, ml: "12px" },
+    "& .MuiChip-label": { px: 1.75 },
+    "&:hover, &.MuiChip-clickable:hover": {
+      bgcolor: selected ? "rgba(26,115,232,0.06)" : "#F8F9FA",
+    },
+  } as const;
 }
 
 const visuallyHidden = {
