@@ -34,6 +34,49 @@ def intake_payload(**updates):
     return {**data, **updates}
 
 
+def full_v2_payload(**updates):
+    data = {
+        **intake_payload(),
+        "genderIdentity": "Woman",
+        "race": ["Asian", "White"],
+        "ethnicity": "Hispanic or Latino",
+        "maritalStatus": "Married",
+        "interpreterNeeded": False,
+        "email": "rosa@example.test",
+        "phoneType": "Mobile",
+        "city": "El Paso",
+        "state": "TX",
+        "zipCode": "79901-1234",
+        "insurancePlanType": "PPO",
+        "insuranceSubscriberIsPatient": False,
+        "insuranceSubscriberName": "Rosa Demo Subscriber",
+        "insuranceSubscriberDob": "1970-01-02",
+        "insuranceRelationship": "Spouse",
+        "insuranceEffectiveDate": "2025-01-01",
+        "secondaryInsurancePayer": "Secondary Example Plan",
+        "secondaryInsuranceMemberId": "SECONDARY-MEMBER-20",
+        "secondaryInsuranceGroupNumber": "SECONDARY-GROUP-2",
+        "secondaryInsuranceRelationship": "Self",
+        "conditions": [{"name": "Asthma", "year": "2018"}],
+        "surgeries": [{"procedure": "Appendectomy", "year": "2010"}],
+        "allergies": [{"agent": "Penicillin", "reaction": "Rash"}],
+        "noKnownAllergies": False,
+        "medications": [{"name": "Lisinopril", "dose": "10 mg", "frequency": "Daily"}],
+        "familyMembers": [{"relative": "Mother", "status": "Living", "conditions": "Hypertension"}],
+        "tobaccoUse": "Never",
+        "tobaccoDetail": "",
+        "alcoholUse": "Occasional",
+        "alcoholDetail": "One drink monthly",
+        "drugUse": "Never",
+        "occupation": "Teacher",
+        "livesWith": "Family",
+        "exercise": "Walks weekly",
+        "preferredPharmacy": "Example Pharmacy",
+        "confirmedAccurate": True,
+    }
+    return {**data, **updates}
+
+
 async def _rosa_context(client):
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     course = await course_id(client, instructor, "PHAR 5320")
@@ -316,3 +359,170 @@ async def test_retention_purge_removes_intake_rows_written_by_user(client, db_se
         select(PatientIntake.id).where(PatientIntake.updated_by_user_id == user.id)
     ) is None
     assert instructor
+
+
+@pytest.mark.asyncio
+async def test_v2_legacy_intake_row_defaults_new_fields_and_accepts_update(client, db_session):
+    patient_headers, _ = await login(client, "patient.demo@example.com")
+    _, _, rosa = await _rosa_context(client)
+    patient_user = await db_session.scalar(select(User).where(User.email == "patient.demo@example.com"))
+    assert patient_user is not None
+    legacy_data = {
+        "preferred_name": "Legacy Rosa",
+        "pronouns": "she/her",
+        "phone": "915-555-0101",
+        "address": "100 Demo Street",
+        "preferred_language": "English",
+        "past_medical_history": "Legacy condition",
+        "surgical_history": "",
+        "family_history": "Legacy family history",
+        "social_history": "",
+        "insurance_payer": "Legacy Plan",
+        "insurance_member_id": "LEGACY-100",
+        "insurance_group_number": "LEGACY-GROUP",
+        "emergency_contact_name": "Legacy Contact",
+        "emergency_contact_phone": "915-555-0102",
+        "emergency_contact_relationship": "Family",
+    }
+    db_session.add(PatientIntake(
+        patient_id=uuid.UUID(rosa["id"]), data=legacy_data, updated_by_user_id=patient_user.id,
+    ))
+    await db_session.flush()
+
+    response = await client.get("/api/v1/portal/intake", headers=patient_headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["data"]["preferredName"] == "Legacy Rosa"
+    assert body["data"]["pastMedicalHistory"] == "Legacy condition"
+    assert body["data"]["genderIdentity"] == ""
+    assert body["data"]["race"] == []
+    assert body["data"]["conditions"] == []
+    assert body["data"]["allergies"] == []
+    assert body["data"]["familyMembers"] == []
+    assert body["data"]["insuranceSubscriberIsPatient"] is True
+    assert body["data"]["insuranceSubscriberDob"] is None
+
+    saved = await client.put(
+        "/api/v1/portal/intake", headers=patient_headers, json=full_v2_payload(preferredName="Updated Rosa"),
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["data"]["preferredName"] == "Updated Rosa"
+
+
+@pytest.mark.asyncio
+async def test_v2_full_round_trip_and_staff_visibility(client):
+    patient_headers, _ = await login(client, "patient.demo@example.com")
+    instructor, _, rosa = await _rosa_context(client)
+    payload = full_v2_payload()
+
+    saved = await client.put("/api/v1/portal/intake", headers=patient_headers, json=payload)
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert body["data"]["race"] == payload["race"]
+    assert body["data"]["insuranceSubscriberDob"] == payload["insuranceSubscriberDob"]
+    assert body["data"]["conditions"] == payload["conditions"]
+    assert body["data"]["allergies"] == payload["allergies"]
+    assert body["data"]["familyMembers"] == payload["familyMembers"]
+    assert body["data"]["confirmedAccurate"] is True
+    assert_no_hidden(body)
+
+    patient_read = await client.get("/api/v1/portal/intake", headers=patient_headers)
+    assert patient_read.status_code == 200
+    assert patient_read.json()["data"] == body["data"]
+    staff = await client.get(
+        f"/api/v1/patients/{rosa['id']}/intake", headers=instructor, params={"role": "instructor"},
+    )
+    assert staff.status_code == 200, staff.text
+    assert staff.json()["data"]["allergies"] == payload["allergies"]
+    assert_no_hidden(staff.json())
+    student, _ = await login(client, "daniel.reyes@miners.utep.edu")
+    student_read = await client.get(
+        f"/api/v1/patients/{rosa['id']}/intake", headers=student, params={"role": "student"},
+    )
+    assert student_read.status_code == 200, student_read.text
+    assert student_read.json()["data"]["conditions"] == payload["conditions"]
+    assert_no_hidden(student_read.json())
+
+
+@pytest.mark.asyncio
+async def test_v2_returning_patient_edits_keep_other_list_items(client, db_session):
+    patient_headers, _ = await login(client, "patient.demo@example.com")
+    _, _, rosa = await _rosa_context(client)
+    payload = full_v2_payload(
+        conditions=[{"name": "Asthma", "year": "2018"}, {"name": "Migraines", "year": "2021"}],
+        allergies=[{"agent": "Penicillin", "reaction": "Rash"}, {"agent": "Latex", "reaction": "Hives"}],
+    )
+    first = await client.put("/api/v1/portal/intake", headers=patient_headers, json=payload)
+    assert first.status_code == 200, first.text
+
+    changed = {**payload, "preferredName": "Rosa Updated", "allergies": [payload["allergies"][0], {"agent": "Latex", "reaction": "Swelling"}]}
+    second = await client.put("/api/v1/portal/intake", headers=patient_headers, json=changed)
+    assert second.status_code == 200, second.text
+    assert second.json()["data"]["preferredName"] == "Rosa Updated"
+    assert second.json()["data"]["conditions"] == payload["conditions"]
+    assert second.json()["data"]["allergies"][1]["reaction"] == "Swelling"
+    rows = list((await db_session.scalars(
+        select(PatientIntake).where(PatientIntake.patient_id == uuid.UUID(rosa["id"]))
+    )).all())
+    assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_v2_validation_rejects_bad_fields_and_accepts_empty_dates(client):
+    patient_headers, _ = await login(client, "patient.demo@example.com")
+    invalid_payloads = [
+        full_v2_payload(state="Texas"),
+        full_v2_payload(zipCode="7990"),
+        full_v2_payload(email="not-an-email"),
+        full_v2_payload(phone="555-ABC-1234"),
+        full_v2_payload(conditions=[{"name": "Asthma", "year": "1899"}]),
+        full_v2_payload(genderIdentity="Unknown"),
+        full_v2_payload(allergies=[{"agent": "Penicillin", "reaction": "Rash", "extra": "no"}]),
+        full_v2_payload(conditions=[{"name": "Asthma", "year": "2020"}] * 31),
+        full_v2_payload(insuranceSubscriberDob="not-a-date"),
+    ]
+    for payload in invalid_payloads:
+        response = await client.put("/api/v1/portal/intake", headers=patient_headers, json=payload)
+        assert response.status_code == 422, response.text
+
+    oversized = full_v2_payload(
+        pastMedicalHistory="x" * 4000,
+        surgicalHistory="x" * 4000,
+        familyHistory="x" * 4000,
+        socialHistory="x" * 4000,
+        conditions=[{"name": "x" * 80, "year": "2020"}] * 30,
+        surgeries=[{"procedure": "x" * 120, "year": "2020"}] * 20,
+        allergies=[{"agent": "x" * 80, "reaction": "x" * 120}] * 20,
+        medications=[{"name": "x" * 80, "dose": "x" * 60, "frequency": "x" * 60}] * 25,
+        familyMembers=[{"relative": "Other", "conditions": "x" * 200}] * 15,
+    )
+    too_large = await client.put("/api/v1/portal/intake", headers=patient_headers, json=oversized)
+    assert too_large.status_code == 422, too_large.text
+
+    empty_dates = await client.put(
+        "/api/v1/portal/intake", headers=patient_headers,
+        json=full_v2_payload(insuranceSubscriberDob="", insuranceEffectiveDate=""),
+    )
+    assert empty_dates.status_code == 200, empty_dates.text
+    assert empty_dates.json()["data"]["insuranceSubscriberDob"] is None
+    assert empty_dates.json()["data"]["insuranceEffectiveDate"] is None
+
+
+@pytest.mark.asyncio
+async def test_v2_audit_detail_contains_names_but_no_submitted_values(client, db_session):
+    patient_headers, _ = await login(client, "patient.demo@example.com")
+    _, _, rosa = await _rosa_context(client)
+    response = await client.put(
+        "/api/v1/portal/intake", headers=patient_headers,
+        json=full_v2_payload(insurancePayer="SECRET-CARRIER-123"),
+    )
+    assert response.status_code == 200, response.text
+    event = await db_session.scalar(select(AuditEvent).where(
+        AuditEvent.action == "portal.intake.update",
+        AuditEvent.entity_id == rosa["id"],
+    ))
+    assert event is not None
+    detail = event.details["detail"]
+    assert "insurance_payer" in detail
+    assert "allergies" in detail
+    assert "SECRET-CARRIER-123" not in detail
