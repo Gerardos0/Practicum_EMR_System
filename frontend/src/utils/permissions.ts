@@ -28,7 +28,8 @@ export type Action =
   | "report:export_teaching"
   | "case:author"
   | "instructor:manage"
-  | "portal:view";
+  | "portal:view"
+  | "portal:edit";
 
 const teaching: Action[] = [
   "patient:create", "patient:update_status", "patient:reset_practice",
@@ -45,7 +46,7 @@ const matrix: Record<Role, Action[]> = {
     "report:run", "report:export_teaching", "note:view_sensitive",
   ],
   front_desk: [],
-  patient: ["portal:view"],
+  patient: ["portal:view", "portal:edit"],
 };
 
 export function can(role: Role, action: Action): boolean {

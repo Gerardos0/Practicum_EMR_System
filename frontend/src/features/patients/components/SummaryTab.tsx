@@ -5,6 +5,7 @@ import type { AllergyCategory, ClinicalNote, EncounterStatus, Patient } from "..
 import { listAppointments } from "../../../api/scheduling";
 import { addAllergy, addVital, markVitalEnteredInError, removeAllergy } from "../../../api/chart";
 import VitalsChart from "./VitalsChart";
+import PatientReportedCard from "./PatientReportedCard";
 import { useSession } from "../../auth/useSession";
 import { can } from "../../../utils/permissions";
 import { canEditSection } from "../../chart/access";
@@ -291,6 +292,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           </>
         ) : <Typography variant="body2" color="text.secondary">None scheduled.</Typography>}
       </Paper>
+      <PatientReportedCard patientId={p.id} />
     </Box>
   );
 }

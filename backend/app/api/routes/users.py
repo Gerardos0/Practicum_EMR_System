@@ -19,7 +19,6 @@ from app.services.retention import RETENTION, anonymize_user, purge_expired
 from app.services.serialize import user_out
 
 router = APIRouter(prefix="/users", tags=["users"])
-UTEP_EMAIL = re.compile(r"@(miners\.)?utep\.edu$", re.IGNORECASE)
 
 
 def _require_account_admin(user: User, rows) -> None:
@@ -60,8 +59,8 @@ async def update_account(user_id: uuid.UUID, body: AccountUpdate, db: DbSession,
     if target is None or target.deleted_at is not None or target.purged_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
     email = body.email.strip().lower()
-    if not UTEP_EMAIL.search(email):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email must be @miners.utep.edu or @utep.edu.")
+    if not email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email is required.")
     taken = await db.scalar(select(User.id).where(User.email == email, User.id != target.id))
     if taken is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Another account already uses that email.")

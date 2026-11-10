@@ -39,7 +39,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "note:view_sensitive",
     ],
     "front_desk": [],
-    "patient": ["portal:view"],
+    "patient": ["portal:view", "portal:edit"],
 }
 
 CLINICAL_ROLES = set(ROLE_PERMISSIONS)

@@ -31,6 +31,7 @@ from app.schemas.clinical import (
     TriggersOut,
     VitalWrite,
 )
+from app.schemas.intake import IntakeData, StaffIntakeOut
 from app.services.chart_edits import (
     add_allergy,
     add_lab,
@@ -54,6 +55,7 @@ from app.services.answer_keys import deny_answer_key, read_answer_key
 from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
 from app.services.charts import apply_status, assign_case, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
+from app.services.intake import get_intake
 from app.services.simulation import assigned_patient_ids, end_simulation, presence_rows, station_for
 from app.services.serialize import patient_out
 
@@ -185,6 +187,25 @@ async def get_patient(
     await db.commit()
     station = await station_for(db, patient.id, user.id) if patient.mode == "simulation" else None
     return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role, viewer_station=station)
+
+
+@router.get("/{patient_id}/intake", response_model=StaffIntakeOut)
+async def get_patient_intake(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    intake = await get_intake(db, patient.id)
+    return StaffIntakeOut(
+        submitted=intake is not None,
+        data=IntakeData.model_validate(intake.data) if intake is not None else None,
+        updated_at=intake.updated_at if intake is not None else None,
+    )
 
 
 def _decode_photo(data: str) -> bytes:

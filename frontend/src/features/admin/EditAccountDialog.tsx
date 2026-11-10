@@ -25,8 +25,8 @@ export default function EditAccountDialog({ person, requireStudentId, onClose, o
       setError("Name is required.");
       return;
     }
-    if (!/@(miners\.)?utep\.edu$/i.test(email.trim())) {
-      setError("Email must be @miners.utep.edu or @utep.edu.");
+    if (!email.trim()) {
+      setError("Email is required.");
       return;
     }
     if (requireStudentId && !/^800\d{6}$/.test(id)) {

@@ -106,6 +106,20 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
 
 
+class PatientIntake(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "patient_intakes"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb"), nullable=False
+    )
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
 class Allergy(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "allergies"
 

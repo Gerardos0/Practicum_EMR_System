@@ -7,7 +7,6 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.api.deps import DbSession, get_current_user_allow_password_change
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
-import re
 
 from app.schemas.auth import ChangePasswordRequest, RefreshRequest, Token
 from app.schemas.clinical import PublicUser
@@ -15,8 +14,6 @@ from app.services.audit import log_event
 from app.services.auth import authenticate_user, get_user_by_email, get_user_by_id, is_usable
 from app.services.serialize import user_out
 from app.services.sessions import issue_refresh_token, revoke_refresh_token, rotate_refresh_token
-
-UTEP_EMAIL = re.compile(r"@(miners\.)?utep\.edu$", re.IGNORECASE)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -44,8 +41,6 @@ async def login(
     db: DbSession,
 ):
     email = form.username.strip()
-    if not UTEP_EMAIL.search(email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use your UTEP email address (@utep.edu or @miners.utep.edu).")
     now = datetime.now(timezone.utc)
     existing = await get_user_by_email(db, email)
     if existing is not None and existing.locked_until is not None and existing.locked_until > now:

@@ -24,7 +24,7 @@ export default function LoginPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError("Enter your UTEP email to continue.");
+      setError("Enter your email to continue.");
       return;
     }
     if (!password) {
@@ -43,7 +43,11 @@ export default function LoginPage() {
         const roles = uniqueRoles(result.user);
         const only = roles.length === 1 ? roles[0] : undefined;
         const singleCourse = result.user.roles.length === 1 && result.user.roles[0].courseIds.length === 1;
-        if (only === "admin" || only === "patient" || singleCourse) {
+        if (only === "patient") {
+          navigate(homePathFor("patient"), { replace: true });
+          return;
+        }
+        if (only === "admin" || singleCourse) {
           navigate(homePathFor(only!), { replace: true });
           return;
         }
@@ -67,7 +71,7 @@ export default function LoginPage() {
         <Paper component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>
           <Typography id="login-title" component="h1" variant="h5" sx={{ mb: 0.5 }}>Sign in</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            For UTEP health sciences students and faculty. Every patient here is simulated training data — never real PHI.
+            For authorized EMR accounts. Every patient here is simulated training data — never real PHI.
           </Typography>
 
           {notice && <Alert severity="info" sx={{ mb: 2 }}>{notice}</Alert>}
@@ -76,8 +80,8 @@ export default function LoginPage() {
           <Box component="form" noValidate onSubmit={submit}>
             <Stack spacing={2}>
               <TextField
-                label="UTEP email" type="email" autoComplete="username" autoFocus fullWidth
-                placeholder="you@miners.utep.edu" value={email} onChange={(e) => setEmail(e.target.value)}
+                label="Email" type="email" autoComplete="username" autoFocus fullWidth
+                placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
               />
               <TextField
                 label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password"

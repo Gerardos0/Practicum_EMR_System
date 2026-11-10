@@ -30,7 +30,6 @@ from app.services.rubric_import import guide_from_upload
 from app.services.serialize import course_out, user_out
 
 router = APIRouter(prefix="/courses", tags=["courses"])
-UTEP_EMAIL = re.compile(r"@(miners\.)?utep\.edu$", re.IGNORECASE)
 COURSE_TRANSITIONS = {
     "planned": {"active"},
     "active": {"ended"},
@@ -187,8 +186,8 @@ async def import_roster(
     passwords: list[TempPassword] = []
     for row in body.rows:
         email = row.email.strip().lower()
-        if not UTEP_EMAIL.search(email):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{email} is not a UTEP email address.")
+        if not email:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email is required.")
         person = await db.scalar(select(User).where(User.email == email))
         university_id = row.university_id.strip() or None
         if person is None and body.role == "student" and not re.fullmatch(r"800\d{6}", university_id or ""):

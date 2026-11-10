@@ -7,7 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
-from app.models.clinical import CourseMembership
+from app.models.clinical import CourseMembership, PatientIntake
 from app.models.user import User
 from app.services.charts import utcnow
 
@@ -21,6 +21,7 @@ def retention_ends(archived_at: datetime) -> datetime:
 
 async def anonymize_user(db: AsyncSession, user: User) -> None:
     await db.execute(delete(CourseMembership).where(CourseMembership.user_id == user.id))
+    await db.execute(delete(PatientIntake).where(PatientIntake.updated_by_user_id == user.id))
     user.first_name = "Archived"
     user.last_name = "Student"
     user.email = f"archived-{user.id}@invalid.local"
