@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Menu, MenuItem, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { copyCase, downloadCaseTemplate, importCases, listCases } from "../../api/cases";
 import { listCoursesForUser } from "../../api/courses";
@@ -22,6 +22,7 @@ export default function CaseListPage() {
   const [assignCase, setAssignCase] = useState<AuthoredCase>();
   const [simCase, setSimCase] = useState<AuthoredCase>();
   const [copyTarget, setCopyTarget] = useState<AuthoredCase>();
+  const [rowMenu, setRowMenu] = useState<{ anchor: HTMLElement; item: AuthoredCase }>();
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -31,12 +32,11 @@ export default function CaseListPage() {
     <Box>
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, mb: 2, flexWrap: "wrap" }}>
         <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Case masters</Typography>
           <Typography variant="body2" color="text.secondary">
-            Build a case once, then assign private copies. Charts already assigned keep their locks and prefill. Later edits stay on the master.
+            Build a case once, then assign private copies. Later edits stay on the master.
           </Typography>
         </Box>
-        <Button variant="outlined" onClick={() => downloadCaseTemplate(activeRole, courseId)}>Download template</Button>
+        <Button onClick={() => downloadCaseTemplate(activeRole, courseId)}>Download template</Button>
         <input ref={fileInput} hidden type="file" accept=".xlsx" onChange={async (event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
@@ -49,7 +49,7 @@ export default function CaseListPage() {
             setNotice((e as Error).message);
           }
         }} />
-        <Button variant="outlined" onClick={() => fileInput.current?.click()}>Upload cases</Button>
+        <Button onClick={() => fileInput.current?.click()}>Upload cases</Button>
         <Button variant="contained" onClick={() => navigate("/cases/new")}>Create case</Button>
       </Box>
 
@@ -83,9 +83,7 @@ export default function CaseListPage() {
                   <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{item.status.program || "—"}</TableCell>
                   <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{formatDateTime(item.updatedAt)}</TableCell>
                   <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                    <Button size="small" onClick={() => setCopyTarget(item)}>Copy to course</Button>
-                    <Button size="small" onClick={() => setAssignCase(item)}>Assign</Button>
-                    <Button size="small" onClick={() => setSimCase(item)}>Simulate</Button>
+                    <Button size="small" onClick={(e) => setRowMenu({ anchor: e.currentTarget, item })}>Actions</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -93,6 +91,16 @@ export default function CaseListPage() {
           </Table>
         </Paper>
       )}
+
+      <Menu
+        anchorEl={rowMenu?.anchor}
+        open={Boolean(rowMenu)}
+        onClose={() => setRowMenu(undefined)}
+      >
+        <MenuItem onClick={() => { setCopyTarget(rowMenu?.item); setRowMenu(undefined); }}>Copy to course</MenuItem>
+        <MenuItem onClick={() => { setAssignCase(rowMenu?.item); setRowMenu(undefined); }}>Assign</MenuItem>
+        <MenuItem onClick={() => { setSimCase(rowMenu?.item); setRowMenu(undefined); }}>Simulate</MenuItem>
+      </Menu>
 
       {copyTarget && (
         <CopyCaseDialog

@@ -4,7 +4,6 @@ import {
 } from "@mui/material";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listReviewQueue } from "../../api/notes";
-import { getCourse } from "../../api/courses";
 import { useSession } from "../auth/useSession";
 import { formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
@@ -44,7 +43,6 @@ export default function ReviewQueuePage() {
   }
   const filter = tabFromSearch(params.get("status"));
   const queue = useAsync(() => listReviewQueue(courseId, activeRole), [courseId, activeRole]);
-  const course = useAsync(() => getCourse(courseId), [courseId]);
 
   useEffect(() => {
     if (!incoming) return;
@@ -58,27 +56,14 @@ export default function ReviewQueuePage() {
 
   if (queue.error) return <PageError error={queue.error} />;
 
-  const pendingCount = count("pending_review");
-
   return (
     <Box>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>Review queue</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        {course.data ? `${course.data.code}: ` : ""}assessment notes students routed to you for co-signature
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: "72ch" }}>
-        Open a note to read it beside the chart. Co-sign accepts the documentation; return sends it back with feedback the student must fix.
-        Scores you save are stored on the note. Students do not see them.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Assessment notes routed to you. Scores you save stay on the note. Students do not see them.
       </Typography>
 
       {flash && (
         <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>
-      )}
-
-      {pendingCount > 0 && filter === "pending_review" && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {pendingCount === 1 ? "1 note needs your review." : `${pendingCount} notes need your review.`}
-        </Alert>
       )}
 
       <Paper>

@@ -61,7 +61,6 @@ export default function ReportsPage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Course reports</Typography>
         <Typography variant="body2" color="text.secondary">Enrollment, clinical activity, and audit totals.</Typography>
       </Box>
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}

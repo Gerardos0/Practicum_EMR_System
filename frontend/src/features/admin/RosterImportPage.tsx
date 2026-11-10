@@ -102,10 +102,11 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
 
   return (
     <Stack spacing={2.5}>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Course roster</Typography>
-        <Typography variant="body2" color="text.secondary">{course.data ? `${course.data.code}: ${course.data.title}, ${course.data.term}` : " "}</Typography>
-      </Box>
+      {!courseIdProp && (
+        <Typography variant="body2" color="text.secondary">
+          {course.data ? `${course.data.code}: ${course.data.title}, ${course.data.term}` : "Enroll people in this class."}
+        </Typography>
+      )}
 
       {message && <Alert severity={message.kind} onClose={() => setMessage(undefined)}>{message.text}</Alert>}
       {passwords.length > 0 && (

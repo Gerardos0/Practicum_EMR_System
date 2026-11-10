@@ -112,8 +112,7 @@ export default function CourseAdminPage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Classes</Typography>
-        <Typography variant="body2" color="text.secondary">Create a class, set how many days without chart activity flags a student, and retrieve an archived class.</Typography>
+        <Typography variant="body2" color="text.secondary">Create a class, set the at-risk window, and retrieve an archived class.</Typography>
       </Box>
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 

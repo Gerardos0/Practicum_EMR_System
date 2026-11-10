@@ -119,15 +119,17 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
 
   return (
     <Stack spacing={2}>
+      {(interactions?.text || lexicomp?.url) && (
       <Paper sx={{ p: 2, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6">Interaction checking</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {interactions?.text || (lexicomp?.configured ? "No interaction text was returned." : "The interaction check is unavailable.")}
-        </Typography>
+        {interactions?.text && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{interactions.text}</Typography>
+        )}
         {lexicomp?.url && (
           <Button sx={{ mt: 1 }} href={lexicomp.url} target="_blank" rel="noreferrer">Open Lexicomp</Button>
         )}
       </Paper>
+      )}
       {message && <Alert severity="info" onClose={() => setMessage("")}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
       {editable && (
@@ -245,7 +247,7 @@ function MedTable({
   onGive?: (row: Medication) => void;
   onClear?: (row: Medication) => void;
 }) {
-  if (rows.length === 0) return empty ? <EmptyState title={empty} /> : null;
+  if (rows.length === 0) return empty ? <EmptyState title={empty}>Medications added to this chart show up here.</EmptyState> : null;
   return (
     <Paper sx={{ borderRadius: "16px" }}>
       <Typography component="h2" variant="h6" sx={{ p: 2, pb: 1 }}>{title}</Typography>

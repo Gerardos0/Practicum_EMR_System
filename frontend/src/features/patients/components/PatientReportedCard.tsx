@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Alert, Box, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import { getStaffIntake } from "../../../api/intake";
 import { useSession } from "../../auth/useSession";
@@ -5,13 +6,18 @@ import { formatDateTime } from "../../../utils/format";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";
 
-function ValueRow({ label, value }: { label: string; value: string | boolean | string[] }) {
-  const display = Array.isArray(value) ? value.join(", ") : typeof value === "boolean" ? (value ? "Yes" : "No") : value;
-  return (
-    <Typography variant="body2">
-      <b>{label}:</b> {display || <Typography component="span" variant="body2" color="text.secondary">Not on file</Typography>}
-    </Typography>
-  );
+function shown(value: string | boolean | string[] | undefined | null): string | null {
+  if (typeof value === "boolean" || value == null) return null;
+  if (Array.isArray(value)) {
+    const items = value.map((item) => item.trim()).filter(Boolean);
+    return items.length ? items.join(", ") : null;
+  }
+  const text = value.trim();
+  return text || null;
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return <Typography variant="body2"><b>{label}:</b> {value}</Typography>;
 }
 
 export default function PatientReportedCard({ patientId }: { patientId: string }) {
@@ -25,20 +31,68 @@ export default function PatientReportedCard({ patientId }: { patientId: string }
   const card = { p: 2.5, borderRadius: "16px" } as const;
   const titleSx = { color: utep.navy, fontSize: 18, mb: 1.5 } as const;
   const data = intake.data.data;
-  const group = (title: string, children: React.ReactNode) => (
-    <Box>
-      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{title}</Typography>
-      <Stack spacing={0.35}>{children}</Stack>
-    </Box>
-  );
-  const list = (label: string, items: string[]) => (
-    <Box>
-      <Typography variant="subtitle2">{label}</Typography>
-      {items.length ? items.map((item, index) => <Typography key={`${label}-${index}`} variant="body2">{item}</Typography>) : (
-        <Typography variant="body2" color="text.secondary">Not on file</Typography>
-      )}
-    </Box>
-  );
+  const lines = (pairs: [string, string | null | undefined][]) => pairs.flatMap(([label, value]) => (
+    value ? [<Row key={label} label={label} value={value} />] : []
+  ));
+  const sections: { title: string; rows: ReactNode[] }[] = [
+    { title: "Demographics", rows: lines([
+      ["Preferred name", shown(data?.preferredName)],
+      ["Pronouns", shown(data?.pronouns)],
+      ["Gender identity", shown(data?.genderIdentity)],
+      ["Race", shown(data?.race)],
+      ["Ethnicity", shown(data?.ethnicity)],
+      ["Marital status", shown(data?.maritalStatus)],
+      ["Preferred language", shown(data?.preferredLanguage)],
+      ["Interpreter needed", data?.interpreterNeeded ? "Yes" : null],
+    ]) },
+    { title: "Contact", rows: lines([
+      ["Phone", [shown(data?.phone), shown(data?.phoneType)].filter(Boolean).join(" · ") || null],
+      ["Email", shown(data?.email)],
+      ["Address", [shown(data?.address), shown(data?.city), shown(data?.state), shown(data?.zipCode)].filter(Boolean).join(", ") || null],
+    ]) },
+    { title: "Insurance", rows: lines([
+      ["Primary carrier", shown(data?.insurancePayer)],
+      ["Plan type", shown(data?.insurancePlanType)],
+      ["Member ID", shown(data?.insuranceMemberId)],
+      ["Group number", shown(data?.insuranceGroupNumber)],
+      ["Subscriber", data?.insuranceSubscriberIsPatient === false ? "Someone else" : null],
+      ["Subscriber name", shown(data?.insuranceSubscriberName)],
+      ["Subscriber date of birth", shown(data?.insuranceSubscriberDob)],
+      ["Relationship", shown(data?.insuranceRelationship)],
+      ["Effective date", shown(data?.insuranceEffectiveDate)],
+      ["Secondary carrier", shown(data?.secondaryInsurancePayer)],
+      ["Secondary member ID", shown(data?.secondaryInsuranceMemberId)],
+      ["Secondary group number", shown(data?.secondaryInsuranceGroupNumber)],
+      ["Secondary relationship", shown(data?.secondaryInsuranceRelationship)],
+    ]) },
+    { title: "Medical history", rows: lines([
+      ["Conditions", shown((data?.conditions ?? []).map((item) => `${item.name}${item.year ? ` (${item.year})` : ""}`))],
+      ["Other conditions", shown(data?.pastMedicalHistory)],
+      ["Surgeries", shown((data?.surgeries ?? []).map((item) => `${item.procedure}${item.year ? ` (${item.year})` : ""}`))],
+      ["Allergies", data?.noKnownAllergies && !(data.allergies ?? []).length ? "No known allergies" : shown((data?.allergies ?? []).map((item) => `${item.agent}${item.reaction ? ` — ${item.reaction}` : ""}`))],
+      ["Medications", shown((data?.medications ?? []).map((item) => [item.name, item.dose, item.frequency].filter(Boolean).join(" ")))],
+      ["Other surgeries or procedures", shown(data?.surgicalHistory)],
+    ]) },
+    { title: "Family history", rows: lines([
+      ["Family", shown((data?.familyMembers ?? []).map((item) => [item.relative, item.status, item.conditions].filter(Boolean).join(" · ")))],
+      ["Other family history", shown(data?.familyHistory)],
+    ]) },
+    { title: "Social history", rows: lines([
+      ["Tobacco", [shown(data?.tobaccoUse), shown(data?.tobaccoDetail)].filter(Boolean).join(" · ") || null],
+      ["Alcohol", [shown(data?.alcoholUse), shown(data?.alcoholDetail)].filter(Boolean).join(" · ") || null],
+      ["Drug use", shown(data?.drugUse)],
+      ["Occupation", shown(data?.occupation)],
+      ["Lives with", shown(data?.livesWith)],
+      ["Exercise", shown(data?.exercise)],
+      ["Other notes on lifestyle", shown(data?.socialHistory)],
+    ]) },
+    { title: "Emergency contact and pharmacy", rows: lines([
+      ["Name", shown(data?.emergencyContactName)],
+      ["Phone", shown(data?.emergencyContactPhone)],
+      ["Relationship", shown(data?.emergencyContactRelationship)],
+      ["Preferred pharmacy", shown(data?.preferredPharmacy)],
+    ]) },
+  ].filter((section) => section.rows.length > 0);
 
   return (
     <Paper sx={card}>
@@ -50,71 +104,16 @@ export default function PatientReportedCard({ patientId }: { patientId: string }
       )}
       {!intake.data.submitted ? (
         <Typography variant="body2" color="text.secondary">The patient has not submitted information yet.</Typography>
+      ) : sections.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">Submitted, with no details filled in yet.</Typography>
       ) : (
         <Stack spacing={2}>
-          {group("Demographics", <>
-            <ValueRow label="Preferred name" value={data?.preferredName ?? ""} />
-            <ValueRow label="Pronouns" value={data?.pronouns ?? ""} />
-            <ValueRow label="Gender identity" value={data?.genderIdentity ?? ""} />
-            <ValueRow label="Race" value={data?.race ?? []} />
-            <ValueRow label="Ethnicity" value={data?.ethnicity ?? ""} />
-            <ValueRow label="Marital status" value={data?.maritalStatus ?? ""} />
-            <ValueRow label="Preferred language" value={data?.preferredLanguage ?? ""} />
-            <ValueRow label="Interpreter needed" value={data?.interpreterNeeded ?? false} />
-          </>)}
-          {group("Contact", <>
-            <ValueRow label="Phone" value={data?.phone ?? ""} />
-            <ValueRow label="Phone type" value={data?.phoneType ?? ""} />
-            <ValueRow label="Email" value={data?.email ?? ""} />
-            <ValueRow label="Street address" value={data?.address ?? ""} />
-            <ValueRow label="City" value={data?.city ?? ""} />
-            <ValueRow label="State" value={data?.state ?? ""} />
-            <ValueRow label="ZIP code" value={data?.zipCode ?? ""} />
-          </>)}
-          {group("Insurance", <>
-            <ValueRow label="Primary carrier" value={data?.insurancePayer ?? ""} />
-            <ValueRow label="Plan type" value={data?.insurancePlanType ?? ""} />
-            <ValueRow label="Member ID" value={data?.insuranceMemberId ?? ""} />
-            <ValueRow label="Group number" value={data?.insuranceGroupNumber ?? ""} />
-            <ValueRow label="Subscriber is patient" value={data?.insuranceSubscriberIsPatient ?? true} />
-            <ValueRow label="Subscriber name" value={data?.insuranceSubscriberName ?? ""} />
-            <ValueRow label="Subscriber date of birth" value={data?.insuranceSubscriberDob ?? ""} />
-            <ValueRow label="Relationship" value={data?.insuranceRelationship ?? ""} />
-            <ValueRow label="Effective date" value={data?.insuranceEffectiveDate ?? ""} />
-            <ValueRow label="Secondary carrier" value={data?.secondaryInsurancePayer ?? ""} />
-            <ValueRow label="Secondary member ID" value={data?.secondaryInsuranceMemberId ?? ""} />
-            <ValueRow label="Secondary group number" value={data?.secondaryInsuranceGroupNumber ?? ""} />
-            <ValueRow label="Secondary relationship" value={data?.secondaryInsuranceRelationship ?? ""} />
-          </>)}
-          {group("Medical history", <>
-            {list("Conditions", (data?.conditions ?? []).map((item) => `${item.name}${item.year ? ` (${item.year})` : ""}`))}
-            <ValueRow label="Other conditions" value={data?.pastMedicalHistory ?? ""} />
-            {list("Surgeries", (data?.surgeries ?? []).map((item) => `${item.procedure}${item.year ? ` (${item.year})` : ""}`))}
-            {list("Allergies", data?.noKnownAllergies && !data.allergies.length ? ["No known allergies"] : (data?.allergies ?? []).map((item) => `${item.agent}${item.reaction ? ` — ${item.reaction}` : ""}`))}
-            {list("Medications", (data?.medications ?? []).map((item) => `${item.name}${item.dose ? ` ${item.dose}` : ""}${item.frequency ? ` ${item.frequency}` : ""}`))}
-            <ValueRow label="Other surgeries or procedures" value={data?.surgicalHistory ?? ""} />
-          </>)}
-          {group("Family history", <>
-            {(data?.familyMembers ?? []).map((item, index) => <Typography key={`${item.relative}-${index}`} variant="body2">{item.relative}{item.status ? ` · ${item.status}` : ""}{item.conditions ? `: ${item.conditions}` : ""}</Typography>)}
-            <ValueRow label="Other family history" value={data?.familyHistory ?? ""} />
-          </>)}
-          {group("Social history", <>
-            <ValueRow label="Tobacco use" value={data?.tobaccoUse ?? ""} />
-            <ValueRow label="Tobacco details" value={data?.tobaccoDetail ?? ""} />
-            <ValueRow label="Alcohol use" value={data?.alcoholUse ?? ""} />
-            <ValueRow label="Alcohol details" value={data?.alcoholDetail ?? ""} />
-            <ValueRow label="Drug use" value={data?.drugUse ?? ""} />
-            <ValueRow label="Occupation" value={data?.occupation ?? ""} />
-            <ValueRow label="Lives with" value={data?.livesWith ?? ""} />
-            <ValueRow label="Exercise" value={data?.exercise ?? ""} />
-            <ValueRow label="Other notes on lifestyle" value={data?.socialHistory ?? ""} />
-          </>)}
-          {group("Emergency contact and pharmacy", <>
-            <ValueRow label="Name" value={data?.emergencyContactName ?? ""} />
-            <ValueRow label="Phone" value={data?.emergencyContactPhone ?? ""} />
-            <ValueRow label="Relationship" value={data?.emergencyContactRelationship ?? ""} />
-            <ValueRow label="Preferred pharmacy" value={data?.preferredPharmacy ?? ""} />
-          </>)}
+          {sections.map((section) => (
+            <Box key={section.title}>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{section.title}</Typography>
+              <Stack spacing={0.35}>{section.rows}</Stack>
+            </Box>
+          ))}
         </Stack>
       )}
     </Paper>

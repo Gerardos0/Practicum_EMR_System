@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
   Alert, Box, Button, Checkbox, FormControlLabel, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
@@ -25,15 +25,16 @@ interface Props {
 
 export default function PatientIntakeForm({ intake, onSaved, previewMode = false }: Props) {
   const [draft, setDraft] = useState<IntakeData>(intake.data);
+  const [draftSource, setDraftSource] = useState(intake.data);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  if (draftSource !== intake.data) {
+    setDraftSource(intake.data);
+    setDraft(intake.data);
+  }
   const errors = validateIntake(draft);
   const disabled = previewMode || !intake.editable;
-
-  useEffect(() => {
-    setDraft(intake.data);
-  }, [intake.data]);
 
   const update = (key: keyof IntakeData, value: unknown) => {
     setDraft((current) => ({ ...current, [key]: value }) as IntakeData);

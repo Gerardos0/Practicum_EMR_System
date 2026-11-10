@@ -38,11 +38,10 @@ export default function AuditLogPage() {
     <Box>
       <Box sx={{ display: "flex", alignItems: "flex-end", gap: 2, flexWrap: "wrap", mb: 2 }}>
         <Box sx={{ flex: 1, minWidth: 220 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Activity log</Typography>
           <Typography variant="body2" color="text.secondary">
             {adminView
-              ? "Recorded actions from classes and accounts. Entries can't be edited or deleted."
-              : "Every chart view, note action, and denied attempt. Entries can't be edited or deleted."}
+              ? "Recorded actions. Entries can't be edited or deleted."
+              : "Chart views, note actions, and denied attempts. Entries can't be edited or deleted."}
           </Typography>
         </Box>
         {adminView && (
