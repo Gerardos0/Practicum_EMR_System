@@ -37,7 +37,7 @@ def course_out(course: Course, instructor_ids: list[str]) -> dict:
     }
 
 
-def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | None = None) -> dict:
+def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | None = None, viewer_station: str | None = None) -> dict:
     encounter = patient.encounter
     payload = {
         "id": str(patient.id),
@@ -130,6 +130,8 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
         "room": patient.room,
         "bed": patient.bed,
         "has_photo": bool(patient.photo),
+        "simulation_phase": patient.simulation_phase,
+        "viewer_station": viewer_station,
         "family_history": patient.family_history,
         "surgical_history": patient.surgical_history,
         "social_history": patient.social_history,
@@ -165,6 +167,7 @@ def note_out(note: ClinicalNote, *, include_scores: bool = False) -> dict:
         "author_name": full_name(note.author),
         "author_discipline": note.discipline.code,
         "mode": note.mode,
+        "kind": note.kind or "visit",
         "status": note.status,
         "version": note.version,
         "content": reveal_content(note),

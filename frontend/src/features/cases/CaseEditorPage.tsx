@@ -254,12 +254,9 @@ export default function CaseEditorPage() {
         <Link component={RouterLink} to="/cases" underline="hover">Cases</Link>
         <Typography color="text.primary">{isNew ? "New case" : `${draft.lastName}, ${draft.firstName}`}</Typography>
       </Breadcrumbs>
-      <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>{isNew ? "New case" : `${draft.lastName}, ${draft.firstName}`}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {isNew ? "Students cannot see this master." : `${existing.data?.mrn}. Saving changes the master only. Assigned copies stay as they were.`}
-        </Typography>
-      </Box>
+      <Typography variant="body2" color="text.secondary">
+        {isNew ? "Students cannot see this master." : `${existing.data?.mrn}. Saving changes the master only. Assigned copies stay as they were.`}
+      </Typography>
       {error && <Alert severity="error">{error}</Alert>}
       {photoMessage && <Alert severity="success">{photoMessage}</Alert>}
       {!isNew && (

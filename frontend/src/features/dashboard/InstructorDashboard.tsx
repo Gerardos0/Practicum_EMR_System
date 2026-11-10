@@ -135,8 +135,8 @@ export default function InstructorDashboard() {
         title="Students to check in with"
         subtitle={
           risk.data
-            ? `A student is flagged for no chart activity for ${risk.data.days} days, or an assigned chart with no submitted note.`
-            : "A student is flagged for no chart activity for 7 days, or an assigned chart with no submitted note."
+            ? `No chart activity for ${risk.data.days} days, or an assigned chart with no note.`
+            : "No chart activity for 7 days, or an assigned chart with no note."
         }
         action={{ label: "Activity report", to: "/teaching" }}
       >

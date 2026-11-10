@@ -41,7 +41,41 @@ async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: s
         )
         await db.commit()
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Case masters are only available to instructors.")
-    if role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
+    if patient.mode == "simulation":
+        from app.services.simulation import station_for
+
+        if role == "front_desk":
+            await log_event(
+                db,
+                action="chart.view",
+                entity_type="patient",
+                entity_id=str(patient.id),
+                actor_user_id=user.id,
+                result="denied",
+                course_id=patient.course_id,
+                ip_address=request_ip,
+                detail="Front desk cannot open a simulation chart.",
+            )
+            await db.commit()
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Front desk can't open a simulation chart.")
+        if role == "student" and await station_for(db, patient.id, user.id) is None:
+            await log_event(
+                db,
+                action="chart.view",
+                entity_type="patient",
+                entity_id=str(patient.id),
+                actor_user_id=user.id,
+                result="denied",
+                course_id=patient.course_id,
+                ip_address=request_ip,
+                detail="Simulation chart is limited to its assigned team.",
+            )
+            await db.commit()
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "You are not assigned to this simulation. Graded charts stay private, and this live chart is only for its team.",
+            )
+    elif role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
         await log_event(
             db,
             action="chart.view",

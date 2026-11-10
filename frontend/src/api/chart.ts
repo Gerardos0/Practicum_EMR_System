@@ -5,6 +5,10 @@ function chart(role: Role, patientId: string, path: string, method: string, json
   return request<Patient>(`/patients/${patientId}${path}`, { method, query: { role }, json });
 }
 
+export function listOpened(role: Role, patientId: string): Promise<{ name: string; station?: string | null }[]> {
+  return request(`/patients/${patientId}/opened`, { query: { role } });
+}
+
 export function recordPresence(role: Role, patientId: string): Promise<void> {
   return request<void>(`/patients/${patientId}/presence`, {
     method: "POST",

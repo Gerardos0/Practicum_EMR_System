@@ -4,7 +4,7 @@ import {
   FormControlLabel,
   Divider, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ClinicalNote, CptSelection, IcdCode, Patient, User } from "../../types";
 import { getPatient } from "../../api/patients";
 import { addAddendum, checkInsertedDose, createDraft, getNote, listNotesForPatient, saveDraft, signNote, suggestSection } from "../../api/notes";
@@ -34,6 +34,8 @@ const creatingDraftKeys = new Set<string>();
 
 export default function NoteEditorPage() {
   const { patientId = "", noteId = "new" } = useParams();
+  const [search] = useSearchParams();
+  const draftKind = search.get("kind") === "clarification" ? "clarification" : "visit";
   const navigate = useNavigate();
   const { user, activeRole, discipline, courseId } = useSession();
 
@@ -88,14 +90,16 @@ export default function NoteEditorPage() {
         setInstructors(people);
 
         if (noteId === "new") {
-          const key = `${user.id}:${patientId}`;
+          const key = `${user.id}:${patientId}:${draftKind}`;
           if (creatingDraftKeys.has(key)) return;
           creatingDraftKeys.add(key);
           try {
             const existing = (await listNotesForPatient(activeRole, patientId)).find(
-              (n) => n.authorId === user.id && (n.status === "draft" || n.status === "returned"),
+              (n) => (n.kind ?? "visit") === draftKind
+                && (n.status === "draft" || n.status === "returned")
+                && (draftKind === "visit" || n.authorId === user.id),
             );
-            const n = existing ?? (await createDraft(discipline ?? "pharmacy", p, defaultTemplateFor(discipline), activeRole));
+            const n = existing ?? (await createDraft(discipline ?? "pharmacy", p, defaultTemplateFor(discipline), activeRole, draftKind));
             if (!alive) return;
             navigate(`/patients/${patientId}/notes/${n.id}`, { replace: true });
           } finally {
@@ -112,7 +116,7 @@ export default function NoteEditorPage() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId, noteId]);
+  }, [patientId, noteId, draftKind]);
 
   const latest = useRef({ templateId, content, diagnoses, cptCodes, routedToId });
   useEffect(() => {
@@ -122,8 +126,10 @@ export default function NoteEditorPage() {
   const savedSeq = useRef(0);
   const saving = useRef(false);
 
+  const clinician = patient?.mode === "simulation" && (patient.viewerStation === "pharmacist" || patient.viewerStation === "provider");
   const editable = Boolean(
-    note && note.authorId === user.id && !note.bodyLocked && (note.status === "draft" || note.status === "returned"),
+    note && !note.bodyLocked && (note.status === "draft" || note.status === "returned")
+    && (note.authorId === user.id || (clinician && (note.kind ?? "visit") === "visit")),
   );
 
   const save = useCallback(async (): Promise<boolean> => {
@@ -215,6 +221,7 @@ export default function NoteEditorPage() {
   if (!patient || !note) return <LinearProgress aria-label="Loading note" />;
 
   const isAssessment = note.mode === "assessment";
+  const isSimulation = note.mode === "simulation";
   const reviewer = instructors.find((i) => i.id === (note.routedToId ?? routedToId));
   const errorSet = undefined;
   const choices: NoteTemplate[] = [
@@ -443,7 +450,7 @@ export default function NoteEditorPage() {
             ))}
           </Stack>
 
-          {(note.status === "signed" || note.status === "cosigned" || (note.status === "returned" && note.bodyLocked)) && (
+          {!isSimulation && (note.status === "signed" || note.status === "cosigned" || (note.status === "returned" && note.bodyLocked)) && (
             <>
               <Divider sx={{ my: 3 }} />
               <Addenda
@@ -457,7 +464,7 @@ export default function NoteEditorPage() {
         {/* Side panel */}
         <Stack spacing={2} sx={{ position: { lg: "sticky" }, top: { lg: 88 } }}>
           <Paper sx={{ p: 2.5 }}>
-            <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isAssessment ? "Submission" : "Practice note"}</Typography>
+            <Typography component="h2" variant="subtitle1" sx={{ mb: 1 }}>{isSimulation ? "Simulation note" : isAssessment ? "Submission" : "Practice note"}</Typography>
             <NoteProgress note={note} />
             {activeRole !== "student" && <CourseRubricPanel guide={guide.data} fileName={guide.data?.file_name} />}
 
@@ -473,7 +480,7 @@ export default function NoteEditorPage() {
                   </TextField>
                 )}
                 <Button variant="contained" size="large" onClick={trySign}>
-                  {!isAssessment ? "Sign note" : note.status === "returned" ? "Sign and resubmit" : "Submit for signature"}
+                  {isSimulation ? "Sign and close note" : !isAssessment ? "Sign note" : note.status === "returned" ? "Sign and resubmit" : "Submit for signature"}
                 </Button>
                 <Typography variant="caption" color="text.secondary" role="status" aria-live="polite">
                   {saveState === "saving" && "Saving…"}
@@ -482,6 +489,11 @@ export default function NoteEditorPage() {
                   {saveState === "error" && "Not saved. See the message above."}
                 </Typography>
               </Stack>
+            )}
+            {isSimulation && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+                Signing closes this note. A later clarification is a separate note and does not reopen it.
+              </Typography>
             )}
             {isAssessment && (
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
@@ -498,17 +510,19 @@ export default function NoteEditorPage() {
       </Box>
 
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>{isAssessment ? "Submit this note for signature?" : "Sign this note?"}</DialogTitle>
+        <DialogTitle>{isSimulation ? "Close this note?" : isAssessment ? "Submit this note for signature?" : "Sign this note?"}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {isAssessment
+            {isSimulation
+              ? "The visit note locks. Anyone on the team can open a new clarification note afterward."
+              : isAssessment
               ? `It goes to ${reviewer?.fullName ?? "your instructor"} for review. You won't be able to edit it unless it's returned.`
               : "Signed notes are locked. You can still add an addendum."}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)}>Keep editing</Button>
-          <Button variant="contained" onClick={doSign}>{isAssessment ? "Submit for signature" : "Sign note"}</Button>
+          <Button variant="contained" onClick={doSign}>{isSimulation ? "Sign and close" : isAssessment ? "Submit for signature" : "Sign note"}</Button>
         </DialogActions>
       </Dialog>
     </Stack>

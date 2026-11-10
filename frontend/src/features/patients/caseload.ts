@@ -27,7 +27,7 @@ export const CASELOAD_VIEWS = [
   },
   {
     id: "awaiting",
-    label: "Awaiting review",
+    label: "Needs review",
     description: "Notes you submitted that are waiting on your instructor.",
     emptyTitle: "No notes awaiting review",
     emptyBody: "Submitted notes waiting for an instructor appear here.",

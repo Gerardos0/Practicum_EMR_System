@@ -18,6 +18,7 @@ import NotesList from "../encounters/components/NotesList";
 import MedicationsTab from "../medications/MedicationsTab";
 import LabsTab from "../labs/LabsTab";
 import SchedulingTab from "../scheduling/SchedulingTab";
+import { simulationNoteAction } from "./simulation";
 
 const TABS = [
   { id: "summary", label: "Overview" },
@@ -51,9 +52,10 @@ export default function PatientChartPage() {
     ? `${patient.data.lastName}, ${patient.data.firstName}`
     : "Patient chart";
   usePageHeading(heading);
+  const chartId = patient.data?.id;
 
   useEffect(() => {
-    if (!patient.data) return;
+    if (!chartId) return;
     let lastInput = Date.now();
     const mark = () => { lastInput = Date.now(); };
     window.addEventListener("pointerdown", mark);
@@ -72,7 +74,7 @@ export default function PatientChartPage() {
       window.removeEventListener("pointermove", mark);
       window.removeEventListener("keydown", mark);
     };
-  }, [patient.data?.id, patientId, activeRole]);
+  }, [chartId, patientId, activeRole]);
 
   if (patient.error) return <PageError error={patient.error} />;
   if (!patient.data) return <LinearProgress aria-label="Loading chart" />;
@@ -80,7 +82,10 @@ export default function PatientChartPage() {
   const isAuthor = can(activeRole, "note:author");
   const mine = (notes.data ?? []).filter((n) => n.authorId === user.id);
   const openNote = mine.find((n) => n.status === "draft" || n.status === "returned");
-  const noteAction = !isAuthor ? undefined : (
+  const simAction = p.mode === "simulation" ? simulationNoteAction(p, notes.data ?? [], user.id) : undefined;
+  const noteAction = simAction !== undefined ? (simAction ? (
+    <Button variant="contained" color="secondary" onClick={() => navigate(simAction.href)}>{simAction.label}</Button>
+  ) : undefined) : !isAuthor ? undefined : (
     <Button
       variant="contained"
       color="secondary"
@@ -105,28 +110,29 @@ export default function PatientChartPage() {
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
 
-      {can(activeRole, "user:manage_access") && (
-        <Box sx={{ my: 2 }}>
-          <Button size="small" variant="outlined" onClick={() => {
-            setPortalEmail("");
-            setPortalFullName(`${p.firstName} ${p.lastName}`);
-            setPortalError("");
-            setPortalGranted(false);
-            setTemporaryPassword("");
-            setPortalAccessOpen(true);
-          }}>
-            Grant portal access
-          </Button>
-        </Box>
-      )}
-
-      {can(activeRole, "patient:update_status") && (
-        <Paper sx={{ p: 2, my: 2, display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-          <Typography variant="subtitle2" sx={{ mr: 1 }}>Bed assignment</Typography>
-          <input aria-label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} />
-          <input aria-label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} />
-          <input aria-label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} />
-          <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save placement</Button>
+      {(can(activeRole, "user:manage_access") || can(activeRole, "patient:update_status")) && (
+        <Paper sx={{ px: 2, py: 1.25, my: 2, display: "flex", gap: 1.25, flexWrap: "wrap", alignItems: "center" }}>
+          {can(activeRole, "patient:update_status") && (
+            <>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: utep.navy }}>Placement</Typography>
+              <TextField size="small" label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} sx={{ width: 120 }} />
+              <TextField size="small" label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} sx={{ width: 110 }} />
+              <TextField size="small" label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} sx={{ width: 100 }} />
+              <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save</Button>
+            </>
+          )}
+          {can(activeRole, "user:manage_access") && (
+            <Button size="small" sx={{ ml: { sm: "auto" } }} onClick={() => {
+              setPortalEmail("");
+              setPortalFullName(`${p.firstName} ${p.lastName}`);
+              setPortalError("");
+              setPortalGranted(false);
+              setTemporaryPassword("");
+              setPortalAccessOpen(true);
+            }}>
+              Portal access
+            </Button>
+          )}
         </Paper>
       )}
 

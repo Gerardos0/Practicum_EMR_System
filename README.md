@@ -212,7 +212,8 @@ GitHub Actions runs backend `pytest -q` with PostgreSQL. It runs `npm ci` and `n
 
 - Courses cannot be deleted. Archive a course instead. Archived courses cannot reopen.
 - Admin permissions do not grant instructor membership. To use Instructor mode for a course, an admin must also be rostered there as an instructor.
-- The roster form and spreadsheet upload require a 9-digit 800 number. The API does not independently validate the format.
+- The roster form, spreadsheet upload, and student account API require a 9-digit 800 number.
+- Simulation charts are a separate shared handoff. Assessment copies stay private to the student they were assigned to. Encounter statuses are Scheduled, Checked in, Roomed, In progress, Checked out, and Closed.
 
 ## Deploy
 

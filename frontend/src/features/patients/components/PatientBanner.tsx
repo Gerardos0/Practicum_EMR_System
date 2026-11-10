@@ -3,9 +3,12 @@ import { Box, Button, Chip, Paper, Typography } from "@mui/material";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import type { Patient } from "../../../types";
 import { getPatientPhoto } from "../../../api/patients";
+import { listOpened } from "../../../api/chart";
+import { useAsync } from "../../../utils/useAsync";
 import { formatDate } from "../../../utils/format";
 import { utep } from "../../../theme/tokens";
 import { useSession } from "../../auth/useSession";
+import { phaseChip } from "../simulation";
 
 interface Props {
   patient: Patient;
@@ -18,6 +21,10 @@ const card = { borderRadius: "16px", overflow: "hidden" } as const;
 
 export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
   const { activeRole } = useSession();
+  const opened = useAsync(
+    () => (p.mode === "simulation" ? listOpened(activeRole, p.id) : Promise.resolve([])),
+    [activeRole, p.id, p.mode],
+  );
   const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`;
   const [photo, setPhoto] = useState<{ id: string; src: string }>();
   useEffect(() => {
@@ -29,6 +36,22 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
     return () => { live = false; };
   }, [activeRole, p.hasPhoto, p.id]);
   const shownPhoto = p.hasPhoto && photo?.id === p.id ? photo.src : undefined;
+  const phase = phaseChip(p.simulationPhase);
+  const openedLine = (opened.data ?? []).length
+    ? `Opened by ${opened.data!.map((person) => person.station ? `${person.name} (${person.station})` : person.name).join(", ")}`
+    : "";
+  const statusLabel = p.mode === "case"
+    ? "Case master"
+    : p.mode === "assessment"
+      ? (ownerName ? `Assessment · ${ownerName}` : "Assessment · your copy")
+      : p.mode === "simulation"
+        ? phase.label
+        : `${p.practiceLabel ?? "Practice"} · not graded`;
+  const statusChip = p.mode === "simulation"
+    ? { bgcolor: phase.bgcolor, color: phase.color }
+    : p.mode === "practice"
+      ? { bgcolor: "transparent", color: utep.navy, border: `1px solid ${utep.line}` }
+      : { bgcolor: utep.navy, color: "#fff" };
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
     ["Setting", p.status.careSetting],
@@ -75,15 +98,15 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
           </Typography>
-          <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap" }}>
-            {p.mode === "case" ? (
-              <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
-            ) : p.mode === "assessment" ? (
-              <Chip size="small" label={ownerName ? `Assessment case: ${ownerName}` : "Assessment case: only your work appears here"} sx={{ bgcolor: utep.navy, color: "#fff" }} />
-            ) : (
-              <Chip size="small" label={`${p.practiceLabel ?? "Practice patient"}: shared, not graded`} variant="outlined" />
-            )}
-            <Chip size="small" label="Simulated patient" sx={{ bgcolor: utep.orangeSoft, color: utep.navy }} />
+          <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
+            <Chip size="small" label={statusLabel} sx={statusChip} />
+            <Typography variant="caption" color="text.secondary">
+              {[
+                p.mode === "simulation" && p.viewerStation ? `You are the ${p.viewerStation}` : "",
+                openedLine,
+                "Simulated patient",
+              ].filter(Boolean).join(" · ")}
+            </Typography>
           </Box>
         </Box>
 

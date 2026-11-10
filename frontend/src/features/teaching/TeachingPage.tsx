@@ -37,12 +37,9 @@ export default function TeachingPage() {
 
   return (
     <Stack spacing={2}>
-      <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Grades and chart time</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Exports are Excel workbooks for this course. Case masters themselves are not exported. Blackboard is not connected.
-        </Typography>
-      </Box>
+      <Typography variant="body2" color="text.secondary">
+        Excel exports for this course. Case masters are not included. Blackboard is not connected.
+      </Typography>
       {message && <Alert severity="success" onClose={() => setMessage("")}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
       <Paper sx={{ p: 2.5 }}>
@@ -78,7 +75,7 @@ export default function TeachingPage() {
       <Paper sx={{ p: 2.5 }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1 }}>Student activity</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          One row per student. Minutes count only while the chart tab is visible and the student has moved or typed in the last minute. A gap longer than two minutes starts a new session. Case charts are not included.
+          One row per student. Minutes count while the chart is open and the student is active.
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2, alignItems: { sm: "center" } }}>
           <TextField size="small" type="date" label="From" value={start} onChange={(e) => setStart(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />

@@ -24,12 +24,12 @@ export async function getNote(role: Role, id: string): Promise<ClinicalNote> {
 }
 
 export async function createDraft(
-  discipline: Discipline, patient: Patient, templateId: string, role: Role,
+  discipline: Discipline, patient: Patient, templateId: string, role: Role, kind: "visit" | "clarification" = "visit",
 ): Promise<ClinicalNote> {
   return request<ClinicalNote>(`/patients/${patient.id}/notes`, {
     method: "POST",
     query: { role },
-    json: { templateId, discipline },
+    json: { templateId, discipline, kind },
   });
 }
 

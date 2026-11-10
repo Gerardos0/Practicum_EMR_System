@@ -184,8 +184,19 @@ async def delete_medication(db, patient: Patient, actor: User, role: str, medica
     await _touch(db, patient, actor, ip, "medication.delete", row.name)
 
 
+async def _simulation_nurse(db, patient: Patient, actor: User) -> None:
+    from app.services.simulation import station_for
+
+    if patient.simulation_phase == "closed":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This simulation note is closed.")
+    if await station_for(db, patient.id, actor.id) != "nurse":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the assigned nurse records vitals in a simulation.")
+
+
 async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "vitals"):
+    if patient.mode == "simulation":
+        await _simulation_nurse(db, patient, actor)
+    elif not _can_edit_section(role, patient, "vitals"):
         _deny("vitals")
     label = (body.get("label") or "").strip()
     value = (body.get("value") or "").strip()
@@ -200,11 +211,15 @@ async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip
             status="recorded",
         )
     )
+    if patient.mode == "simulation" and patient.simulation_phase == "waiting_vitals":
+        patient.simulation_phase = "ready"
     await _touch(db, patient, actor, ip, "vital.add", f"{label} {value}")
 
 
 async def mark_vital_entered_in_error(db, patient: Patient, actor: User, role: str, vital_id: uuid.UUID, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "vitals"):
+    if patient.mode == "simulation":
+        await _simulation_nurse(db, patient, actor)
+    elif not _can_edit_section(role, patient, "vitals"):
         _deny("vitals")
     row = _find(patient.vitals, vital_id, "Vital")
     if row.status == "entered_in_error":
