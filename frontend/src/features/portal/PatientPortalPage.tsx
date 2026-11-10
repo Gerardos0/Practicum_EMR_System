@@ -158,11 +158,8 @@ function ProfileCompleteness({ intake, onComplete }: { intake: PortalIntake; onC
 }
 
 function ValueRow({ label, value }: { label: string; value: string }) {
-  return (
-    <Typography variant="body2">
-      <b>{label}:</b> {value || <Typography component="span" variant="body2" color="text.secondary">Not on file</Typography>}
-    </Typography>
-  );
+  if (!value.trim()) return null;
+  return <Typography variant="body2"><b>{label}:</b> {value}</Typography>;
 }
 
 function HealthRecord({ chart, intake }: { chart: PortalChart; intake: PortalIntake }) {
@@ -207,21 +204,25 @@ function HealthRecord({ chart, intake }: { chart: PortalChart; intake: PortalInt
             </Table>
           </Box>
         )}
-        <Typography variant="subtitle2" sx={{ mt: 2 }}>Patient-reported medications</Typography>
-        {intake.data.medications.length === 0 ? <Typography variant="body2" color="text.secondary">None on file.</Typography> : (
-          <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-            {intake.data.medications.map((item, index) => <Typography key={`${item.name}-${index}`} variant="body2">{item.name} {item.dose} {item.frequency}</Typography>)}
-          </Stack>
+        {intake.data.medications.length > 0 && (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2 }}>Patient-reported medications</Typography>
+            <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+              {intake.data.medications.map((item, index) => <Typography key={`${item.name}-${index}`} variant="body2">{item.name} {item.dose} {item.frequency}</Typography>)}
+            </Stack>
+          </>
         )}
-        <Typography variant="subtitle2" sx={{ mt: 2 }}>Patient-reported allergies</Typography>
-        {intake.data.noKnownAllergies && allergies.length === 0 ? (
-          <Typography variant="body2">No known allergies.</Typography>
-        ) : allergies.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">None on file.</Typography>
-        ) : (
-          <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-            {allergies.map((item, index) => <Typography key={`${item.agent}-${index}`} variant="body2">{item.agent}{item.reaction ? ` — ${item.reaction}` : ""}</Typography>)}
-          </Stack>
+        {(intake.data.noKnownAllergies || allergies.length > 0) && (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2 }}>Patient-reported allergies</Typography>
+            {intake.data.noKnownAllergies && allergies.length === 0 ? (
+              <Typography variant="body2">No known allergies.</Typography>
+            ) : (
+              <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                {allergies.map((item, index) => <Typography key={`${item.agent}-${index}`} variant="body2">{item.agent}{item.reaction ? ` — ${item.reaction}` : ""}</Typography>)}
+              </Stack>
+            )}
+          </>
         )}
       </Paper>
     </Stack>

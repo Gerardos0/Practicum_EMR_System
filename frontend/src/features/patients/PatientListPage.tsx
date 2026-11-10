@@ -156,12 +156,10 @@ export default function PatientListPage() {
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 2, pt: 1.5, flexWrap: "wrap" }}>
           <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 220 }}>
             {mode === "assessment"
-              ? isStudent
-                ? "Cases your instructor assigned to you. Each one is your own copy: no one else's notes appear on it."
-                : "One private copy per student. Open a case to see that student's work, or remove it from them."
+              ? "Private copies. Each student's notes stay on their own chart."
               : mode === "simulation"
-                ? "One shared chart for a live handoff. The row stays amber until the nurse records vitals, then turns green for the pharmacist or provider."
-                : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
+                ? "Shared chart. Amber until vitals are in, then green for the pharmacist or provider."
+                : "Shared patients for practice. Nothing here is graded."}
           </Typography>
           {canAssign && (
             <Button size="small" variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button>
@@ -208,6 +206,7 @@ export default function PatientListPage() {
                       tabIndex={0}
                       sx={{
                         cursor: "pointer",
+                        boxShadow: mode === "simulation" ? `inset 4px 0 0 ${phaseChip(p.simulationPhase).color}` : undefined,
                         bgcolor: mode === "simulation" ? phaseChip(p.simulationPhase).bgcolor : undefined,
                       }}
                       aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
@@ -215,12 +214,12 @@ export default function PatientListPage() {
                       <TableCell sx={{ maxWidth: { xs: 140, sm: "none" } }}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                           {p.lastName}, {p.firstName}
-                          {p.practiceLabel && <Chip size="small" label={p.practiceLabel} variant="outlined" sx={{ ml: 1 }} />}
-                          {mode === "simulation" && (
-                            <Chip size="small" label={phaseChip(p.simulationPhase).label} sx={{ ml: 1, bgcolor: "#fff", color: phaseChip(p.simulationPhase).color }} />
-                          )}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">MRN {p.mrn}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: { xs: 140, sm: 280 } }}>
+                          {p.practiceLabel ? `${p.practiceLabel} · ` : ""}
+                          {mode === "simulation" ? `${phaseChip(p.simulationPhase).label} · ` : ""}
+                          MRN {p.mrn}
+                        </Typography>
                         <Typography
                           variant="caption"
                           color="text.secondary"
@@ -236,7 +235,7 @@ export default function PatientListPage() {
                         {p.ageYears} y, {p.sexAtBirth}
                       </TableCell>
                       <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                        <Chip size="small" label={p.status.encounter} color={p.status.encounter === "Checked in" || p.status.encounter === "Roomed" || p.status.encounter === "In progress" ? "info" : "default"} variant="outlined" />
+                        {p.status.encounter}
                       </TableCell>
                       <TableCell>
                         <NoteStatusChip status={r.latestNote?.status} />
@@ -260,7 +259,7 @@ export default function PatientListPage() {
                         {mode === "simulation" && canAssign && (
                           <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>End</Button>
                         )}
-                        <Button size="small" variant="contained" onClick={open}>
+                        <Button size="small" onClick={open}>
                           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Open chart</Box>
                           <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Open</Box>
                         </Button>

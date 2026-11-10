@@ -11,7 +11,7 @@ import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
 import NoteStatusChip from "../../components/NoteStatusChip";
-import { Panel, StatCard, StatGrid, VisitChip } from "./components/DashboardParts";
+import { Panel, StatCard, StatGrid } from "./components/DashboardParts";
 import { DAY_MS, patientName, since } from "./dashboardFormat";
 import { utep } from "../../theme/tokens";
 
@@ -115,7 +115,7 @@ export default function StudentDashboard() {
                     sx={{ textDecoration: "none", "&:hover td": { color: utep.navy } }}
                   >
                     <TableCell sx={{ fontWeight: 600 }}>{patientName(r.patient)}</TableCell>
-                    <TableCell><VisitChip status={r.patient.status.encounter} /></TableCell>
+                    <TableCell>{r.patient.status.encounter}</TableCell>
                     <TableCell><NoteStatusChip status={r.latestNote?.status} /></TableCell>
                     <TableCell>{r.latestNote ? since(r.latestNote.updatedAt, now) : "—"}</TableCell>
                   </TableRow>

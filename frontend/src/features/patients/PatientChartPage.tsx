@@ -109,28 +109,29 @@ export default function PatientChartPage() {
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
 
-      {can(activeRole, "user:manage_access") && (
-        <Box sx={{ my: 2 }}>
-          <Button size="small" variant="outlined" onClick={() => {
-            setPortalEmail("");
-            setPortalFullName(`${p.firstName} ${p.lastName}`);
-            setPortalError("");
-            setPortalGranted(false);
-            setTemporaryPassword("");
-            setPortalAccessOpen(true);
-          }}>
-            Grant portal access
-          </Button>
-        </Box>
-      )}
-
-      {can(activeRole, "patient:update_status") && (
-        <Paper sx={{ p: 2, my: 2, display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-          <Typography variant="subtitle2" sx={{ mr: 1 }}>Bed assignment</Typography>
-          <input aria-label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} />
-          <input aria-label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} />
-          <input aria-label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} />
-          <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save placement</Button>
+      {(can(activeRole, "user:manage_access") || can(activeRole, "patient:update_status")) && (
+        <Paper sx={{ px: 2, py: 1.25, my: 2, display: "flex", gap: 1.25, flexWrap: "wrap", alignItems: "center" }}>
+          {can(activeRole, "patient:update_status") && (
+            <>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: utep.navy }}>Placement</Typography>
+              <TextField size="small" label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} sx={{ width: 120 }} />
+              <TextField size="small" label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} sx={{ width: 110 }} />
+              <TextField size="small" label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} sx={{ width: 100 }} />
+              <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save</Button>
+            </>
+          )}
+          {can(activeRole, "user:manage_access") && (
+            <Button size="small" sx={{ ml: { sm: "auto" } }} onClick={() => {
+              setPortalEmail("");
+              setPortalFullName(`${p.firstName} ${p.lastName}`);
+              setPortalError("");
+              setPortalGranted(false);
+              setTemporaryPassword("");
+              setPortalAccessOpen(true);
+            }}>
+              Portal access
+            </Button>
+          )}
         </Paper>
       )}
 

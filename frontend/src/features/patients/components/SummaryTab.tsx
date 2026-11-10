@@ -69,6 +69,28 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   ) : null;
 
   const nextStep = (() => {
+    if (p.mode === "simulation") {
+      const phase = p.simulationPhase ?? "waiting_vitals";
+      if (phase === "waiting_vitals") {
+        return {
+          severity: "info" as const,
+          title: "Waiting for vitals",
+          body: "The nurse records vitals. The visit note opens after that.",
+          action: null,
+        };
+      }
+      if (simAction) {
+        return {
+          severity: "info" as const,
+          title: phase === "closed" ? "Visit note is closed" : "Ready for the visit note",
+          body: phase === "closed"
+            ? "A clarification is a new note. The signed visit note stays closed."
+            : "The pharmacist or provider writes the note. The provider signs it closed.",
+          action: noteButton,
+        };
+      }
+      return null;
+    }
     if (!isAuthor) return null;
     if (openNote?.status === "returned") {
       return {
@@ -155,25 +177,24 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 
-      <Paper sx={card}>
-        <Typography component="h2" variant="h6" sx={titleSx}>Demographics</Typography>
-        <Typography variant="body2">
-          {p.lastName}, {p.firstName} · {p.ageYears} y · {p.sexAtBirth} · DOB {formatDate(p.dob)} · MRN {p.mrn}
-          {(p.unit || p.room || p.bed) ? ` · ${[p.unit, p.room && `Room ${p.room}`, p.bed && `Bed ${p.bed}`].filter(Boolean).join(", ")}` : ""}
-        </Typography>
-      </Paper>
+      {(p.unit || p.room || p.bed) && (
+        <Paper sx={card}>
+          <Typography component="h2" variant="h6" sx={titleSx}>Location</Typography>
+          <Typography variant="body2">{[p.unit, p.room && `Room ${p.room}`, p.bed && `Bed ${p.bed}`].filter(Boolean).join(", ")}</Typography>
+        </Paper>
+      )}
 
+      {(p.insurance?.payer || p.insurance?.memberId || p.insurance?.groupNumber || p.insurance?.notes) && (
       <Paper sx={card}>
         <Typography component="h2" variant="h6" sx={titleSx}>Insurance</Typography>
-        {p.insurance?.payer || p.insurance?.memberId || p.insurance?.groupNumber || p.insurance?.notes ? (
-          <Stack spacing={0.5}>
-            {p.insurance.payer && <Typography variant="body2"><strong>Payer:</strong> {p.insurance.payer}</Typography>}
-            {p.insurance.memberId && <Typography variant="body2"><strong>Member ID:</strong> {p.insurance.memberId}</Typography>}
-            {p.insurance.groupNumber && <Typography variant="body2"><strong>Group:</strong> {p.insurance.groupNumber}</Typography>}
-            {p.insurance.notes && <Typography variant="body2"><strong>Notes:</strong> {p.insurance.notes}</Typography>}
-          </Stack>
-        ) : <Typography variant="body2" color="text.secondary">Not on file</Typography>}
+        <Stack spacing={0.5}>
+          {p.insurance.payer && <Typography variant="body2"><strong>Payer:</strong> {p.insurance.payer}</Typography>}
+          {p.insurance.memberId && <Typography variant="body2"><strong>Member ID:</strong> {p.insurance.memberId}</Typography>}
+          {p.insurance.groupNumber && <Typography variant="body2"><strong>Group:</strong> {p.insurance.groupNumber}</Typography>}
+          {p.insurance.notes && <Typography variant="body2"><strong>Notes:</strong> {p.insurance.notes}</Typography>}
+        </Stack>
       </Paper>
+      )}
 
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
         <Paper sx={card}>
@@ -283,15 +304,13 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         </Paper>
       </Box>
 
+      {nextAppointment && (
       <Paper sx={card}>
         <Typography component="h2" variant="h6" sx={titleSx}>Next appointment</Typography>
-        {nextAppointment ? (
-          <>
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatDateTime(nextAppointment.when)}</Typography>
-            <Typography variant="body2">{nextAppointment.kind}, {nextAppointment.withWhom}</Typography>
-          </>
-        ) : <Typography variant="body2" color="text.secondary">None scheduled.</Typography>}
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>{formatDateTime(nextAppointment.when)}</Typography>
+        <Typography variant="body2">{nextAppointment.kind}, {nextAppointment.withWhom}</Typography>
       </Paper>
+      )}
       <PatientReportedCard patientId={p.id} />
     </Box>
   );

@@ -36,6 +36,22 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
     return () => { live = false; };
   }, [activeRole, p.hasPhoto, p.id]);
   const shownPhoto = p.hasPhoto && photo?.id === p.id ? photo.src : undefined;
+  const phase = phaseChip(p.simulationPhase);
+  const openedLine = (opened.data ?? []).length
+    ? `Opened by ${opened.data!.map((person) => person.station ? `${person.name} (${person.station})` : person.name).join(", ")}`
+    : "";
+  const statusLabel = p.mode === "case"
+    ? "Case master"
+    : p.mode === "assessment"
+      ? (ownerName ? `Assessment · ${ownerName}` : "Assessment · your copy")
+      : p.mode === "simulation"
+        ? phase.label
+        : `${p.practiceLabel ?? "Practice"} · not graded`;
+  const statusChip = p.mode === "simulation"
+    ? { bgcolor: phase.bgcolor, color: phase.color }
+    : p.mode === "practice"
+      ? { bgcolor: "transparent", color: utep.navy, border: `1px solid ${utep.line}` }
+      : { bgcolor: utep.navy, color: "#fff" };
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
     ["Setting", p.status.careSetting],
@@ -82,25 +98,15 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
           </Typography>
-          <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap" }}>
-            {p.mode === "case" ? (
-              <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
-            ) : p.mode === "assessment" ? (
-              <Chip size="small" label={ownerName ? `Assessment case: ${ownerName}` : "Assessment case: only your work appears here"} sx={{ bgcolor: utep.navy, color: "#fff" }} />
-            ) : p.mode === "simulation" ? (
-              <Chip size="small" label={phaseChip(p.simulationPhase).label} sx={{ bgcolor: phaseChip(p.simulationPhase).bgcolor, color: phaseChip(p.simulationPhase).color }} />
-            ) : (
-              <Chip size="small" label={`${p.practiceLabel ?? "Practice patient"}: shared, not graded`} variant="outlined" />
-            )}
-            {p.mode === "simulation" && p.viewerStation && (
-              <Chip size="small" label={`You are the ${p.viewerStation}`} variant="outlined" />
-            )}
-            {p.mode === "simulation" && (opened.data ?? []).length > 0 && (
-              <Typography variant="caption" color="text.secondary" sx={{ flexBasis: "100%" }}>
-                Opened by {(opened.data ?? []).map((person) => person.station ? `${person.name} (${person.station})` : person.name).join(", ")}
-              </Typography>
-            )}
-            <Chip size="small" label="Simulated patient" sx={{ bgcolor: utep.orangeSoft, color: utep.navy }} />
+          <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
+            <Chip size="small" label={statusLabel} sx={statusChip} />
+            <Typography variant="caption" color="text.secondary">
+              {[
+                p.mode === "simulation" && p.viewerStation ? `You are the ${p.viewerStation}` : "",
+                openedLine,
+                "Simulated patient",
+              ].filter(Boolean).join(" · ")}
+            </Typography>
           </Box>
         </Box>
 

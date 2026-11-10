@@ -14,9 +14,8 @@ export default function AdminHomePage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>Program administration</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: "62ch" }}>
-          This area is for classes and accounts. Instructors build cases and grade notes in their own screens.
+          Classes and accounts. Instructors build cases and grade notes in their own screens.
         </Typography>
       </Box>
       {courses.loading && <LinearProgress aria-label="Loading classes" />}

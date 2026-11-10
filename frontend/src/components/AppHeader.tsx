@@ -84,7 +84,9 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
               {heading?.title ?? courseLabel}
             </Typography>
             {heading && (
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: utep.navy, opacity: 0.85 }}>{courseLabel}</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: utep.navy, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {courseLabel}
+              </Typography>
             )}
           </Box>
 

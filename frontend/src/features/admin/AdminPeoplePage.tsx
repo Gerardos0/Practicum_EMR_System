@@ -21,9 +21,8 @@ export default function AdminPeoplePage() {
   return (
     <Stack spacing={2.5}>
       <Box>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>People</Typography>
         <Typography variant="body2" color="text.secondary">
-          Pick a class, then enroll students and instructors who already have accounts, or create an account and place it in that class.
+          Pick a class, then enroll someone who already has an account or create one for that class.
         </Typography>
       </Box>
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
