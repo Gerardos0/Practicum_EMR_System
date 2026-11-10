@@ -55,6 +55,12 @@ export function validateIntake(data: IntakeData): Record<string, string> {
 }
 
 export function intakeCompleteness(data: IntakeData): { done: number; total: number; missing: string[] } {
+  const hasText = (value: string) => value.trim().length > 0;
+  const hasCondition = data.conditions.some((item) => hasText(item.name));
+  const hasSurgery = data.surgeries.some((item) => hasText(item.procedure));
+  const hasMedication = data.medications.some((item) => hasText(item.name));
+  const hasAllergy = data.allergies.some((item) => hasText(item.agent));
+  const hasFamilyHistory = data.familyMembers.some((item) => hasText(item.conditions));
   const checks: [string, boolean][] = [
     ["Preferred language", Boolean(data.preferredLanguage.trim())],
     ["Phone", Boolean(data.phone.trim())],
@@ -62,9 +68,9 @@ export function intakeCompleteness(data: IntakeData): { done: number; total: num
     ["Email", Boolean(data.email.trim())],
     ["Primary insurance", Boolean(data.insurancePayer.trim() && data.insuranceMemberId.trim())],
     ["Emergency contact", Boolean(data.emergencyContactName.trim() && data.emergencyContactPhone.trim())],
-    ["Health history", Boolean(data.conditions.length || data.surgeries.length || data.pastMedicalHistory.trim() || data.medications.length)],
-    ["Allergies", Boolean(data.allergies.length || data.noKnownAllergies)],
-    ["Family history", Boolean(data.familyMembers.length || data.familyHistory.trim())],
+    ["Health history", Boolean(hasCondition || hasSurgery || hasText(data.pastMedicalHistory) || hasMedication)],
+    ["Allergies", Boolean(hasAllergy || data.noKnownAllergies)],
+    ["Family history", Boolean(hasFamilyHistory || hasText(data.familyHistory))],
     ["Social history", Boolean(data.tobaccoUse && data.alcoholUse)],
     ["Review and confirm", data.confirmedAccurate],
   ];
