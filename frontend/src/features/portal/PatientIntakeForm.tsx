@@ -122,7 +122,6 @@ export default function PatientIntakeForm({ intake, onSaved, previewMode = false
 
   return (
     <Stack component="form" spacing={2.5} onSubmit={save}>
-      <Alert severity="info">Use fictional information only. Do not enter real personal, insurance, or health information.</Alert>
       {intake.source === "patient" && intake.updatedAt && !previewMode ? (
         <Alert severity="info">Your information was last updated {formatDateTime(intake.updatedAt)}. Review it and make any changes.</Alert>
       ) : !previewMode ? (

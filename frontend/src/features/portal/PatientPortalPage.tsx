@@ -20,7 +20,7 @@ interface PortalChart {
 }
 
 const PREVIEW_CHART: PortalChart = {
-  patient: { name: "Alex Morgan", dob: "1994-06-12", mrn: "DEMO-2048" },
+  patient: { name: "Alex Morgan", dob: "1994-06-12", mrn: "MR-2048" },
   labs: [
     { name: "Lipid panel", value: "168", unit: "mg/dL", reference_range: "< 200", collected_at: "2026-10-21" },
     { name: "Hemoglobin A1c", value: "5.8", unit: "%", reference_range: "4.0–5.6", flag: "H", collected_at: "2026-08-13" },
@@ -50,17 +50,17 @@ const PREVIEW_INTAKE: PortalIntake = {
     race: ["White"],
     ethnicity: "Prefer not to say",
     maritalStatus: "Single",
-    email: "alex.morgan@example.test",
+    email: "alex.morgan@portal.test",
     phone: "915-555-0148",
     phoneType: "Mobile",
-    address: "100 Fictional Way",
+    address: "100 Maple Avenue",
     city: "El Paso",
     state: "TX",
     zipCode: "79901",
     preferredLanguage: "English",
-    insurancePayer: "Example Health Plan",
-    insuranceMemberId: "DEMO-MEMBER-100",
-    insuranceGroupNumber: "DEMO-GROUP-10",
+    insurancePayer: "Valley Health Plan",
+    insuranceMemberId: "VHP-2048",
+    insuranceGroupNumber: "VHP-10",
     insurancePlanType: "PPO",
     insuranceSubscriberIsPatient: true,
     conditions: [{ name: "Asthma", year: "2018" }],
@@ -74,7 +74,7 @@ const PREVIEW_INTAKE: PortalIntake = {
     emergencyContactRelationship: "Sibling",
     confirmedAccurate: true,
   },
-  identity: { firstName: "Alex", lastName: "Morgan", dob: "1994-06-12", sexAtBirth: "Female", mrn: "DEMO-2048" },
+  identity: { firstName: "Alex", lastName: "Morgan", dob: "1994-06-12", sexAtBirth: "Female", mrn: "MR-2048" },
   source: "patient",
   updatedAt: "2026-10-21T15:00:00Z",
   editable: false,
@@ -98,7 +98,6 @@ function Overview({ chart, intake, onComplete }: { chart: PortalChart; intake: P
             DOB {formatDate(chart.patient.dob)} · MRN {chart.patient.mrn}
           </Typography>
         </Box>
-        <Chip label="SIMULATED DATA" sx={{ bgcolor: utep.navy, color: "#fff", fontWeight: 800 }} />
       </Box>
       <ProfileCompleteness intake={intake} onComplete={onComplete} />
       <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
@@ -297,12 +296,9 @@ export default function PatientPortalPage({ previewMode = false }: { previewMode
             <Typography component="h1" variant="h4" sx={{ fontWeight: 800, lineHeight: 1.15 }}>Your health, at a glance</Typography>
             <Typography variant="body2" sx={{ mt: 0.5 }}>Visit details, medications, and recent lab results.</Typography>
           </Box>
-          <Chip label="SIMULATED DATA" sx={{ bgcolor: utep.navy, color: "#fff", fontWeight: 800, alignSelf: { xs: "flex-start", sm: "center" } }} />
         </Stack>
       </Paper>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Preview only. Nothing is saved.
-      </Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>Preview only. Nothing is saved.</Alert>
       {portal}
     </Container>
   );
