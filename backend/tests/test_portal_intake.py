@@ -418,6 +418,7 @@ async def test_v2_full_round_trip_and_staff_visibility(client):
     saved = await client.put("/api/v1/portal/intake", headers=patient_headers, json=payload)
     assert saved.status_code == 200, saved.text
     body = saved.json()
+    assert body["data"] == payload
     assert body["data"]["race"] == payload["race"]
     assert body["data"]["insuranceSubscriberDob"] == payload["insuranceSubscriberDob"]
     assert body["data"]["conditions"] == payload["conditions"]
