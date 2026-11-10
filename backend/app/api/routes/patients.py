@@ -16,6 +16,7 @@ from app.schemas.clinical import (
     AllergyWrite,
     AnswerKeyOut,
     AssignCase,
+    ChartPresence,
     HistoryWrite,
     LabWrite,
     MedicationWrite,
@@ -55,6 +56,7 @@ from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
 from app.services.charts import apply_status, assign_case, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
 from app.services.intake import get_intake
+from app.services.simulation import assigned_patient_ids, end_simulation, presence_rows, station_for
 from app.services.serialize import patient_out
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -77,6 +79,7 @@ async def list_patients(
 
     require_course(role, course_id, user, rows)
     await ensure_student_may_enter(db, role, course_id)
+    sim_ids = await assigned_patient_ids(db, user.id, course_id) if role == "student" else set()
     patients = list(
         (
             await db.scalars(
@@ -90,15 +93,19 @@ async def list_patients(
     )
     visible = []
     for patient in patients:
-        if role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
+        if patient.mode == "simulation" and role == "front_desk":
+            continue
+        if role == "student" and patient.mode == "simulation":
+            if patient.id not in sim_ids:
+                continue
+        elif role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
             continue
         if role not in {"student", "instructor", "course_coordinator", "admin", "front_desk"}:
             continue
-        author_id = user.id if role == "student" else patient.owner_id
         note_query = select(ClinicalNote).where(ClinicalNote.patient_id == patient.id, ClinicalNote.archived.is_(False))
-        if author_id is not None and role == "student":
-            note_query = note_query.where(ClinicalNote.author_id == author_id)
-        elif role != "student" and patient.owner_id is not None:
+        if role == "student" and patient.mode != "simulation":
+            note_query = note_query.where(ClinicalNote.author_id == user.id)
+        elif role != "student" and patient.owner_id is not None and patient.mode != "simulation":
             note_query = note_query.where(ClinicalNote.author_id == patient.owner_id)
         if not can(role, "note:view_sensitive"):
             note_query = note_query.where(ClinicalNote.sensitive.is_(False))
@@ -111,9 +118,15 @@ async def list_patients(
                 )
         shown_owner = full_owner(patient)
         open_flags = sum(1 for med in patient.medications if med.status == "active" and med.flags)
+        station = await station_for(db, patient.id, user.id) if patient.mode == "simulation" else None
         visible.append(
             {
-                "patient": patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role),
+                "patient": patient_out(
+                    patient,
+                    owner_name=owner_name_for(patient, role),
+                    viewer_role=role,
+                    viewer_station=station,
+                ),
                 "owner_name": shown_owner,
                 "latest_note": {"status": latest.status, "updated_at": latest.updated_at} if latest else None,
                 "open_flag_count": open_flags,
@@ -172,7 +185,8 @@ async def get_patient(
         ip_address=_ip(request),
     )
     await db.commit()
-    return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role)
+    station = await station_for(db, patient.id, user.id) if patient.mode == "simulation" else None
+    return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role, viewer_station=station)
 
 
 @router.get("/{patient_id}/intake", response_model=StaffIntakeOut)
@@ -363,7 +377,10 @@ async def unassign_patient(
     rows = await memberships_for(db, user.id)
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
     await ensure_course_open(db, patient.course_id)
-    await unassign_case(db, patient, user, role, _ip(request))
+    if patient.mode == "simulation":
+        await end_simulation(db, patient, user, role, _ip(request))
+    else:
+        await unassign_case(db, patient, user, role, _ip(request))
     await db.commit()
 
 
@@ -389,6 +406,20 @@ async def presence(
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
     await record_presence(db, patient, user, _ip(request), active=body.active)
     await db.commit()
+
+
+@router.get("/{patient_id}/opened", response_model=list[ChartPresence], response_model_exclude_none=True)
+async def opened(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    return await presence_rows(db, patient)
 
 
 @router.post("/{patient_id}/allergies", response_model=PatientOut, response_model_exclude_none=True)

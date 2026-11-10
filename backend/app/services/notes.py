@@ -12,6 +12,7 @@ from app.services.note_prefill import diagnoses_from_patient, prefill_from_patie
 from app.services.charts import utcnow
 from app.services.note_crypto import seal_note, seal_text
 from app.services.note_templates import allowed_section_ids, assert_usable, template_sensitivity
+from app.services.simulation import may_edit_simulation_note, prepare_note, sign_simulation
 
 CONTENT_LIMIT = 20_000
 
@@ -37,7 +38,7 @@ def _bounded_content(content: dict) -> dict:
 
 
 def ensure_can_read(note: ClinicalNote, user: User, role: str) -> None:
-    if role == "student" and note.author_id != user.id:
+    if role == "student" and note.author_id != user.id and note.mode != "simulation":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only open notes you wrote.")
 
 
@@ -50,8 +51,10 @@ async def create_draft(
     discipline_code: str,
     role: str,
     ip: str | None,
+    kind: str = "visit",
 ) -> ClinicalNote:
     require(role, "note:author", "Your role can't write notes.")
+    kind = await prepare_note(db, patient, author, role, kind)
     if patient.mode == "case":
         raise HTTPException(status.HTTP_409_CONFLICT, "Edit the case instead of writing a note on the master.")
     if patient.encounter is None:
@@ -70,6 +73,7 @@ async def create_draft(
         author_id=author.id,
         discipline_id=discipline.id,
         mode=patient.mode,
+        kind=kind,
         status="draft",
         version=1,
         content=prefill_from_patient(template_id, patient),
@@ -92,10 +96,15 @@ async def create_draft(
 
 
 async def save_draft(db, note: ClinicalNote, author: User, expected_version: int, patch: dict) -> ClinicalNote:
-    if note.author_id != author.id:
+    closed = note.status not in EDITABLE or note.body_locked
+    shared = await may_edit_simulation_note(db, note, author)
+    if note.author_id != author.id and not shared:
+        if note.mode == "simulation" and closed:
+            raise HTTPException(status.HTTP_409_CONFLICT, "This note is closed. Start a clarification note instead.")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the author can edit this note.")
-    if note.status not in EDITABLE or note.body_locked:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This note is signed. Add an addendum instead of changing it.")
+    if closed:
+        message = "This note is closed. Start a clarification note instead." if note.mode == "simulation" else "This note is signed. Add an addendum instead of changing it."
+        raise HTTPException(status.HTTP_409_CONFLICT, message)
     _check_version(note, expected_version)
     if patch.get("template_id"):
         patient = await db.get(Patient, note.patient_id)
@@ -121,6 +130,27 @@ async def save_draft(db, note: ClinicalNote, author: User, expected_version: int
 
 
 async def sign_note(db, note: ClinicalNote, author: User, expected_version: int, ip: str | None, course_id) -> ClinicalNote:
+    if note.mode == "simulation":
+        if note.status not in EDITABLE or note.body_locked:
+            raise HTTPException(status.HTTP_409_CONFLICT, "This note is closed. Start a clarification note instead.")
+        _check_version(note, expected_version)
+        patient = await db.get(Patient, note.patient_id)
+        if patient is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "This patient doesn't exist or was archived.")
+        await sign_simulation(db, note, author, patient)
+        note.signed_at = utcnow()
+        note.updated_at = note.signed_at
+        note.version += 1
+        await log_event(
+            db,
+            action="note.sign",
+            entity_type="note",
+            entity_id=str(note.id),
+            actor_user_id=author.id,
+            course_id=course_id,
+            ip_address=ip,
+        )
+        return note
     if note.author_id != author.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the author can sign this note.")
     if note.status not in EDITABLE:
@@ -317,6 +347,8 @@ async def save_scores(db, note: ClinicalNote, reviewer: User, role: str, scores:
 
 
 async def add_addendum(db, note: ClinicalNote, author: User, body: str, ip: str | None, course_id) -> None:
+    if note.mode == "simulation":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This note is closed. Start a clarification note instead.")
     if note.author_id != author.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the author can add an addendum.")
     revisable = note.status in {"signed", "cosigned"} or (note.status == "returned" and note.body_locked)

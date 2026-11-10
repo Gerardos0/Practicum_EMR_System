@@ -12,6 +12,7 @@ import { canEditSection } from "../../chart/access";
 import { formatDate, formatDateTime } from "../../../utils/format";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";
+import { simulationNoteAction } from "../simulation";
 
 const FLOW: EncounterStatus[] = ["Scheduled", "Checked in", "Roomed", "In progress", "Checked out"];
 const ADVANCE_LABEL: Partial<Record<EncounterStatus, string>> = {
@@ -55,8 +56,11 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   const mine = notes.filter((n) => n.authorId === user.id);
   const openNote = mine.find((n) => n.status === "draft" || n.status === "returned");
   const submitted = p.mode === "assessment" && mine.some((n) => n.status === "pending_review" || n.status === "cosigned");
+  const simAction = p.mode === "simulation" ? simulationNoteAction(p, notes, user.id) : undefined;
 
-  const noteButton = !isAuthor ? null : openNote ? (
+  const noteButton = simAction !== undefined ? (simAction ? (
+    <Button variant="contained" color="secondary" onClick={() => navigate(simAction.href)}>{simAction.label}</Button>
+  ) : null) : !isAuthor ? null : openNote ? (
     <Button variant="contained" color="secondary" onClick={() => navigate(`/patients/${p.id}/notes/${openNote.id}`)}>
       {openNote.status === "returned" ? "Revise returned note" : "Continue note"}
     </Button>

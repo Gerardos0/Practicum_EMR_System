@@ -69,7 +69,7 @@ export default function StudentDashboard() {
           icon={<ReplayOutlined fontSize="small" />}
         />
         <StatCard
-          label="Awaiting review"
+          label="Needs review"
           value={pending.length}
           tone="navySoft"
           to={caseloadHref("awaiting")}

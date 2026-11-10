@@ -11,7 +11,7 @@ import { useAsync } from "../../utils/useAsync";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
-  pending_review: "Pending review",
+  pending_review: "Needs review",
   signed: "Signed",
   cosigned: "Co-signed",
   returned: "Returned",

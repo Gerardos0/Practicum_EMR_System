@@ -18,6 +18,7 @@ import NotesList from "../encounters/components/NotesList";
 import MedicationsTab from "../medications/MedicationsTab";
 import LabsTab from "../labs/LabsTab";
 import SchedulingTab from "../scheduling/SchedulingTab";
+import { simulationNoteAction } from "./simulation";
 
 const TABS = [
   { id: "summary", label: "Overview" },
@@ -80,7 +81,10 @@ export default function PatientChartPage() {
   const isAuthor = can(activeRole, "note:author");
   const mine = (notes.data ?? []).filter((n) => n.authorId === user.id);
   const openNote = mine.find((n) => n.status === "draft" || n.status === "returned");
-  const noteAction = !isAuthor ? undefined : (
+  const simAction = p.mode === "simulation" ? simulationNoteAction(p, notes.data ?? [], user.id) : undefined;
+  const noteAction = simAction !== undefined ? (simAction ? (
+    <Button variant="contained" color="secondary" onClick={() => navigate(simAction.href)}>{simAction.label}</Button>
+  ) : undefined) : !isAuthor ? undefined : (
     <Button
       variant="contained"
       color="secondary"
