@@ -17,6 +17,9 @@ export function sectionLocked(patient: Patient, section: string): boolean {
 }
 
 export function canEditSection(role: Role, patient: Patient, section: string): boolean {
+  if (patient.mode === "simulation" && section === "vitals") {
+    return patient.viewerStation === "nurse" && patient.simulationPhase !== "closed";
+  }
   if (can(role, "case:author") || can(role, "patient:update_status")) return true;
   return role === "student" && !sectionLocked(patient, section);
 }

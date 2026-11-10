@@ -19,6 +19,7 @@ from app.models.clinical import (  # noqa: F401
     Problem,
     SavedNoteTemplate,
     Referral,
+    SimulationAssignment,
     Vital,
 )
 from app.models.user import Discipline, Permission, Role, User  # noqa: F401

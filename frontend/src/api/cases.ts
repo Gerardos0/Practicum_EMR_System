@@ -1,5 +1,5 @@
 import type {
-  Allergy, AuthoredCase, CareSetting, EncounterStatus, GradingGuide, LabResult, LifecycleStatus, Medication, PlantedTrigger, Problem, Role, Vital,
+  Allergy, AuthoredCase, CareSetting, EncounterStatus, GradingGuide, LabResult, LifecycleStatus, Medication, Patient, PlantedTrigger, Problem, Role, Vital,
 } from "../types";
 import { downloadFile, request } from "./client";
 
@@ -102,6 +102,13 @@ export async function putTriggers(role: Role, caseId: string, triggers: PlantedT
 
 export async function getChartTriggers(role: Role, patientId: string): Promise<{ triggers: PlantedTrigger[] }> {
   return request(`/patients/${patientId}/triggers`, { query: { role } });
+}
+
+export async function startSimulation(
+  role: Role, courseId: string, caseId: string,
+  body: { nurseId: string; pharmacistId?: string; providerId?: string },
+): Promise<Patient> {
+  return request(`/cases/${caseId}/simulations`, { method: "POST", query: { course_id: courseId, role }, json: body });
 }
 
 export async function copyCase(role: Role, caseId: string, courseId: string): Promise<AuthoredCase> {

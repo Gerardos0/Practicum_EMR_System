@@ -90,6 +90,7 @@ async def seed(admin_email: str | None, admin_password: str | None) -> None:
         roles = await _upsert_roles(db, permissions)
         await _drop_obsolete(db)
         await _seed_courses_and_people(db, roles, disciplines, _demo_password())
+        await _repair_demo(db)
         if admin_email and admin_password:
             await _ensure_admin(db, roles["admin"], admin_email, admin_password)
         await db.commit()
@@ -205,9 +206,12 @@ async def _course(db, code: str, title: str, term: str, rubric: str, *, guardrai
     if course is None:
         course = Course(
             code=code, title=title, term=term, rubric_file_name=rubric, guardrail_profile=guardrail_profile,
+            grading_guide=_guide_for(rubric),
         )
         db.add(course)
         await db.flush()
+    elif course.grading_guide is None:
+        course.grading_guide = _guide_for(rubric)
     return course
 
 
@@ -698,11 +702,13 @@ def _clone_case(source: Patient, mrn: str, owner: User) -> Patient:
         ),
     )
     for item in source.allergies:
-        chart.allergies.append(Allergy(substance=item.substance, reaction=item.reaction, severity=item.severity))
+        chart.allergies.append(
+            Allergy(substance=item.substance, reaction=item.reaction, severity=item.severity, category=item.category)
+        )
     for item in source.medications:
         chart.medications.append(Medication(
             name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
-            indication=item.indication, adherence=item.adherence,
+            indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
         ))
     for item in source.problems:
         chart.problems.append(Problem(code=item.code, description=item.description, since=item.since))
@@ -712,7 +718,10 @@ def _clone_case(source: Patient, mrn: str, owner: User) -> Patient:
             flag=item.flag, collected_at=item.collected_at,
         ))
     for item in source.vitals:
-        chart.vitals.append(Vital(label=item.label, value=item.value))
+        chart.vitals.append(Vital(
+            label=item.label, value=item.value, recorded_at=item.recorded_at,
+            recorded_by_name=item.recorded_by_name, status=item.status or "recorded",
+        ))
     return chart
 
 
@@ -824,9 +833,58 @@ async def _ensure_audit(db, actor_id, action, entity_type, entity_id, course_id,
         ))
 
 
+_FOOD_ALLERGIES = {"Shellfish"}
+_ENV_ALLERGIES = {"Cats", "Latex", "Iodine contrast"}
+_BASELINE_VITAL = datetime(2026, 10, 6, 15, tzinfo=timezone.utc)
+
+
+def _allergy_category(substance: str) -> str:
+    if substance in _FOOD_ALLERGIES:
+        return "food"
+    if substance in _ENV_ALLERGIES:
+        return "environmental"
+    return "medication"
+
+
+def _normalize_vital(label: str, value: str) -> str:
+    text = value.strip()
+    if label == "BP" and "mmHg" not in text:
+        return f"{text} mmHg"
+    if label == "Pulse" and "bpm" not in text:
+        return f"{text} bpm"
+    if label == "Temp" and text.upper().endswith("F"):
+        return "37.0 °C"
+    return text
+
+
+def _guide_for(filename: str) -> dict:
+    if filename.startswith("PT-"):
+        criteria = [
+            ("subjective", "Patient report", "Patient-reported symptoms, functional limits, and response to the prior session."),
+            ("objective", "Skilled interventions & measures", "Interventions, assistance level, and objective measures."),
+            ("assessment", "Clinical reasoning", "Progress toward goals and the skilled need for continued therapy."),
+            ("plan", "Plan of care", "Next-session focus, home program, and follow-up."),
+            ("safety", "Safety & documentation standards", "Precautions addressed and language appropriate for the record."),
+        ]
+    else:
+        criteria = [
+            ("s", "Subjective", "Chief concern, history, adherence, and context that affect the plan."),
+            ("o", "Objective", "Vitals, exam, labs, and current medications with doses."),
+            ("a", "Assessment", "Prioritized problems and drug-therapy issues linked to the findings."),
+            ("p", "Plan", "Actions per problem, counseling, and follow-up timing."),
+            ("safety", "Safety & professionalism", "Allergy checks, no fabricated data, and clear attribution."),
+        ]
+    return {
+        "file_name": filename,
+        "criteria": [{"id": item_id, "label": label, "detail": detail, "max_points": 20} for item_id, label, detail in criteria],
+    }
+
+
 def _maybe_allergy(chart: Patient, substance: str, reaction: str | None = None, severity: str | None = None) -> None:
     if not any(row.substance == substance for row in chart.allergies):
-        chart.allergies.append(Allergy(substance=substance, reaction=reaction, severity=severity))
+        chart.allergies.append(
+            Allergy(substance=substance, reaction=reaction, severity=severity, category=_allergy_category(substance))
+        )
 
 
 def _maybe_med(chart: Patient, name: str, **kwargs) -> None:
@@ -845,8 +903,11 @@ def _maybe_lab(chart: Patient, name: str, collected_at: date, **kwargs) -> None:
 
 
 def _maybe_vital(chart: Patient, label: str, value: str) -> None:
+    value = _normalize_vital(label, value)
     if not any(row.label == label for row in chart.vitals):
-        chart.vitals.append(Vital(label=label, value=value))
+        chart.vitals.append(Vital(
+            label=label, value=value, recorded_at=_BASELINE_VITAL, recorded_by_name="Chart baseline",
+        ))
 
 
 def _contacts(chart: Patient, *, payer=None, member=None, group=None, em_name=None, em_phone=None, em_rel=None) -> None:
@@ -1019,7 +1080,7 @@ def _priya(course: Course) -> Patient:
         pronouns="she/her", course=course, mode="practice", case_key="practice_thyroid", label="Test Patient E",
         cc="Fatigue, weight gain, and lipid results.",
         hpi="48-year-old female with hypothyroidism on levothyroxine 75 mcg. Tired, cold, and up 6 lb since June. Last TSH was high. Also here for a statin start discussion.",
-        lifecycle="Active", encounter_status="Waiting", care="Outpatient",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
         family="Mother: hypothyroidism. Father: MI at 58.", surgical="C-section (2012).",
         social="Works nights in a call center. Vegetarian. No tobacco. Wine on weekends.",
         encounter_type="Office visit",
@@ -1176,7 +1237,7 @@ def _nadine(course: Course) -> Patient:
         pronouns="she/her", course=course, mode="practice", case_key="practice_geriatric", label="Test Patient I",
         cc="Confusion and burning with urination. Family brought a bag of bottles.",
         hpi="85-year-old female from assisted living with 2 days of dysuria and new confusion. Fall last month, no fracture. Daughter is unsure which pills she actually takes.",
-        lifecycle="Active", encounter_status="Waiting", care="Outpatient",
+        lifecycle="Active", encounter_status="Checked in", care="Outpatient",
         family="Daughter is historian. No known CAD.", surgical="TKA right (2016). Pacemaker (2020).",
         social="Assisted living. Widowed. No tobacco or alcohol.",
         encounter_type="Geriatric visit",
@@ -1858,6 +1919,29 @@ async def ensure_live_demo() -> None:
             await _deactivate_demo(db, scott, phar, student, gerardo)
         await db.commit()
     print("Live demo cases are in place.")
+
+
+async def _repair_demo(db) -> None:
+    charts = (
+        await db.scalars(select(Patient).options(selectinload(Patient.allergies), selectinload(Patient.vitals)))
+    ).all()
+    for chart in charts:
+        if chart.encounter_status == "Waiting":
+            chart.encounter_status = "Checked in"
+        for allergy in chart.allergies:
+            wanted = _allergy_category(allergy.substance)
+            if allergy.category != wanted and allergy.substance in _FOOD_ALLERGIES | _ENV_ALLERGIES:
+                allergy.category = wanted
+        for vital in chart.vitals:
+            vital.value = _normalize_vital(vital.label, vital.value)
+            if vital.recorded_at is None:
+                vital.recorded_at = _BASELINE_VITAL
+                if not vital.recorded_by_name:
+                    vital.recorded_by_name = "Chart baseline"
+    courses = (await db.scalars(select(Course))).all()
+    for course in courses:
+        if course.grading_guide is None and course.rubric_file_name:
+            course.grading_guide = _guide_for(course.rubric_file_name)
 
 
 def main() -> None:

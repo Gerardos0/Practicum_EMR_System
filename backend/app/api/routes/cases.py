@@ -4,13 +4,15 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Query, Request, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession
-from app.schemas.clinical import AnswerKeyIn, AnswerKeyOut, CaseCopyIn, CaseIn, CaseOut, TriggersIn, TriggersOut
+from app.schemas.clinical import AnswerKeyIn, AnswerKeyOut, CaseCopyIn, CaseIn, CaseOut, PatientOut, StartSimulation, TriggersIn, TriggersOut
 from app.services.access import can, ensure_course_open, memberships_for, require_course
 from app.services.answer_keys import deny_answer_key, read_answer_key, upsert_answer_key
 from app.services.audit import log_event
 from app.services.case_import import import_cases, template_workbook
 from app.services.cases import copy_case, create_case, list_cases, load_case, save_case_rubric, save_triggers, update_case
-from app.services.serialize import authored_case_out
+from app.services.serialize import authored_case_out, patient_out
+from app.services.charts import owner_name_for
+from app.services.simulation import start_simulation
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
@@ -103,6 +105,35 @@ async def post_case_import(
     )
     await db.commit()
     return result
+
+
+@router.post("/{case_id}/simulations", response_model=PatientOut, response_model_exclude_none=True)
+async def post_simulation(
+    case_id: uuid.UUID,
+    body: StartSimulation,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    course_id: Annotated[uuid.UUID, Query()],
+    role: Annotated[str, Query()],
+):
+    source = await load_case(db, case_id)
+    rows = await memberships_for(db, user.id)
+    await _require_author(db, user, role, rows, course_id, request, "simulation.start")
+    await ensure_course_open(db, course_id)
+    clone = await start_simulation(
+        db,
+        source=source,
+        actor=user,
+        role=role,
+        course_id=course_id,
+        nurse_id=body.nurse_id,
+        pharmacist_id=body.pharmacist_id,
+        provider_id=body.provider_id,
+        ip=_ip(request),
+    )
+    await db.commit()
+    return patient_out(clone, owner_name=owner_name_for(clone, role), viewer_role=role)
 
 
 @router.get("/{case_id}", response_model=CaseOut, response_model_exclude_none=True)

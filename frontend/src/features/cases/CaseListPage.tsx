@@ -11,6 +11,7 @@ import { usePageHeading } from "../../components/usePageHeading";
 import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
 import AssignCaseDialog from "../patients/components/AssignCaseDialog";
+import StartSimulationDialog from "./StartSimulationDialog";
 import type { AuthoredCase } from "../../types";
 
 export default function CaseListPage() {
@@ -19,6 +20,7 @@ export default function CaseListPage() {
   const { activeRole, courseId } = useSession();
   const cases = useAsync(() => listCases(activeRole, courseId), [activeRole, courseId]);
   const [assignCase, setAssignCase] = useState<AuthoredCase>();
+  const [simCase, setSimCase] = useState<AuthoredCase>();
   const [copyTarget, setCopyTarget] = useState<AuthoredCase>();
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -83,6 +85,7 @@ export default function CaseListPage() {
                   <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                     <Button size="small" onClick={() => setCopyTarget(item)}>Copy to course</Button>
                     <Button size="small" onClick={() => setAssignCase(item)}>Assign</Button>
+                    <Button size="small" onClick={() => setSimCase(item)}>Simulate</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -98,6 +101,17 @@ export default function CaseListPage() {
           onCopied={(name) => {
             setCopyTarget(undefined);
             setNotice(`${copyTarget.lastName}, ${copyTarget.firstName} copied to ${name}.`);
+          }}
+        />
+      )}
+
+      {simCase && (
+        <StartSimulationDialog
+          item={simCase}
+          onClose={() => setSimCase(undefined)}
+          onStarted={() => {
+            setNotice(`${simCase.lastName}, ${simCase.firstName} is live for the assigned team. Open it from the Simulation tab.`);
+            setSimCase(undefined);
           }}
         />
       )}

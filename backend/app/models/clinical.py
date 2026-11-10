@@ -58,6 +58,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     pronouns: Mapped[str | None] = mapped_column(String(40))
     course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id"), index=True)
     mode: Mapped[str] = mapped_column(String(20))
+    simulation_phase: Mapped[str | None] = mapped_column(String(20))
     case_key: Mapped[str] = mapped_column(String(50))
     source_patient_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("patients.id"))
     owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
@@ -187,6 +188,7 @@ class ClinicalNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     discipline_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("disciplines.id"))
     mode: Mapped[str] = mapped_column(String(20))
+    kind: Mapped[str] = mapped_column(String(20), default="visit", server_default="visit")
     status: Mapped[str] = mapped_column(String(20), default="draft")
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
@@ -281,6 +283,17 @@ class Referral(UUIDPrimaryKeyMixin, Base):
 
     to_discipline: Mapped["Discipline"] = relationship(lazy="selectin")
     created_by: Mapped[User] = relationship(lazy="selectin")
+
+
+class SimulationAssignment(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "simulation_assignments"
+    __table_args__ = (UniqueConstraint("patient_id", "user_id", name="uq_simulation_patient_user"),)
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    station: Mapped[str] = mapped_column(String(20))
+
+    user: Mapped[User] = relationship(lazy="selectin")
 
 
 class ChartSession(UUIDPrimaryKeyMixin, Base):

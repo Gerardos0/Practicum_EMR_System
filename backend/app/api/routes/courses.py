@@ -142,7 +142,8 @@ async def list_instructors(course_id: uuid.UUID, db: DbSession, user: CurrentUse
 async def list_roster(course_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request):
     rows = await memberships_for(db, user.id)
     role = _staff_role(user, rows, course_id)
-    require(role, "roster:import", "Your role can't view the roster.")
+    if not (can(role, "roster:import") or can(role, "case:author")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't view the roster.")
     members = (
         await db.scalars(
             select(CourseMembership)

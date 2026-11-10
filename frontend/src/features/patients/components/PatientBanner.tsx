@@ -3,9 +3,12 @@ import { Box, Button, Chip, Paper, Typography } from "@mui/material";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import type { Patient } from "../../../types";
 import { getPatientPhoto } from "../../../api/patients";
+import { listOpened } from "../../../api/chart";
+import { useAsync } from "../../../utils/useAsync";
 import { formatDate } from "../../../utils/format";
 import { utep } from "../../../theme/tokens";
 import { useSession } from "../../auth/useSession";
+import { phaseChip } from "../simulation";
 
 interface Props {
   patient: Patient;
@@ -18,6 +21,10 @@ const card = { borderRadius: "16px", overflow: "hidden" } as const;
 
 export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
   const { activeRole } = useSession();
+  const opened = useAsync(
+    () => (p.mode === "simulation" ? listOpened(activeRole, p.id) : Promise.resolve([])),
+    [activeRole, p.id, p.mode],
+  );
   const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`;
   const [photo, setPhoto] = useState<{ id: string; src: string }>();
   useEffect(() => {
@@ -80,8 +87,18 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
               <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
             ) : p.mode === "assessment" ? (
               <Chip size="small" label={ownerName ? `Assessment case: ${ownerName}` : "Assessment case: only your work appears here"} sx={{ bgcolor: utep.navy, color: "#fff" }} />
+            ) : p.mode === "simulation" ? (
+              <Chip size="small" label={phaseChip(p.simulationPhase).label} sx={{ bgcolor: phaseChip(p.simulationPhase).bgcolor, color: phaseChip(p.simulationPhase).color }} />
             ) : (
               <Chip size="small" label={`${p.practiceLabel ?? "Practice patient"}: shared, not graded`} variant="outlined" />
+            )}
+            {p.mode === "simulation" && p.viewerStation && (
+              <Chip size="small" label={`You are the ${p.viewerStation}`} variant="outlined" />
+            )}
+            {p.mode === "simulation" && (opened.data ?? []).length > 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ flexBasis: "100%" }}>
+                Opened by {(opened.data ?? []).map((person) => person.station ? `${person.name} (${person.station})` : person.name).join(", ")}
+              </Typography>
             )}
             <Chip size="small" label="Simulated patient" sx={{ bgcolor: utep.orangeSoft, color: utep.navy }} />
           </Box>

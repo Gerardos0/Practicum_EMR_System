@@ -82,7 +82,8 @@ export interface RubricScores {
   overall_feedback?: string;
 }
 
-export type CaseMode = "practice" | "assessment" | "case";
+export type CaseMode = "practice" | "assessment" | "case" | "simulation";
+export type SimulationPhase = "waiting_vitals" | "ready" | "closed";
 
 export type LifecycleStatus =
   | "Active" | "Inactive" | "Prospective" | "Discharged from practice" | "Archived" | "Deceased";
@@ -202,6 +203,8 @@ export interface Patient {
   room?: string;
   bed?: string;
   hasPhoto?: boolean;
+  simulationPhase?: SimulationPhase | null;
+  viewerStation?: "nurse" | "pharmacist" | "provider" | null;
 }
 
 export type NoteStatus = "draft" | "signed" | "pending_review" | "returned" | "cosigned";
@@ -258,6 +261,7 @@ export interface ClinicalNote {
   authorName: string;
   authorDiscipline: Discipline;
   mode: CaseMode;
+  kind?: "visit" | "clarification";
   status: NoteStatus;
   version: number;
   content: Record<string, string>;

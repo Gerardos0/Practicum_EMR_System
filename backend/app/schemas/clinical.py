@@ -193,6 +193,8 @@ class PatientOut(APIModel):
     room: str | None = None
     bed: str | None = None
     has_photo: bool = False
+    simulation_phase: str | None = None
+    viewer_station: str | None = None
 
 
 class LatestNote(APIModel):
@@ -217,6 +219,19 @@ class StatusPatch(APIModel):
 class AssignCase(APIModel):
     source_patient_id: uuid.UUID
     owner_id: uuid.UUID
+
+
+class StartSimulation(APIModel):
+    nurse_id: uuid.UUID
+    pharmacist_id: uuid.UUID | None = None
+    provider_id: uuid.UUID | None = None
+
+
+class ChartPresence(APIModel):
+    user_id: str
+    name: str
+    station: str | None = None
+    last_seen_at: datetime
 
 
 class IcdCode(APIModel):
@@ -267,6 +282,7 @@ class NoteOut(APIModel):
     author_name: str
     author_discipline: str
     mode: str
+    kind: str = "visit"
     status: str
     version: int
     content: dict[str, str]
@@ -288,6 +304,7 @@ class NoteOut(APIModel):
 class DraftCreate(APIModel):
     template_id: str = Field(min_length=1, max_length=40)
     discipline: DisciplineCode
+    kind: Literal["visit", "clarification"] = "visit"
 
 
 class DraftPatch(APIModel):

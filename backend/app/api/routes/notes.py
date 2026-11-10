@@ -80,7 +80,7 @@ async def list_notes(
         .where(ClinicalNote.patient_id == patient.id, ClinicalNote.archived.is_(False))
         .options(selectinload(ClinicalNote.discipline))
     )
-    if role == "student":
+    if role == "student" and patient.mode != "simulation":
         query = query.where(ClinicalNote.author_id == user.id)
     notes = (await db.scalars(query.order_by(ClinicalNote.updated_at.desc()))).all()
     payload = []
@@ -112,6 +112,7 @@ async def create_note(
         discipline_code=body.discipline,
         role=role,
         ip=_ip(request),
+        kind=body.kind,
     )
     await db.commit()
     return note_out(await _reload(db, note), include_scores=role != "student")
@@ -132,7 +133,7 @@ async def get_note(
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
     if not may_read_note(role, rows, patient.course_id, note):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found.")
-    if role == "student" and note.author_id != user.id:
+    if role == "student" and note.author_id != user.id and patient.mode != "simulation":
         await log_event(
             db,
             action="note.view",

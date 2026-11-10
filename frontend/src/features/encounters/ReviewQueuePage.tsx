@@ -68,7 +68,7 @@ export default function ReviewQueuePage() {
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: "72ch" }}>
         Open a note to read it beside the chart. Co-sign accepts the documentation; return sends it back with feedback the student must fix.
-        Record scores in the course gradebook — grades are not stored here.
+        Scores you save are stored on the note. Students do not see them.
       </Typography>
 
       {flash && (

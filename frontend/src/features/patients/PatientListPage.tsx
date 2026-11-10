@@ -16,13 +16,15 @@ import { usePageHeading } from "../../components/usePageHeading";
 import AssignCaseDialog from "./components/AssignCaseDialog";
 import { CASELOAD_VIEWS, caseloadHref, caseloadViewMeta, matchesCaseload, parseCaseloadView } from "./caseload";
 import type { CaseMode } from "../../types";
+import { phaseChip } from "./simulation";
 
 export default function PatientListPage() {
   const navigate = useNavigate();
   const { activeRole, courseId } = useSession();
   const isStudent = activeRole === "student";
   const [params, setParams] = useSearchParams();
-  const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
+  const requested = params.get("mode");
+  const mode: CaseMode = requested === "practice" || requested === "simulation" ? requested : "assessment";
   const query = params.get("q") ?? "";
   const view = isStudent ? parseCaseloadView(params.get("view")) : undefined;
   const viewMeta = view ? caseloadViewMeta(view) : undefined;
@@ -42,6 +44,7 @@ export default function PatientListPage() {
   const counts = useMemo(() => ({
     assessment: clinical.filter((r) => r.patient.mode === "assessment").length,
     practice: clinical.filter((r) => r.patient.mode === "practice").length,
+    simulation: clinical.filter((r) => r.patient.mode === "simulation").length,
   }), [clinical]);
 
   const visible = clinical
@@ -79,7 +82,9 @@ export default function PatientListPage() {
       await unassignCase(activeRole, unassignTarget.patient.id);
       setFlash({
         severity: "success",
-        text: `${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} was removed from ${unassignTarget.ownerName ?? "the student"}.`,
+        text: unassignTarget.patient.mode === "simulation"
+          ? `${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} was ended.`
+          : `${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} was removed from ${unassignTarget.ownerName ?? "the student"}.`,
       });
       setUnassignTarget(undefined);
       rows.reload();
@@ -143,6 +148,7 @@ export default function PatientListPage() {
         >
           <Tab value="assessment" label={`${isStudent ? "Assigned cases" : "Assessment cases"} (${counts.assessment})`} />
           <Tab value="practice" label={`Practice patients (${counts.practice})`} />
+          <Tab value="simulation" label={`Simulation (${counts.simulation})`} />
         </Tabs>
         )}
 
@@ -153,7 +159,9 @@ export default function PatientListPage() {
               ? isStudent
                 ? "Cases your instructor assigned to you. Each one is your own copy: no one else's notes appear on it."
                 : "One private copy per student. Open a case to see that student's work, or remove it from them."
-              : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
+              : mode === "simulation"
+                ? "One shared chart for a live handoff. The row stays amber until the nurse records vitals, then turns green for the pharmacist or provider."
+                : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
           </Typography>
           {canAssign && (
             <Button size="small" variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button>
@@ -167,10 +175,10 @@ export default function PatientListPage() {
           {rows.loading ? null : visible.length === 0 ? (
             <Box sx={{ p: 2 }}>
               <EmptyState
-                title={query ? "No patients match that search" : viewMeta ? viewMeta.emptyTitle : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
+                title={query ? "No patients match that search" : viewMeta ? viewMeta.emptyTitle : mode === "assessment" ? "No cases assigned yet" : mode === "simulation" ? "No simulations yet" : "No practice patients in this course"}
                 action={!query && !view && mode === "assessment" && canAssign ? <Button variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button> : undefined}
               >
-                {query ? "Try a last name, a date of birth, or the full MRN." : viewMeta ? viewMeta.emptyBody : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
+                {query ? "Try a last name, a date of birth, or the full MRN." : viewMeta ? viewMeta.emptyBody : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : mode === "practice" ? "Practice patients are shared copies for learning the screens. They are not graded." : mode === "simulation" ? "Start one from a case. Only the assigned nurse, pharmacist, and provider can open it." : undefined}
               </EmptyState>
             </Box>
           ) : (
@@ -198,13 +206,19 @@ export default function PatientListPage() {
                       onClick={open}
                       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
                       tabIndex={0}
-                      sx={{ cursor: "pointer" }}
+                      sx={{
+                        cursor: "pointer",
+                        bgcolor: mode === "simulation" ? phaseChip(p.simulationPhase).bgcolor : undefined,
+                      }}
                       aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
                     >
                       <TableCell sx={{ maxWidth: { xs: 140, sm: "none" } }}>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
                           {p.lastName}, {p.firstName}
                           {p.practiceLabel && <Chip size="small" label={p.practiceLabel} variant="outlined" sx={{ ml: 1 }} />}
+                          {mode === "simulation" && (
+                            <Chip size="small" label={phaseChip(p.simulationPhase).label} sx={{ ml: 1, bgcolor: "#fff", color: phaseChip(p.simulationPhase).color }} />
+                          )}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">MRN {p.mrn}</Typography>
                         <Typography
@@ -243,6 +257,9 @@ export default function PatientListPage() {
                         {mode === "assessment" && canAssign && (
                           <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>Remove</Button>
                         )}
+                        {mode === "simulation" && canAssign && (
+                          <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>End</Button>
+                        )}
                         <Button size="small" variant="contained" onClick={open}>
                           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Open chart</Box>
                           <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Open</Box>
@@ -275,15 +292,23 @@ export default function PatientListPage() {
       </Dialog>
 
       <Dialog open={Boolean(unassignTarget)} onClose={() => setUnassignTarget(undefined)}>
-        <DialogTitle>Remove this case from {unassignTarget?.ownerName ?? "the student"}?</DialogTitle>
+        <DialogTitle>
+          {unassignTarget?.patient.mode === "simulation"
+            ? "End this simulation?"
+            : `Remove this case from ${unassignTarget?.ownerName ?? "the student"}?`}
+        </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {unassignTarget?.patient.lastName}, {unassignTarget?.patient.firstName} will disappear from their patient list. Their notes on this copy are no longer reachable. Other students' copies are unchanged.
+            {unassignTarget?.patient.mode === "simulation"
+              ? `${unassignTarget.patient.lastName}, ${unassignTarget.patient.firstName} leaves the Simulation tab for everyone assigned to it. Graded charts are not affected.`
+              : `${unassignTarget?.patient.lastName}, ${unassignTarget?.patient.firstName} will disappear from their patient list. Their notes on this copy are no longer reachable. Other students' copies are unchanged.`}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUnassignTarget(undefined)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={doUnassign}>Remove assignment</Button>
+          <Button variant="contained" color="error" onClick={doUnassign}>
+            {unassignTarget?.patient.mode === "simulation" ? "End simulation" : "Remove assignment"}
+          </Button>
         </DialogActions>
       </Dialog>
 

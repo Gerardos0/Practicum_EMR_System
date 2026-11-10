@@ -39,7 +39,7 @@ export default function LabsTab({ patient, onChange }: { patient: Patient; onCha
           <Button sx={{ mt: 1.5 }} variant="contained" onClick={save}>Add result</Button>
         </Paper>
       )}
-      {patient.labs.length === 0 ? <EmptyState title="No lab results on file" /> : (
+      {patient.labs.length === 0 ? <EmptyState title="No lab results on file">Results added to this chart show up here with the date they were collected.</EmptyState> : (
         <Paper sx={{ borderRadius: "16px" }}>
           <Typography component="h2" variant="h6" sx={{ p: 2, pb: 1 }}>Lab results</Typography>
           <Box sx={{ overflowX: "auto" }}>
