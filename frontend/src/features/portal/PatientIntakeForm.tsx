@@ -227,7 +227,11 @@ export default function PatientIntakeForm({ intake, onSaved, previewMode = false
                         disabled={disabled}
                         error={Boolean(fieldError)}
                         helperText={fieldError}
-                        onChange={(event) => setDraft((current) => ({ ...current, conditions: current.conditions.map((item, rowIndex) => rowIndex === index ? { ...item, year: event.target.value } : item) }))}
+                        onChange={(event) => {
+                          setDraft((current) => ({ ...current, conditions: current.conditions.map((item, rowIndex) => rowIndex === index ? { ...item, year: event.target.value } : item) }));
+                          setError("");
+                          setSaved(false);
+                        }}
                       />
                     )}
                   </Box>
