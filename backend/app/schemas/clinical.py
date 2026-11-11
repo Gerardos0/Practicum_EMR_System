@@ -90,11 +90,16 @@ class MedicationOut(APIModel):
     dose: str
     route: str
     frequency: str
+    sig: str | None = None
     indication: str | None = None
     adherence: str | None = None
     access_cost: str | None = None
     status: str = "active"
     prescribed: bool = False
+    is_compound: bool = False
+    compound_ingredients: str | None = None
+    compound_vehicle: str | None = None
+    compound_reason: str | None = None
     discontinued_at: datetime | None = None
     rxcui: str | None = None
     generic_name: str | None = None
@@ -123,6 +128,16 @@ class VitalOut(APIModel):
     id: str | None = None
     label: str
     value: str
+    recorded_at: datetime | None = None
+    recorded_by_name: str | None = None
+    status: str = "recorded"
+
+
+class LungSoundOut(APIModel):
+    id: str | None = None
+    location: str
+    finding: str
+    notes: str | None = None
     recorded_at: datetime | None = None
     recorded_by_name: str | None = None
     status: str = "recorded"
@@ -181,12 +196,18 @@ class PatientOut(APIModel):
     problems: list[ProblemOut]
     labs: list[LabOut]
     vitals: list[VitalOut]
+    lung_sounds: list[LungSoundOut] = []
     family_history: str
     surgical_history: str
     social_history: str
     encounter: EncounterOut
     insurance: InsuranceOut
     emergency_contact: EmergencyContactOut
+    code_status: str | None = None
+    advance_directive_notes: str | None = None
+    hipaa_on_file: bool = False
+    hipaa_signed_at: datetime | None = None
+    hipaa_note: str | None = None
     section_locks: dict[str, bool] = {}
     prefill_sections: list[str] = []
     unit: str | None = None
@@ -404,6 +425,10 @@ class CaseMedicationIn(APIModel):
     adherence: str | None = None
     access_cost: str | None = None
     prescribed: bool = False
+    is_compound: bool = False
+    compound_ingredients: str | None = None
+    compound_vehicle: str | None = None
+    compound_reason: str | None = None
 
 
 class CaseProblemIn(APIModel):
@@ -426,6 +451,12 @@ class CaseVitalIn(APIModel):
     value: str = ""
 
 
+class CaseLungSoundIn(APIModel):
+    location: str = ""
+    finding: str = ""
+    notes: str | None = None
+
+
 class CaseIn(APIModel):
     first_name: str
     last_name: str
@@ -443,6 +474,13 @@ class CaseIn(APIModel):
     insurance_member_id: str | None = None
     insurance_group_number: str | None = None
     insurance_notes: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    emergency_contact_relationship: str | None = None
+    code_status: str | None = None
+    advance_directive_notes: str | None = None
+    hipaa_on_file: bool = False
+    hipaa_note: str | None = None
     encounter_type: str = "Office visit"
     care_setting: str = "Outpatient"
     lifecycle: str = "Active"
@@ -453,6 +491,7 @@ class CaseIn(APIModel):
     problems: list[CaseProblemIn] = []
     labs: list[CaseLabIn] = []
     vitals: list[CaseVitalIn] = []
+    lung_sounds: list[CaseLungSoundIn] = []
     section_locks: dict[str, bool] | None = None
     prefill_sections: list[str] | None = None
     unit: str | None = None
@@ -533,6 +572,10 @@ class MedicationWrite(APIModel):
     adherence: str | None = None
     access_cost: str | None = None
     prescribed: bool = False
+    is_compound: bool = False
+    compound_ingredients: str | None = None
+    compound_vehicle: str | None = None
+    compound_reason: str | None = None
     rxcui: str | None = None
     generic_name: str | None = None
     brand_names: list[str] = Field(default_factory=list)
@@ -563,6 +606,12 @@ class DoseCheckOut(APIModel):
 class VitalWrite(APIModel):
     label: str
     value: str
+
+
+class LungSoundWrite(APIModel):
+    location: str
+    finding: str
+    notes: str | None = None
 
 
 class LabWrite(APIModel):
@@ -598,6 +647,34 @@ class AdministerWrite(APIModel):
 class AdministrationReview(APIModel):
     decision: Literal["accepted", "needs_follow_up"]
     comment: str = ""
+
+
+class MedicationOrderCreate(APIModel):
+    medication_id: uuid.UUID
+    quantity: str | None = None
+
+
+class MedicationOrderReview(APIModel):
+    decision: Literal["verify", "hold", "release", "resubmit"]
+    comment: str = ""
+
+
+class MedicationOrderOut(APIModel):
+    id: str
+    medication_id: str
+    name: str
+    dose: str
+    route: str
+    frequency: str
+    sig: str | None = None
+    quantity: str | None = None
+    status: str
+    submitted_by_name: str
+    submitted_at: datetime
+    reviewed_by_name: str | None = None
+    reviewed_at: datetime | None = None
+    review_comment: str | None = None
+    is_compound: bool = False
 
 
 class ScoreCriterion(APIModel):

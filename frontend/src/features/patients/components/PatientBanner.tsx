@@ -52,11 +52,18 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
     : p.mode === "practice"
       ? { bgcolor: "transparent", color: utep.navy, border: `1px solid ${utep.line}` }
       : { bgcolor: utep.navy, color: "#fff" };
+  const emergency = [p.emergencyContact?.name, p.emergencyContact?.relationship && `(${p.emergencyContact.relationship})`]
+    .filter(Boolean)
+    .join(" ");
+  const emergencyLine = [emergency, p.emergencyContact?.phone].filter(Boolean).join(" · ");
+  const codeAlert = p.codeStatus === "DNR" || p.codeStatus === "DNI";
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
     ["Setting", p.status.careSetting],
     ["Record", p.status.lifecycle],
     ...(p.status.program ? ([["Program", p.status.program]] as [string, string][]) : []),
+    ...(p.codeStatus ? ([["Code status", p.codeStatus]] as [string, string][]) : []),
+    ...(emergencyLine ? ([["Emergency", emergencyLine]] as [string, string][]) : []),
   ];
 
   return (
@@ -100,6 +107,18 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
           </Typography>
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
             <Chip size="small" label={statusLabel} sx={statusChip} />
+            {p.codeStatus && (
+              <Chip
+                size="small"
+                label={p.codeStatus}
+                sx={codeAlert
+                  ? { bgcolor: utep.alertSoft, color: utep.alert, fontWeight: 700 }
+                  : { bgcolor: "action.hover", color: utep.ink2 }}
+              />
+            )}
+            {p.hipaaOnFile && (
+              <Chip size="small" label="HIPAA on file" sx={{ bgcolor: "action.hover", color: utep.ink2 }} />
+            )}
             <Typography variant="caption" color="text.secondary">
               {[
                 p.mode === "simulation" && p.viewerStation ? `You are the ${p.viewerStation}` : "",

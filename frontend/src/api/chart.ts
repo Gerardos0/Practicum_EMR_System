@@ -1,4 +1,4 @@
-import type { Allergy, LabResult, Medication, Patient, Problem, Role, Vital } from "../types";
+import type { Allergy, LabResult, LungSound, Medication, Patient, Problem, Role, Vital } from "../types";
 import { request } from "./client";
 
 function chart(role: Role, patientId: string, path: string, method: string, json?: unknown) {
@@ -76,12 +76,67 @@ export function reviewAdministration(role: Role, administrationId: string, decis
   });
 }
 
+export interface MedicationOrderRecord {
+  id: string;
+  medicationId: string;
+  name: string;
+  dose: string;
+  route: string;
+  frequency: string;
+  sig?: string | null;
+  quantity?: string | null;
+  status: "pending_verify" | "verified" | "released" | "held" | string;
+  submittedByName: string;
+  submittedAt: string;
+  reviewedByName?: string | null;
+  reviewedAt?: string | null;
+  reviewComment?: string | null;
+  isCompound?: boolean;
+}
+
+export function listMedicationOrders(role: Role, patientId: string): Promise<MedicationOrderRecord[]> {
+  return request<MedicationOrderRecord[]>(`/patients/${patientId}/medication-orders`, { query: { role } });
+}
+
+export function submitMedicationOrder(role: Role, patientId: string, medicationId: string, quantity?: string): Promise<MedicationOrderRecord> {
+  return request<MedicationOrderRecord>(`/patients/${patientId}/medication-orders`, {
+    method: "POST",
+    query: { role },
+    json: { medicationId, quantity },
+  });
+}
+
+export function reviewMedicationOrder(
+  role: Role,
+  orderId: string,
+  decision: "verify" | "hold" | "release" | "resubmit",
+  comment = "",
+): Promise<MedicationOrderRecord> {
+  return request<MedicationOrderRecord>(`/patients/medication-orders/${orderId}/review`, {
+    method: "POST",
+    query: { role },
+    json: { decision, comment },
+  });
+}
+
 export function addVital(role: Role, patientId: string, body: Pick<Vital, "label" | "value">): Promise<Patient> {
   return chart(role, patientId, "/vitals", "POST", body);
 }
 
 export function markVitalEnteredInError(role: Role, patientId: string, vitalId: string): Promise<Patient> {
   return chart(role, patientId, `/vitals/${vitalId}/entered-in-error`, "POST");
+}
+
+export function addLungSound(
+  role: Role,
+  patientId: string,
+  body: Pick<LungSound, "location" | "finding" | "notes">,
+): Promise<Patient> {
+  return chart(role, patientId, "/lung-sounds", "POST", body);
+}
+
+export function markLungSoundEnteredInError(role: Role, patientId: string, lungSoundId: string): Promise<Patient> {
+  return chart(role, patientId, `/lung-sounds/${lungSoundId}/entered-in-error`, "POST");
 }
 
 export function addLab(role: Role, patientId: string, body: Omit<LabResult, "id">): Promise<Patient> {

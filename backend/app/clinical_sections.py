@@ -4,6 +4,7 @@ SECTION_IDS = (
     "medications",
     "allergies",
     "vitals",
+    "lung_sounds",
     "labs",
     "diagnoses",
     "medical_history",
@@ -11,18 +12,22 @@ SECTION_IDS = (
     "chief_complaint",
 )
 
-# Students can edit medications, allergies, vitals, and labs unless the instructor locks them.
+# Students can edit medications, allergies, vitals, lung sounds, and labs unless the instructor locks them.
 # Diagnoses, histories, and the chief complaint stay locked until an instructor opens them.
 DEFAULT_SECTION_LOCKS: dict[str, bool] = {
     "medications": False,
     "allergies": False,
     "vitals": False,
+    "lung_sounds": False,
     "labs": False,
     "diagnoses": True,
     "medical_history": True,
     "surgical_history": True,
     "chief_complaint": True,
 }
+
+LUNG_SOUND_LOCATIONS = ("RUL", "RML", "RLL", "LUL", "LLL")
+LUNG_SOUND_FINDINGS = ("clear", "crackles", "wheeze", "diminished", "rhonchi", "other")
 
 PREFILL_OPTIONS = (
     "chief_complaint",

@@ -13,6 +13,7 @@ from app.models.clinical import (  # noqa: F401
     ChartSession,
     Medication,
     MedicationAdministration,
+    MedicationOrder,
     NoteAddendum,
     NoteComment,
     Patient,

@@ -1,5 +1,5 @@
 import type {
-  Allergy, AuthoredCase, CareSetting, EncounterStatus, GradingGuide, LabResult, LifecycleStatus, Medication, Patient, PlantedTrigger, Problem, Role, Vital,
+  Allergy, AuthoredCase, CareSetting, EncounterStatus, GradingGuide, LabResult, LifecycleStatus, LungSound, Medication, Patient, PlantedTrigger, Problem, Role, Vital,
 } from "../types";
 import { downloadFile, request } from "./client";
 
@@ -20,6 +20,13 @@ export interface CaseInput {
   insuranceMemberId?: string;
   insuranceGroupNumber?: string;
   insuranceNotes?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  codeStatus?: string;
+  advanceDirectiveNotes?: string;
+  hipaaOnFile?: boolean;
+  hipaaNote?: string;
   encounterType: string;
   careSetting: CareSetting;
   lifecycle: LifecycleStatus;
@@ -35,6 +42,7 @@ export interface CaseInput {
   problems: Problem[];
   labs: Omit<LabResult, "id">[];
   vitals: Vital[];
+  lungSounds?: Pick<LungSound, "location" | "finding" | "notes">[];
 }
 
 export async function listCases(role: Role, courseId: string): Promise<AuthoredCase[]> {

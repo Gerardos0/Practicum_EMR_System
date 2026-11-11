@@ -6,7 +6,17 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.clinical import (
-    Allergy, Appointment, ClinicalNote, CourseMembership, Encounter, LabResult, Medication, Patient, Problem, Vital,
+    Allergy,
+    Appointment,
+    ClinicalNote,
+    CourseMembership,
+    Encounter,
+    LabResult,
+    LungSound,
+    Medication,
+    Patient,
+    Problem,
+    Vital,
 )
 from app.models.user import Role, User
 from app.services.access import can, ensure_student_may_enter, full_name, require, require_course
@@ -191,7 +201,7 @@ async def reset_practice(db: AsyncSession, patient: Patient, user: User, role: s
         .returning(ClinicalNote.id)
     )
     count = len(list(archived.all()))
-    db.expire(patient, ["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+    db.expire(patient, ["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"])
     await log_event(
         db,
         action="patient.reset_practice",
@@ -224,11 +234,31 @@ async def _replace_children(db: AsyncSession, patient: Patient, snap: dict) -> N
         (
             "medications",
             Medication,
-            ("name", "dose", "route", "frequency", "indication", "adherence", "access_cost", "status", "prescribed", "discontinued_at", "rxcui", "generic_name", "brand_names", "flags"),
+            (
+                "name",
+                "dose",
+                "route",
+                "frequency",
+                "indication",
+                "adherence",
+                "access_cost",
+                "status",
+                "prescribed",
+                "is_compound",
+                "compound_ingredients",
+                "compound_vehicle",
+                "compound_reason",
+                "discontinued_at",
+                "rxcui",
+                "generic_name",
+                "brand_names",
+                "flags",
+            ),
         ),
         ("problems", Problem, ("code", "description", "since")),
         ("labs", LabResult, ("name", "value", "unit", "reference_range", "flag", "collected_at")),
         ("vitals", Vital, ("label", "value", "recorded_at", "recorded_by_name", "status")),
+        ("lung_sounds", LungSound, ("location", "finding", "notes", "recorded_at", "recorded_by_name", "status")),
     )
     for key, model, fields in specs:
         getattr(patient, key).clear()
@@ -283,6 +313,10 @@ def chart_snapshot(patient: Patient) -> dict:
                 "access_cost": m.access_cost,
                 "status": m.status,
                 "prescribed": m.prescribed,
+                "is_compound": bool(m.is_compound),
+                "compound_ingredients": m.compound_ingredients,
+                "compound_vehicle": m.compound_vehicle,
+                "compound_reason": m.compound_reason,
                 "discontinued_at": m.discontinued_at.isoformat() if m.discontinued_at else None,
                 "rxcui": m.rxcui,
                 "generic_name": m.generic_name,
@@ -316,6 +350,18 @@ def chart_snapshot(patient: Patient) -> dict:
                 "status": v.status or "recorded",
             }
             for v in patient.vitals
+        ],
+        "lung_sounds": [
+            {
+                "id": str(row.id),
+                "location": row.location,
+                "finding": row.finding,
+                "notes": row.notes,
+                "recorded_at": row.recorded_at.isoformat() if row.recorded_at else None,
+                "recorded_by_name": row.recorded_by_name,
+                "status": row.status or "recorded",
+            }
+            for row in patient.lung_sounds
         ],
     }
 
@@ -384,6 +430,11 @@ async def assign_case(
         emergency_contact_name=source.emergency_contact_name,
         emergency_contact_phone=source.emergency_contact_phone,
         emergency_contact_relationship=source.emergency_contact_relationship,
+        code_status=source.code_status,
+        advance_directive_notes=source.advance_directive_notes,
+        hipaa_on_file=bool(source.hipaa_on_file),
+        hipaa_signed_at=source.hipaa_signed_at,
+        hipaa_note=source.hipaa_note,
         is_training=True,
         section_locks=dict(source.section_locks or {}),
         prefill_sections=list(source.prefill_sections or []),
@@ -407,6 +458,10 @@ async def assign_case(
                 name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
                 indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
                 status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+                is_compound=bool(item.is_compound),
+                compound_ingredients=item.compound_ingredients,
+                compound_vehicle=item.compound_vehicle,
+                compound_reason=item.compound_reason,
                 rxcui=item.rxcui, generic_name=item.generic_name, brand_names=list(item.brand_names or []),
                 flags=list(item.flags or []),
             )
@@ -430,6 +485,17 @@ async def assign_case(
                 status=item.status or "recorded",
             )
         )
+    for item in source.lung_sounds:
+        clone.lung_sounds.append(
+            LungSound(
+                location=item.location,
+                finding=item.finding,
+                notes=item.notes,
+                recorded_at=item.recorded_at,
+                recorded_by_name=item.recorded_by_name,
+                status=item.status or "recorded",
+            )
+        )
     db.add(clone)
     await db.flush()
 
@@ -447,7 +513,10 @@ async def assign_case(
         ip_address=ip,
         detail=f"{full_name(owner)} received {clone.last_name}, {clone.first_name} ({clone.mrn})",
     )
-    await db.refresh(clone, attribute_names=["owner", "allergies", "medications", "problems", "labs", "vitals", "encounter"])
+    await db.refresh(
+        clone,
+        attribute_names=["owner", "allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+    )
     return clone
 
 

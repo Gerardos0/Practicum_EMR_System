@@ -404,6 +404,28 @@ export default function NoteEditorPage() {
             }}
           />
 
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>ICD-10 and coverage (teaching)</Typography>
+            <Typography variant="body2">
+              Diagnosis codes on this note support billing and coverage decisions. Payers use ICD-10
+              (with CPT when billed) to decide what gets paid — for example, an encounter coded as
+              E11.65 tells insurance why the visit is covered. This product does not submit real claims.
+            </Typography>
+            {(patient.insurance?.payer || patient.insurance?.memberId) && (
+              <Typography variant="body2" sx={{ mt: 0.75 }}>
+                Chart payer on file:{" "}
+                {[patient.insurance.payer, patient.insurance.memberId && `member ${patient.insurance.memberId}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Typography>
+            )}
+            {diagnoses[0] && (
+              <Typography variant="body2" sx={{ mt: 0.5 }}>
+                Primary diagnosis on this note: <b>{diagnoses[0].code}</b> {diagnoses[0].label}
+              </Typography>
+            )}
+          </Alert>
+
           <TextField
             select label="Billing codes (CPT)" value={cptCodes.map((item) => item.code)}
             disabled={!editable} sx={{ mt: 2 }}

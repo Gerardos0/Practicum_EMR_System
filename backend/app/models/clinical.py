@@ -83,6 +83,11 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     emergency_contact_name: Mapped[str | None] = mapped_column(String(120))
     emergency_contact_phone: Mapped[str | None] = mapped_column(String(40))
     emergency_contact_relationship: Mapped[str | None] = mapped_column(String(60))
+    code_status: Mapped[str | None] = mapped_column(String(40))
+    advance_directive_notes: Mapped[str | None] = mapped_column(Text)
+    hipaa_on_file: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    hipaa_signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    hipaa_note: Mapped[str | None] = mapped_column(Text)
     is_training: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     answer_key_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -101,6 +106,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     problems: Mapped[list["Problem"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     labs: Mapped[list["LabResult"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     vitals: Mapped[list["Vital"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
+    lung_sounds: Mapped[list["LungSound"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     encounter: Mapped["Encounter | None"] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
     )
@@ -144,6 +150,10 @@ class Medication(UUIDPrimaryKeyMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
     discontinued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     prescribed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_compound: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    compound_ingredients: Mapped[str | None] = mapped_column(Text)
+    compound_vehicle: Mapped[str | None] = mapped_column(String(120))
+    compound_reason: Mapped[str | None] = mapped_column(Text)
     rxcui: Mapped[str | None] = mapped_column(String(20))
     generic_name: Mapped[str | None] = mapped_column(String(120))
     brand_names: Mapped[list[Any]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
@@ -177,6 +187,18 @@ class Vital(UUIDPrimaryKeyMixin, Base):
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
     label: Mapped[str] = mapped_column(String(40))
     value: Mapped[str] = mapped_column(String(40))
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recorded_by_name: Mapped[str | None] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20), default="recorded", server_default="recorded")
+
+
+class LungSound(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "lung_sounds"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    location: Mapped[str] = mapped_column(String(20))
+    finding: Mapped[str] = mapped_column(String(40))
+    notes: Mapped[str | None] = mapped_column(Text)
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     recorded_by_name: Mapped[str | None] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20), default="recorded", server_default="recorded")
@@ -335,4 +357,28 @@ class MedicationAdministration(UUIDPrimaryKeyMixin, Base):
 
     medication: Mapped[Medication] = relationship(lazy="selectin")
     student: Mapped[User] = relationship(foreign_keys=[student_id], lazy="selectin")
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id], lazy="selectin")
+
+
+class MedicationOrder(UUIDPrimaryKeyMixin, Base):
+    """Teaching fill: student/tech submits → pharmacist verifies or holds → optional release."""
+
+    __tablename__ = "medication_orders"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    medication_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("medications.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    dose: Mapped[str] = mapped_column(String(60))
+    route: Mapped[str] = mapped_column(String(40))
+    frequency: Mapped[str] = mapped_column(String(80))
+    quantity: Mapped[str | None] = mapped_column(String(60))
+    status: Mapped[str] = mapped_column(String(20), default="pending_verify", server_default="pending_verify")
+    submitted_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_comment: Mapped[str | None] = mapped_column(Text)
+
+    medication: Mapped[Medication] = relationship(lazy="selectin")
+    submitted_by: Mapped[User] = relationship(foreign_keys=[submitted_by_id], lazy="selectin")
     reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id], lazy="selectin")

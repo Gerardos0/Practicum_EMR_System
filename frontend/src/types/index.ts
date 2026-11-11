@@ -113,11 +113,16 @@ export interface Medication {
   dose: string;
   route: string;
   frequency: string;
+  sig?: string;
   indication?: string;
   adherence?: string;
   accessCost?: string;
   status?: "active" | "discontinued" | "entered_in_error";
   prescribed?: boolean;
+  isCompound?: boolean;
+  compoundIngredients?: string | null;
+  compoundVehicle?: string | null;
+  compoundReason?: string | null;
   discontinuedAt?: string;
   rxcui?: string;
   genericName?: string;
@@ -146,6 +151,19 @@ export interface Vital {
   status?: "recorded" | "entered_in_error";
 }
 
+export type LungSoundLocation = "RUL" | "RML" | "RLL" | "LUL" | "LLL";
+export type LungSoundFinding = "clear" | "crackles" | "wheeze" | "diminished" | "rhonchi" | "other";
+
+export interface LungSound {
+  id?: string;
+  location: LungSoundLocation | string;
+  finding: LungSoundFinding | string;
+  notes?: string | null;
+  recordedAt?: string;
+  recordedByName?: string;
+  status?: "recorded" | "entered_in_error";
+}
+
 export interface Problem {
   id?: string;
   code?: string;
@@ -165,6 +183,14 @@ export interface Insurance {
   groupNumber?: string | null;
   notes?: string | null;
 }
+
+export interface EmergencyContact {
+  name?: string | null;
+  phone?: string | null;
+  relationship?: string | null;
+}
+
+export type CodeStatus = "Full code" | "DNR" | "DNI" | "Other";
 
 export interface Patient {
   id: string;
@@ -192,11 +218,18 @@ export interface Patient {
   problems: Problem[];
   labs: LabResult[];
   vitals: Vital[];
+  lungSounds?: LungSound[];
   familyHistory: string;
   surgicalHistory: string;
   socialHistory: string;
   encounter: Encounter;
   insurance?: Insurance;
+  emergencyContact?: EmergencyContact;
+  codeStatus?: CodeStatus | string | null;
+  advanceDirectiveNotes?: string | null;
+  hipaaOnFile?: boolean;
+  hipaaSignedAt?: string | null;
+  hipaaNote?: string | null;
   sectionLocks?: Record<string, boolean>;
   prefillSections?: string[];
   unit?: string;

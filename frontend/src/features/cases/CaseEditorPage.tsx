@@ -13,11 +13,12 @@ import AnswerKeyEditor from "./AnswerKeyEditor";
 import CaseRubricPanel from "./CaseRubricPanel";
 import CaseTriggersEditor from "./CaseTriggersEditor";
 import EditableTable from "./EditableTable";
-import type { AuthoredCase, CareSetting, EncounterStatus, LifecycleStatus } from "../../types";
+import type { AuthoredCase, CareSetting, CodeStatus, EncounterStatus, LifecycleStatus } from "../../types";
 
 const LIFECYCLE: LifecycleStatus[] = ["Active", "Inactive", "Prospective", "Discharged from practice", "Archived", "Deceased"];
 const ENCOUNTER: EncounterStatus[] = ["Scheduled", "Checked in", "Roomed", "In progress", "Checked out", "Closed"];
 const SETTING: CareSetting[] = ["Outpatient", "Inpatient", "Emergency", "Discharged"];
+const CODE_STATUS: Array<CodeStatus | ""> = ["", "Full code", "DNR", "DNI", "Other"];
 
 interface Draft {
   firstName: string;
@@ -36,6 +37,13 @@ interface Draft {
   insuranceMemberId: string;
   insuranceGroupNumber: string;
   insuranceNotes: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  emergencyContactRelationship: string;
+  codeStatus: CodeStatus | "";
+  advanceDirectiveNotes: string;
+  hipaaOnFile: boolean;
+  hipaaNote: string;
   encounterType: string;
   careSetting: CareSetting;
   lifecycle: LifecycleStatus;
@@ -46,6 +54,7 @@ interface Draft {
   problems: Record<string, string>[];
   labs: Record<string, string>[];
   vitals: Record<string, string>[];
+  lungSounds: Record<string, string>[];
   sectionLocks: Record<string, boolean>;
   prefillSections: string[];
   unit: string;
@@ -57,6 +66,7 @@ const STUDENT_SECTIONS = [
   ["medications", "Medications"],
   ["allergies", "Allergies"],
   ["vitals", "Vitals"],
+  ["lung_sounds", "Lung sounds"],
   ["labs", "Labs"],
   ["diagnoses", "Diagnoses"],
   ["medical_history", "Past medical history"],
@@ -75,7 +85,7 @@ const PREFILL = [
 ] as const;
 
 const DEFAULT_LOCKS: Record<string, boolean> = {
-  medications: false, allergies: false, vitals: false, labs: false,
+  medications: false, allergies: false, vitals: false, lung_sounds: false, labs: false,
   diagnoses: true, medical_history: true, surgical_history: true, chief_complaint: true,
 };
 
@@ -84,8 +94,10 @@ function emptyDraft(): Draft {
     firstName: "", lastName: "", preferredName: "", dob: "", sexAtBirth: "Female", pronouns: "",
     chiefComplaint: "", hpi: "", pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "",
     insurancePayer: "", insuranceMemberId: "", insuranceGroupNumber: "", insuranceNotes: "",
+    emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "",
+    codeStatus: "Full code", advanceDirectiveNotes: "", hipaaOnFile: true, hipaaNote: "",
     encounterType: "Office visit", careSetting: "Outpatient", lifecycle: "Active", encounterStatus: "Scheduled",
-    program: "", allergies: [], medications: [], problems: [], labs: [], vitals: [],
+    program: "", allergies: [], medications: [], problems: [], labs: [], vitals: [], lungSounds: [],
     sectionLocks: { ...DEFAULT_LOCKS }, prefillSections: [], unit: "", room: "", bed: "",
   };
 }
@@ -114,6 +126,13 @@ function draftFrom(item: AuthoredCase): Draft {
     insuranceMemberId: item.insurance?.memberId ?? "",
     insuranceGroupNumber: item.insurance?.groupNumber ?? "",
     insuranceNotes: item.insurance?.notes ?? "",
+    emergencyContactName: item.emergencyContact?.name ?? "",
+    emergencyContactPhone: item.emergencyContact?.phone ?? "",
+    emergencyContactRelationship: item.emergencyContact?.relationship ?? "",
+    codeStatus: (item.codeStatus as CodeStatus | undefined) ?? "",
+    advanceDirectiveNotes: item.advanceDirectiveNotes ?? "",
+    hipaaOnFile: Boolean(item.hipaaOnFile),
+    hipaaNote: item.hipaaNote ?? "",
     encounterType: item.encounter.type,
     careSetting: item.status.careSetting,
     lifecycle: item.status.lifecycle,
@@ -123,12 +142,19 @@ function draftFrom(item: AuthoredCase): Draft {
     medications: item.medications.map((m) => row({
       name: m.name, dose: m.dose, route: m.route, frequency: m.frequency,
       indication: m.indication, adherence: m.adherence, accessCost: m.accessCost,
+      isCompound: m.isCompound ? "true" : "false",
+      compoundIngredients: m.compoundIngredients ?? "",
+      compoundVehicle: m.compoundVehicle ?? "",
+      compoundReason: m.compoundReason ?? "",
     })),
     problems: item.problems.map((p) => row({ code: p.code, description: p.description, since: p.since })),
     labs: item.labs.map((l) => row({
       name: l.name, value: l.value, unit: l.unit, referenceRange: l.referenceRange, flag: l.flag, collectedAt: l.collectedAt.slice(0, 10),
     })),
     vitals: item.vitals.map((v) => row({ label: v.label, value: v.value })),
+    lungSounds: (item.lungSounds ?? []).map((s) => row({
+      location: s.location, finding: s.finding, notes: s.notes ?? "",
+    })),
     sectionLocks: { ...DEFAULT_LOCKS, ...(item.sectionLocks ?? {}) },
     prefillSections: item.prefillSections ?? [],
     unit: item.unit ?? "",
@@ -181,6 +207,13 @@ export default function CaseEditorPage() {
       insuranceMemberId: draft.insuranceMemberId.trim() || undefined,
       insuranceGroupNumber: draft.insuranceGroupNumber.trim() || undefined,
       insuranceNotes: draft.insuranceNotes.trim() || undefined,
+      emergencyContactName: draft.emergencyContactName.trim() || undefined,
+      emergencyContactPhone: draft.emergencyContactPhone.trim() || undefined,
+      emergencyContactRelationship: draft.emergencyContactRelationship.trim() || undefined,
+      codeStatus: draft.codeStatus || undefined,
+      advanceDirectiveNotes: draft.advanceDirectiveNotes.trim() || undefined,
+      hipaaOnFile: draft.hipaaOnFile,
+      hipaaNote: draft.hipaaNote.trim() || undefined,
       encounterType: draft.encounterType,
       careSetting: draft.careSetting,
       lifecycle: draft.lifecycle,
@@ -190,10 +223,17 @@ export default function CaseEditorPage() {
         substance: r.substance, reaction: r.reaction || undefined, category: (r.category || "medication") as "medication" | "food" | "environmental",
         severity: (r.severity || undefined) as CaseInput["allergies"][number]["severity"],
       })),
-      medications: draft.medications.filter((r) => r.name.trim()).map((r) => ({
-        name: r.name, dose: r.dose, route: r.route, frequency: r.frequency,
-        indication: r.indication || undefined, adherence: r.adherence || undefined, accessCost: r.accessCost || undefined,
-      })),
+      medications: draft.medications.filter((r) => r.name.trim()).map((r) => {
+        const isCompound = r.isCompound === "true";
+        return {
+          name: r.name, dose: r.dose, route: r.route, frequency: r.frequency,
+          indication: r.indication || undefined, adherence: r.adherence || undefined, accessCost: r.accessCost || undefined,
+          isCompound,
+          compoundIngredients: isCompound ? (r.compoundIngredients || undefined) : undefined,
+          compoundVehicle: isCompound ? (r.compoundVehicle || undefined) : undefined,
+          compoundReason: isCompound ? (r.compoundReason || undefined) : undefined,
+        };
+      }),
       problems: draft.problems.filter((r) => r.description.trim()).map((r) => ({
         code: r.code || undefined, description: r.description, since: r.since || undefined,
       })),
@@ -203,6 +243,11 @@ export default function CaseEditorPage() {
         collectedAt: r.collectedAt,
       })),
       vitals: draft.vitals.filter((r) => r.label.trim()).map((r) => ({ label: r.label, value: r.value })),
+      lungSounds: draft.lungSounds.filter((r) => r.location.trim() && r.finding.trim()).map((r) => ({
+        location: r.location,
+        finding: r.finding,
+        notes: r.notes.trim() || undefined,
+      })),
       sectionLocks: draft.sectionLocks,
       prefillSections: draft.prefillSections,
       unit: draft.unit || undefined,
@@ -315,6 +360,56 @@ export default function CaseEditorPage() {
       </Paper>
 
       <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Emergency contact</Typography>
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+          <TextField label="Name" value={draft.emergencyContactName} onChange={(e) => set({ emergencyContactName: e.target.value })} />
+          <TextField label="Relationship" value={draft.emergencyContactRelationship} onChange={(e) => set({ emergencyContactRelationship: e.target.value })} />
+          <TextField label="Phone" value={draft.emergencyContactPhone} onChange={(e) => set({ emergencyContactPhone: e.target.value })} />
+        </Box>
+      </Paper>
+
+      <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Directives & consent</Typography>
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+          <TextField
+            select
+            label="Code status"
+            value={draft.codeStatus}
+            onChange={(e) => set({ codeStatus: e.target.value as Draft["codeStatus"] })}
+          >
+            {CODE_STATUS.map((item) => (
+              <MenuItem key={item || "blank"} value={item}>{item || "Not set"}</MenuItem>
+            ))}
+          </TextField>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={draft.hipaaOnFile}
+                onChange={(e) => set({ hipaaOnFile: e.target.checked })}
+              />
+            }
+            label="Simulated HIPAA on file"
+          />
+          <TextField
+            label="Advance directive notes"
+            value={draft.advanceDirectiveNotes}
+            onChange={(e) => set({ advanceDirectiveNotes: e.target.value })}
+            multiline
+            minRows={2}
+            sx={{ gridColumn: { sm: "1 / -1" } }}
+          />
+          <TextField
+            label="HIPAA / consent note"
+            value={draft.hipaaNote}
+            onChange={(e) => set({ hipaaNote: e.target.value })}
+            multiline
+            minRows={2}
+            sx={{ gridColumn: { sm: "1 / -1" } }}
+          />
+        </Box>
+      </Paper>
+
+      <Paper sx={{ p: { xs: 2, md: 2.5 } }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Encounter</Typography>
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
           <TextField label="Encounter type" value={draft.encounterType} onChange={(e) => set({ encounterType: e.target.value })} />
@@ -378,11 +473,18 @@ export default function CaseEditorPage() {
       <Paper sx={{ p: { xs: 2, md: 2.5 }, overflowX: "auto" }}>
         <EditableTable
           label="Medications" addLabel="medication" rows={draft.medications} onChange={(medications) => set({ medications })}
-          blank={{ name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "" }}
+          blank={{
+            name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "",
+            isCompound: "false", compoundIngredients: "", compoundVehicle: "", compoundReason: "",
+          }}
           columns={[
             { key: "name", label: "Name" }, { key: "dose", label: "Dose" }, { key: "route", label: "How taken" },
             { key: "frequency", label: "Frequency" }, { key: "adherence", label: "Adherence" },
             { key: "accessCost", label: "Access or cost" }, { key: "indication", label: "Indication" },
+            { key: "isCompound", label: "Compound", type: "select", options: ["false", "true"] },
+            { key: "compoundIngredients", label: "Ingredients" },
+            { key: "compoundVehicle", label: "Vehicle" },
+            { key: "compoundReason", label: "Why compounded" },
           ]}
         />
       </Paper>
@@ -410,6 +512,17 @@ export default function CaseEditorPage() {
           label="Vitals" addLabel="vital" rows={draft.vitals} onChange={(vitals) => set({ vitals })}
           blank={{ label: "", value: "" }}
           columns={[{ key: "label", label: "Label" }, { key: "value", label: "Value" }]}
+        />
+      </Paper>
+      <Paper sx={{ p: { xs: 2, md: 2.5 }, overflowX: "auto" }}>
+        <EditableTable
+          label="Lung sounds" addLabel="lung sound" rows={draft.lungSounds} onChange={(lungSounds) => set({ lungSounds })}
+          blank={{ location: "RUL", finding: "clear", notes: "" }}
+          columns={[
+            { key: "location", label: "Location", type: "select", options: ["RUL", "RML", "RLL", "LUL", "LLL"] },
+            { key: "finding", label: "Finding", type: "select", options: ["clear", "crackles", "wheeze", "diminished", "rhonchi", "other"] },
+            { key: "notes", label: "Notes" },
+          ]}
         />
       </Paper>
 

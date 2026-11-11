@@ -49,6 +49,113 @@ async def _assign(client, headers, course: str, case_id: str, owner_id: str) -> 
 
 
 @pytest.mark.asyncio
+async def test_case_emergency_contact_round_trip(client):
+    instructor, _ = await login(client, "gerardo.sillas@utep.edu")
+    course = await course_id(client, instructor, "PHAR 5320")
+    master = await _create(
+        client,
+        instructor,
+        course,
+        emergencyContactName="Rosa Demo Contact",
+        emergencyContactPhone="915-555-0102",
+        emergencyContactRelationship="Sibling",
+    )
+    contact = master["emergencyContact"]
+    assert contact["name"] == "Rosa Demo Contact"
+    assert contact["phone"] == "915-555-0102"
+    assert contact["relationship"] == "Sibling"
+
+    edited = dict(DEMO_CASE)
+    edited.update(
+        emergencyContactName="Jordan Morgan",
+        emergencyContactPhone="915-555-0182",
+        emergencyContactRelationship="Spouse",
+    )
+    patched = await client.patch(
+        f"/api/v1/cases/{master['id']}",
+        headers=instructor,
+        params={"role": "instructor"},
+        json=edited,
+    )
+    assert patched.status_code == 200, patched.text
+    updated = patched.json()["emergencyContact"]
+    assert updated["name"] == "Jordan Morgan"
+    assert updated["phone"] == "915-555-0182"
+    assert updated["relationship"] == "Spouse"
+
+
+@pytest.mark.asyncio
+async def test_case_lung_sounds_round_trip(client):
+    instructor, _ = await login(client, "gerardo.sillas@utep.edu")
+    course = await course_id(client, instructor, "PHAR 5320")
+    master = await _create(
+        client,
+        instructor,
+        course,
+        lungSounds=[
+            {"location": "RUL", "finding": "clear"},
+            {"location": "RLL", "finding": "crackles", "notes": "Bases"},
+        ],
+    )
+    sounds = master["lungSounds"]
+    assert {row["location"]: row["finding"] for row in sounds} == {"RUL": "clear", "RLL": "crackles"}
+    assert next(row for row in sounds if row["location"] == "RLL")["notes"] == "Bases"
+
+    edited = dict(DEMO_CASE)
+    edited["lungSounds"] = [{"location": "LLL", "finding": "wheeze"}]
+    patched = await client.patch(
+        f"/api/v1/cases/{master['id']}",
+        headers=instructor,
+        params={"role": "instructor"},
+        json=edited,
+    )
+    assert patched.status_code == 200, patched.text
+    updated = patched.json()["lungSounds"]
+    assert len(updated) == 1
+    assert updated[0]["location"] == "LLL"
+    assert updated[0]["finding"] == "wheeze"
+
+
+@pytest.mark.asyncio
+async def test_case_code_status_and_hipaa_round_trip(client):
+    instructor, _ = await login(client, "gerardo.sillas@utep.edu")
+    course = await course_id(client, instructor, "PHAR 5320")
+    master = await _create(
+        client,
+        instructor,
+        course,
+        codeStatus="DNR",
+        advanceDirectiveNotes="Simulated DNR on file.",
+        hipaaOnFile=True,
+        hipaaNote="Teaching consent on file.",
+    )
+    assert master["codeStatus"] == "DNR"
+    assert master["advanceDirectiveNotes"] == "Simulated DNR on file."
+    assert master["hipaaOnFile"] is True
+    assert master["hipaaSignedAt"]
+    assert master["hipaaNote"] == "Teaching consent on file."
+
+    edited = dict(DEMO_CASE)
+    edited.update(
+        codeStatus="Full code",
+        advanceDirectiveNotes="",
+        hipaaOnFile=False,
+        hipaaNote="",
+    )
+    patched = await client.patch(
+        f"/api/v1/cases/{master['id']}",
+        headers=instructor,
+        params={"role": "instructor"},
+        json=edited,
+    )
+    assert patched.status_code == 200, patched.text
+    body = patched.json()
+    assert body["codeStatus"] == "Full code"
+    assert body["hipaaOnFile"] is False
+    assert body.get("hipaaSignedAt") in (None, "")
+
+
+@pytest.mark.asyncio
 async def test_later_lock_edits_do_not_change_assigned_charts(client):
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     _, daniel = await login(client, "daniel.reyes@miners.utep.edu")

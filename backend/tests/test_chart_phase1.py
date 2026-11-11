@@ -109,6 +109,84 @@ async def test_locked_vitals_reject_a_student_and_allow_an_instructor(client):
 
 
 @pytest.mark.asyncio
+async def test_student_can_record_bp_and_lung_sounds(client):
+    """P1-4 / P1-5: unlocked assessment charts accept BP and lung-sound entries."""
+    _instructor, student, chart = await _assigned_chart(client)
+    bp = await client.post(
+        f"/api/v1/patients/{chart['id']}/vitals",
+        headers=student,
+        params={"role": "student"},
+        json={"label": "BP", "value": "128/82 mmHg"},
+    )
+    assert bp.status_code == 200, bp.text
+    assert any(item["label"] == "BP" and item["value"] == "128/82 mmHg" for item in bp.json()["vitals"])
+
+    lung = await client.post(
+        f"/api/v1/patients/{chart['id']}/lung-sounds",
+        headers=student,
+        params={"role": "student"},
+        json={"location": "RLL", "finding": "crackles", "notes": "Bases"},
+    )
+    assert lung.status_code == 200, lung.text
+    rows = lung.json()["lungSounds"]
+    assert any(item["location"] == "RLL" and item["finding"] == "crackles" for item in rows)
+    sound = next(item for item in rows if item["location"] == "RLL")
+    hidden = await client.post(
+        f"/api/v1/patients/{chart['id']}/lung-sounds/{sound['id']}/entered-in-error",
+        headers=student,
+        params={"role": "student"},
+    )
+    assert hidden.status_code == 200, hidden.text
+    assert all(item["location"] != "RLL" for item in hidden.json()["lungSounds"])
+
+
+@pytest.mark.asyncio
+async def test_locked_lung_sounds_reject_a_student(client):
+    instructor, student, chart = await _assigned_chart(client, locks={"lung_sounds": True})
+    denied = await client.post(
+        f"/api/v1/patients/{chart['id']}/lung-sounds",
+        headers=student,
+        params={"role": "student"},
+        json={"location": "RUL", "finding": "clear"},
+    )
+    assert denied.status_code == 403
+    allowed = await client.post(
+        f"/api/v1/patients/{chart['id']}/lung-sounds",
+        headers=instructor,
+        params={"role": "instructor"},
+        json={"location": "RUL", "finding": "clear"},
+    )
+    assert allowed.status_code == 200, allowed.text
+
+
+@pytest.mark.asyncio
+async def test_compound_medication_and_sig_round_trip(client):
+    _instructor, student, chart = await _assigned_chart(client)
+    created = await client.post(
+        f"/api/v1/patients/{chart['id']}/medications",
+        headers=student,
+        params={"role": "student"},
+        json={
+            "name": "Omeprazole (compounded)",
+            "dose": "20 mg",
+            "route": "PO",
+            "frequency": "Once daily",
+            "indication": "GERD",
+            "isCompound": True,
+            "compoundIngredients": "Omeprazole 20 mg",
+            "compoundVehicle": "Gluten-free capsule",
+            "compoundReason": "Celiac disease — avoid commercial capsules.",
+        },
+    )
+    assert created.status_code == 200, created.text
+    med = next(item for item in created.json()["medications"] if item["name"].startswith("Omeprazole"))
+    assert med["sig"] == "20 mg PO QD"
+    assert med["isCompound"] is True
+    assert med["compoundVehicle"] == "Gluten-free capsule"
+    assert "Celiac" in med["compoundReason"]
+
+
+@pytest.mark.asyncio
 async def test_allergy_reaction_medication_fields_and_roomed_status(client):
     _instructor, student, chart = await _assigned_chart(client)
     allergy = await client.post(

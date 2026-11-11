@@ -256,7 +256,7 @@ function IcdSearch({
           {...params} id={id} label={label}
           placeholder={value.length ? "" : "Search the ICD-10 catalog"}
           error={error || Boolean(lookupError)}
-          helperText={lookupError || "Codes come from the NLM ICD-10-CM search. Primary diagnosis first."}
+          helperText={lookupError || "Codes come from the NLM ICD-10-CM search. Primary diagnosis first — these codes also support teaching about coverage/billing."}
         />
       )}
     />

@@ -7,8 +7,19 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clinical_sections import ALLERGY_CATEGORIES, locks_or_default
-from app.models.clinical import Allergy, ChartSession, LabResult, Medication, MedicationAdministration, Patient, Problem, Vital
+from app.clinical_sections import ALLERGY_CATEGORIES, LUNG_SOUND_FINDINGS, LUNG_SOUND_LOCATIONS, locks_or_default
+from app.models.clinical import (
+    Allergy,
+    ChartSession,
+    LabResult,
+    LungSound,
+    Medication,
+    MedicationAdministration,
+    MedicationOrder,
+    Patient,
+    Problem,
+    Vital,
+)
 from app.models.user import User
 from app.services.access import can, full_name
 from app.services.audit import log_event
@@ -117,6 +128,7 @@ async def add_medication(db, patient: Patient, actor: User, role: str, body: dic
     generic, rxcui, brands = _names(body, name)
     dose = (body.get("dose") or "").strip()
     flags = await _dose_flags(db, patient, role, dose, generic or name, {**body, "_actor_id": actor.id})
+    is_compound = bool(body.get("is_compound"))
     patient.medications.append(
         Medication(
             name=name,
@@ -127,6 +139,10 @@ async def add_medication(db, patient: Patient, actor: User, role: str, body: dic
             adherence=(body.get("adherence") or "").strip() or None,
             access_cost=(body.get("access_cost") or "").strip() or None,
             prescribed=bool(body.get("prescribed")),
+            is_compound=is_compound,
+            compound_ingredients=(body.get("compound_ingredients") or "").strip() or None if is_compound else None,
+            compound_vehicle=(body.get("compound_vehicle") or "").strip() or None if is_compound else None,
+            compound_reason=(body.get("compound_reason") or "").strip() or None if is_compound else None,
             status="active",
             rxcui=rxcui,
             generic_name=generic if generic != name else (body.get("generic_name") or "").strip() or None,
@@ -149,6 +165,16 @@ async def update_medication(db, patient: Patient, actor: User, role: str, medica
             setattr(row, field, value or None if field in {"indication", "adherence", "access_cost"} else value)
     if "prescribed" in body:
         row.prescribed = bool(body["prescribed"])
+    if "is_compound" in body:
+        row.is_compound = bool(body["is_compound"])
+    if "compound_ingredients" in body or "is_compound" in body:
+        row.compound_ingredients = (
+            (body.get("compound_ingredients") or "").strip() or None if row.is_compound else None
+        )
+    if "compound_vehicle" in body or "is_compound" in body:
+        row.compound_vehicle = (body.get("compound_vehicle") or "").strip() or None if row.is_compound else None
+    if "compound_reason" in body or "is_compound" in body:
+        row.compound_reason = (body.get("compound_reason") or "").strip() or None if row.is_compound else None
     if "rxcui" in body:
         row.rxcui = (body.get("rxcui") or "").strip() or None
     if "generic_name" in body:
@@ -226,6 +252,46 @@ async def mark_vital_entered_in_error(db, patient: Patient, actor: User, role: s
         raise HTTPException(status.HTTP_409_CONFLICT, "That vital was already marked entered in error.")
     row.status = "entered_in_error"
     await _touch(db, patient, actor, ip, "vital.entered_in_error", f"{row.label} {row.value}")
+
+
+async def add_lung_sound(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
+    if patient.mode == "simulation":
+        await _simulation_nurse(db, patient, actor)
+    elif not _can_edit_section(role, patient, "lung_sounds"):
+        _deny("lung_sounds")
+    location = (body.get("location") or "").strip().upper()
+    finding = (body.get("finding") or "").strip().lower()
+    if location not in LUNG_SOUND_LOCATIONS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Use a lung location like RUL, RML, RLL, LUL, or LLL.")
+    if finding not in LUNG_SOUND_FINDINGS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Use a lung finding like clear, crackles, wheeze, diminished, rhonchi, or other.")
+    patient.lung_sounds.append(
+        LungSound(
+            location=location,
+            finding=finding,
+            notes=(body.get("notes") or "").strip() or None,
+            recorded_at=utcnow(),
+            recorded_by_name=full_name(actor),
+            status="recorded",
+        )
+    )
+    if patient.mode == "simulation" and patient.simulation_phase == "waiting_vitals":
+        patient.simulation_phase = "ready"
+    await _touch(db, patient, actor, ip, "lung_sound.add", f"{location} {finding}")
+
+
+async def mark_lung_sound_entered_in_error(
+    db, patient: Patient, actor: User, role: str, lung_sound_id: uuid.UUID, ip: str | None
+) -> None:
+    if patient.mode == "simulation":
+        await _simulation_nurse(db, patient, actor)
+    elif not _can_edit_section(role, patient, "lung_sounds"):
+        _deny("lung_sounds")
+    row = _find(patient.lung_sounds, lung_sound_id, "Lung sound")
+    if row.status == "entered_in_error":
+        raise HTTPException(status.HTTP_409_CONFLICT, "That lung sound was already marked entered in error.")
+    row.status = "entered_in_error"
+    await _touch(db, patient, actor, ip, "lung_sound.entered_in_error", f"{row.location} {row.finding}")
 
 
 async def add_lab(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
@@ -333,6 +399,138 @@ async def review_administration(db, row: MedicationAdministration, reviewer: Use
         ip_address=ip,
         detail=decision,
     )
+
+
+async def _can_verify_orders(db, patient: Patient, actor: User, role: str) -> bool:
+    if can(role, "note:cosign") or can(role, "case:author"):
+        return True
+    if patient.mode == "simulation":
+        from app.services.simulation import station_for
+
+        return await station_for(db, patient.id, actor.id) == "pharmacist"
+    return False
+
+
+async def submit_medication_order(
+    db, patient: Patient, actor: User, role: str, medication_id: uuid.UUID, quantity: str | None, ip: str | None
+) -> MedicationOrder:
+    if patient.mode == "simulation":
+        from app.services.simulation import station_for
+
+        station = await station_for(db, patient.id, actor.id)
+        if station not in {"nurse", "pharmacist", "provider"} and not can(role, "case:author"):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a simulation station can submit a fill for verification.")
+    elif not (_can_edit_section(role, patient, "medications") or can(role, "case:author")):
+        _deny("medications")
+    med = _find(patient.medications, medication_id, "Medication")
+    if med.status != "active":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only an active medication can be submitted for verification.")
+    pending = await db.scalar(
+        select(MedicationOrder.id).where(
+            MedicationOrder.patient_id == patient.id,
+            MedicationOrder.medication_id == med.id,
+            MedicationOrder.status == "pending_verify",
+        )
+    )
+    if pending is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "That medication already has a fill waiting for verification.")
+    order = MedicationOrder(
+        patient_id=patient.id,
+        medication_id=med.id,
+        name=med.name,
+        dose=med.dose,
+        route=med.route,
+        frequency=med.frequency,
+        quantity=(quantity or "").strip() or None,
+        status="pending_verify",
+        submitted_by_id=actor.id,
+        submitted_at=utcnow(),
+    )
+    db.add(order)
+    await db.flush()
+    await _touch(db, patient, actor, ip, "medication_order.submit", f"{med.name} pending verify")
+    return order
+
+
+async def review_medication_order(
+    db,
+    order: MedicationOrder,
+    reviewer: User,
+    role: str,
+    decision: str,
+    comment: str,
+    ip: str | None,
+    patient: Patient,
+) -> MedicationOrder:
+    if decision == "resubmit":
+        if order.status != "held":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Only a held fill can be resubmitted.")
+        if not (
+            order.submitted_by_id == reviewer.id
+            or _can_edit_section(role, patient, "medications")
+            or can(role, "case:author")
+        ):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "You can't resubmit this fill.")
+        order.status = "pending_verify"
+        order.review_comment = comment.strip() or order.review_comment
+        order.reviewed_by_id = None
+        order.reviewed_at = None
+        await _touch(db, patient, reviewer, ip, "medication_order.resubmit", order.name)
+        return order
+
+    if not await _can_verify_orders(db, patient, reviewer, role):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't verify medication fills.")
+    if decision == "verify":
+        if order.status != "pending_verify":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Only a pending fill can be verified.")
+        order.status = "verified"
+    elif decision == "hold":
+        if order.status != "pending_verify":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Only a pending fill can be held.")
+        order.status = "held"
+    elif decision == "release":
+        if order.status != "verified":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Verify the fill before releasing it.")
+        order.status = "released"
+    else:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Use verify, hold, release, or resubmit.")
+    order.review_comment = comment.strip() or None
+    order.reviewed_by_id = reviewer.id
+    order.reviewed_at = utcnow()
+    await log_event(
+        db,
+        action=f"medication_order.{decision}",
+        entity_type="medication_order",
+        entity_id=str(order.id),
+        actor_user_id=reviewer.id,
+        course_id=patient.course_id,
+        ip_address=ip,
+        detail=f"{order.name} → {order.status}",
+    )
+    return order
+
+
+def medication_order_out(order: MedicationOrder) -> dict:
+    from app.services.sig import medication_sig
+
+    med = order.medication
+    return {
+        "id": str(order.id),
+        "medication_id": str(order.medication_id),
+        "name": order.name,
+        "dose": order.dose,
+        "route": order.route,
+        "frequency": order.frequency,
+        "sig": medication_sig(order.dose, order.route, order.frequency),
+        "quantity": order.quantity,
+        "status": order.status,
+        "submitted_by_name": full_name(order.submitted_by) if order.submitted_by else "",
+        "submitted_at": order.submitted_at,
+        "reviewed_by_name": full_name(order.reviewed_by) if order.reviewed_by else None,
+        "reviewed_at": order.reviewed_at,
+        "review_comment": order.review_comment,
+        "is_compound": bool(med.is_compound) if med else False,
+    }
 
 
 async def record_presence(db, patient: Patient, user: User, ip: str | None, *, active: bool) -> None:

@@ -30,6 +30,7 @@ from app.models.clinical import (
     Patient,
     Problem,
     Referral,
+    LungSound,
     Vital,
 )
 from app.models.user import Discipline, Permission, Role, User
@@ -728,6 +729,18 @@ def _clone_case(source: Patient, mrn: str, owner: User) -> Patient:
         family_history=source.family_history,
         surgical_history=source.surgical_history,
         social_history=source.social_history,
+        insurance_payer=source.insurance_payer,
+        insurance_member_id=source.insurance_member_id,
+        insurance_group_number=source.insurance_group_number,
+        insurance_notes=source.insurance_notes,
+        emergency_contact_name=source.emergency_contact_name,
+        emergency_contact_phone=source.emergency_contact_phone,
+        emergency_contact_relationship=source.emergency_contact_relationship,
+        code_status=source.code_status,
+        advance_directive_notes=source.advance_directive_notes,
+        hipaa_on_file=bool(source.hipaa_on_file),
+        hipaa_signed_at=source.hipaa_signed_at,
+        hipaa_note=source.hipaa_note,
         snapshot=chart_snapshot(source),
         is_training=True,
         encounter=Encounter(
@@ -743,6 +756,10 @@ def _clone_case(source: Patient, mrn: str, owner: User) -> Patient:
         chart.medications.append(Medication(
             name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
             indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
+            is_compound=bool(item.is_compound),
+            compound_ingredients=item.compound_ingredients,
+            compound_vehicle=item.compound_vehicle,
+            compound_reason=item.compound_reason,
         ))
     for item in source.problems:
         chart.problems.append(Problem(code=item.code, description=item.description, since=item.since))
@@ -755,6 +772,12 @@ def _clone_case(source: Patient, mrn: str, owner: User) -> Patient:
         chart.vitals.append(Vital(
             label=item.label, value=item.value, recorded_at=item.recorded_at,
             recorded_by_name=item.recorded_by_name, status=item.status or "recorded",
+        ))
+    for item in source.lung_sounds:
+        chart.lung_sounds.append(LungSound(
+            location=item.location, finding=item.finding, notes=item.notes,
+            recorded_at=item.recorded_at, recorded_by_name=item.recorded_by_name,
+            status=item.status or "recorded",
         ))
     return chart
 
@@ -922,8 +945,15 @@ def _maybe_allergy(chart: Patient, substance: str, reaction: str | None = None, 
 
 
 def _maybe_med(chart: Patient, name: str, **kwargs) -> None:
-    if not any(row.name == name for row in chart.medications):
+    existing = next((row for row in chart.medications if row.name == name), None)
+    if existing is None:
         chart.medications.append(Medication(name=name, **kwargs))
+        return
+    for key, value in kwargs.items():
+        if value is None:
+            continue
+        if getattr(existing, key, None) in (None, "", False):
+            setattr(existing, key, value)
 
 
 def _maybe_problem(chart: Patient, description: str, code: str | None = None, since: str | None = None) -> None:
@@ -944,7 +974,34 @@ def _maybe_vital(chart: Patient, label: str, value: str) -> None:
         ))
 
 
-def _contacts(chart: Patient, *, payer=None, member=None, group=None, em_name=None, em_phone=None, em_rel=None) -> None:
+def _maybe_lung(chart: Patient, location: str, finding: str, notes: str | None = None) -> None:
+    if any(row.location == location and (row.status or "recorded") == "recorded" for row in chart.lung_sounds):
+        return
+    chart.lung_sounds.append(
+        LungSound(
+            location=location,
+            finding=finding,
+            notes=notes,
+            recorded_at=_BASELINE_VITAL,
+            recorded_by_name="Chart baseline",
+            status="recorded",
+        )
+    )
+
+
+def _contacts(
+    chart: Patient,
+    *,
+    payer=None,
+    member=None,
+    group=None,
+    em_name=None,
+    em_phone=None,
+    em_rel=None,
+    code_status="Full code",
+    advance_notes=None,
+    hipaa=True,
+) -> None:
     if payer and not chart.insurance_payer:
         chart.insurance_payer = payer
     if member and not chart.insurance_member_id:
@@ -957,6 +1014,14 @@ def _contacts(chart: Patient, *, payer=None, member=None, group=None, em_name=No
         chart.emergency_contact_phone = em_phone
     if em_rel and not chart.emergency_contact_relationship:
         chart.emergency_contact_relationship = em_rel
+    if code_status and not chart.code_status:
+        chart.code_status = code_status
+    if advance_notes and not chart.advance_directive_notes:
+        chart.advance_directive_notes = advance_notes
+    if hipaa and not chart.hipaa_on_file:
+        chart.hipaa_on_file = True
+        chart.hipaa_signed_at = chart.hipaa_signed_at or _BASELINE_VITAL
+        chart.hipaa_note = chart.hipaa_note or "Simulated HIPAA acknowledgment on file."
 
 
 def _rosa(course: Course) -> Patient:
@@ -979,6 +1044,8 @@ def _rosa(course: Course) -> Patient:
 def _fill_rosa(chart: Patient) -> None:
     _contacts(chart, payer="Medicare", member="1EG4-TE8-MK72", group="MED-A",
               em_name="Elena Villalobos", em_phone="915-555-0144", em_rel="Daughter")
+    for location in ("RUL", "RML", "RLL", "LUL", "LLL"):
+        _maybe_lung(chart, location, "clear")
     _maybe_allergy(chart, "Sulfa drugs", "Rash", "mild")
     _maybe_allergy(chart, "Shellfish", "Hives", "moderate")
     _maybe_med(chart, "Lisinopril", dose="10 mg", route="PO", frequency="Once daily", indication="Hypertension", adherence="Takes every morning")
@@ -986,7 +1053,20 @@ def _fill_rosa(chart: Patient) -> None:
     _maybe_med(chart, "Hydrochlorothiazide", dose="12.5 mg", route="PO", frequency="Once daily", indication="Hypertension", adherence="Takes every morning")
     _maybe_med(chart, "Atorvastatin", dose="20 mg", route="PO", frequency="Once daily at bedtime", indication="Hyperlipidemia")
     _maybe_med(chart, "Aspirin", dose="81 mg", route="PO", frequency="Once daily", indication="Primary prevention")
+    _maybe_med(
+        chart,
+        "Omeprazole (compounded)",
+        dose="20 mg",
+        route="PO",
+        frequency="Once daily",
+        indication="GERD",
+        is_compound=True,
+        compound_ingredients="Omeprazole 20 mg",
+        compound_vehicle="Gluten-free capsule",
+        compound_reason="Celiac disease — avoid commercial capsules that may contain gluten or starch fillers.",
+    )
     _maybe_problem(chart, "Essential hypertension", code="I10", since="2012")
+    _maybe_problem(chart, "Celiac disease", code="K90.0")
     _maybe_problem(chart, "Hyperlipidemia", code="E78.5", since="2018")
     _maybe_problem(chart, "Lower extremity edema", code="R60.0")
     collected = date(2026, 9, 10)
@@ -1349,14 +1429,34 @@ def _deshawn(course: Course) -> Patient:
         encounter_type="Neuro PT visit #8",
         payer="Medicare", member="1EG4-DC8-WW02", group="MED-B",
         em_name="Andre Carter", em_phone="915-555-0199", em_rel="Son",
+        code_status="DNR",
+        advance_notes="Simulated DNR order on file after stroke; family aware.",
     )
     _fill_deshawn(chart)
     return chart
 
 
 def _fill_deshawn(chart: Patient) -> None:
-    _contacts(chart, payer="Medicare", member="1EG4-DC8-WW02", group="MED-B",
-              em_name="Andre Carter", em_phone="915-555-0199", em_rel="Son")
+    _contacts(
+        chart,
+        payer="Medicare",
+        member="1EG4-DC8-WW02",
+        group="MED-B",
+        em_name="Andre Carter",
+        em_phone="915-555-0199",
+        em_rel="Son",
+        code_status="DNR",
+        advance_notes="Simulated DNR order on file after stroke; family aware.",
+    )
+    chart.code_status = "DNR"
+    chart.advance_directive_notes = chart.advance_directive_notes or (
+        "Simulated DNR order on file after stroke; family aware."
+    )
+    _maybe_lung(chart, "RUL", "clear")
+    _maybe_lung(chart, "RML", "clear")
+    _maybe_lung(chart, "RLL", "diminished", "Right base quieter after stroke admission.")
+    _maybe_lung(chart, "LUL", "clear")
+    _maybe_lung(chart, "LLL", "clear")
     _maybe_allergy(chart, "NKDA")
     _maybe_med(chart, "Aspirin", dose="81 mg", route="PO", frequency="Once daily", indication="Stroke secondary prevention")
     _maybe_med(chart, "Clopidogrel", dose="75 mg", route="PO", frequency="Once daily", indication="Stroke secondary prevention")
@@ -1760,6 +1860,11 @@ def _patient(**kwargs) -> Patient:
         emergency_contact_name=kwargs.get("em_name"),
         emergency_contact_phone=kwargs.get("em_phone"),
         emergency_contact_relationship=kwargs.get("em_rel"),
+        code_status=kwargs.get("code_status", "Full code"),
+        advance_directive_notes=kwargs.get("advance_notes"),
+        hipaa_on_file=bool(kwargs.get("hipaa", True)),
+        hipaa_signed_at=_BASELINE_VITAL if kwargs.get("hipaa", True) else None,
+        hipaa_note="Simulated HIPAA acknowledgment on file." if kwargs.get("hipaa", True) else None,
         is_training=True,
         encounter=Encounter(type=kwargs["encounter_type"], date=date(2026, 9, 22)),
     )

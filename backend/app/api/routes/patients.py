@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.models.clinical import ClinicalNote, Patient
 from app.models.user import User
-from app.models.clinical import MedicationAdministration
+from app.models.clinical import MedicationAdministration, MedicationOrder
 from app.schemas.clinical import (
     AdministerWrite,
     AdministrationReview,
@@ -19,6 +19,9 @@ from app.schemas.clinical import (
     ChartPresence,
     HistoryWrite,
     LabWrite,
+    MedicationOrderCreate,
+    MedicationOrderOut,
+    MedicationOrderReview,
     MedicationWrite,
     PatientOut,
     PatientRowOut,
@@ -29,24 +32,30 @@ from app.schemas.clinical import (
     ProblemWrite,
     StatusPatch,
     TriggersOut,
+    LungSoundWrite,
     VitalWrite,
 )
 from app.schemas.intake import IntakeData, StaffIntakeOut
 from app.services.chart_edits import (
     add_allergy,
     add_lab,
+    add_lung_sound,
     add_medication,
     add_problem,
     add_vital,
     administer_medication,
+    mark_lung_sound_entered_in_error,
     mark_vital_entered_in_error,
     delete_allergy,
     delete_medication,
     discontinue_medication,
+    medication_order_out,
     record_presence,
     review_administration,
+    review_medication_order,
     set_history,
     set_placement,
+    submit_medication_order,
     update_allergy,
     update_medication,
 )
@@ -517,6 +526,31 @@ async def vital_entered_in_error(
     return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
 
 
+@router.post("/{patient_id}/lung-sounds", response_model=PatientOut, response_model_exclude_none=True)
+async def post_lung_sound(
+    patient_id: uuid.UUID, body: LungSoundWrite, db: DbSession, user: CurrentUser, request: Request, role: Annotated[str, Query()]
+):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    await add_lung_sound(db, patient, user, role, body.model_dump(), _ip(request))
+    await db.commit()
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
+
+
+@router.post("/{patient_id}/lung-sounds/{lung_sound_id}/entered-in-error", response_model=PatientOut, response_model_exclude_none=True)
+async def lung_sound_entered_in_error(
+    patient_id: uuid.UUID,
+    lung_sound_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    await mark_lung_sound_entered_in_error(db, patient, user, role, lung_sound_id, _ip(request))
+    await db.commit()
+    return patient_out(await load_patient(db, patient.id), owner_name=owner_name_for(patient, role), viewer_role=role)
+
+
 @router.post("/{patient_id}/labs", response_model=PatientOut, response_model_exclude_none=True)
 async def post_lab(patient_id: uuid.UUID, body: LabWrite, db: DbSession, user: CurrentUser, request: Request, role: Annotated[str, Query()]):
     patient = await _open_chart(patient_id, db, user, request, role)
@@ -590,3 +624,53 @@ async def review_admin(
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
     await review_administration(db, row, user, role, body.decision, body.comment, _ip(request), patient.course_id)
     await db.commit()
+
+
+@router.get("/{patient_id}/medication-orders", response_model=list[MedicationOrderOut], response_model_exclude_none=True)
+async def list_medication_orders(patient_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request, role: Annotated[str, Query()]):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    rows = (
+        await db.scalars(
+            select(MedicationOrder)
+            .where(MedicationOrder.patient_id == patient.id)
+            .order_by(MedicationOrder.submitted_at.desc())
+        )
+    ).all()
+    return [medication_order_out(row) for row in rows]
+
+
+@router.post("/{patient_id}/medication-orders", response_model=MedicationOrderOut, response_model_exclude_none=True)
+async def post_medication_order(
+    patient_id: uuid.UUID,
+    body: MedicationOrderCreate,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    order = await submit_medication_order(db, patient, user, role, body.medication_id, body.quantity, _ip(request))
+    await db.commit()
+    order = await db.get(MedicationOrder, order.id)
+    return medication_order_out(order)
+
+
+@router.post("/medication-orders/{order_id}/review", response_model=MedicationOrderOut, response_model_exclude_none=True)
+async def review_medication_order_route(
+    order_id: uuid.UUID,
+    body: MedicationOrderReview,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    order = await db.get(MedicationOrder, order_id)
+    if order is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Medication fill not found.")
+    patient = await load_patient(db, order.patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    await review_medication_order(db, order, user, role, body.decision, body.comment, _ip(request), patient)
+    await db.commit()
+    order = await db.get(MedicationOrder, order_id)
+    return medication_order_out(order)

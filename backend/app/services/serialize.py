@@ -12,6 +12,7 @@ from app.models.clinical import (
 from app.models.user import User
 from app.services.access import full_name, memberships_for
 from app.services.note_crypto import reveal_content, reveal_text
+from app.services.sig import medication_sig
 
 
 def _age(dob: date) -> int:
@@ -83,11 +84,16 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
                 "dose": m.dose,
                 "route": m.route,
                 "frequency": m.frequency,
+                "sig": medication_sig(m.dose, m.route, m.frequency),
                 "indication": m.indication,
                 "adherence": m.adherence,
                 "access_cost": m.access_cost,
                 "status": m.status,
                 "prescribed": m.prescribed,
+                "is_compound": bool(m.is_compound),
+                "compound_ingredients": m.compound_ingredients,
+                "compound_vehicle": m.compound_vehicle,
+                "compound_reason": m.compound_reason,
                 "discontinued_at": m.discontinued_at,
                 "rxcui": m.rxcui,
                 "generic_name": m.generic_name,
@@ -124,6 +130,19 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
             for v in patient.vitals
             if viewer_role != "student" or (v.status or "recorded") != "entered_in_error"
         ],
+        "lung_sounds": [
+            {
+                "id": str(row.id),
+                "location": row.location,
+                "finding": row.finding,
+                "notes": row.notes,
+                "recorded_at": row.recorded_at,
+                "recorded_by_name": row.recorded_by_name,
+                "status": row.status or "recorded",
+            }
+            for row in patient.lung_sounds
+            if viewer_role != "student" or (row.status or "recorded") != "entered_in_error"
+        ],
         "section_locks": locks_or_default(patient.section_locks),
         "prefill_sections": prefill_or_default(patient.prefill_sections),
         "unit": patient.unit,
@@ -153,6 +172,11 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
             "phone": patient.emergency_contact_phone,
             "relationship": patient.emergency_contact_relationship,
         },
+        "code_status": patient.code_status,
+        "advance_directive_notes": patient.advance_directive_notes,
+        "hipaa_on_file": bool(patient.hipaa_on_file),
+        "hipaa_signed_at": patient.hipaa_signed_at,
+        "hipaa_note": patient.hipaa_note,
     }
     return payload
 

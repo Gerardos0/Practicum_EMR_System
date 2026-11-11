@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Alert, Autocomplete, Box, Button, MenuItem, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import type { AllergyCategory, ClinicalNote, EncounterStatus, Patient } from "../../../types";
+import type { AllergyCategory, ClinicalNote, EncounterStatus, LungSoundFinding, LungSoundLocation, Patient } from "../../../types";
 import { listAppointments } from "../../../api/scheduling";
-import { addAllergy, addVital, markVitalEnteredInError, removeAllergy } from "../../../api/chart";
+import { addAllergy, addLungSound, addVital, markLungSoundEnteredInError, markVitalEnteredInError, removeAllergy } from "../../../api/chart";
 import VitalsChart from "./VitalsChart";
 import PatientReportedCard from "./PatientReportedCard";
 import { useSession } from "../../auth/useSession";
@@ -22,6 +22,8 @@ const ADVANCE_LABEL: Partial<Record<EncounterStatus, string>> = {
   "Checked out": "Check out",
 };
 const VITAL_LABELS = ["BP", "Pulse", "Pain", "Temperature", "Respiratory rate", "SpO2", "Weight"];
+const LUNG_LOCATIONS: LungSoundLocation[] = ["RUL", "RML", "RLL", "LUL", "LLL"];
+const LUNG_FINDINGS: LungSoundFinding[] = ["clear", "crackles", "wheeze", "diminished", "rhonchi", "other"];
 
 interface Props {
   patient: Patient;
@@ -46,6 +48,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   const appts = useAsync(() => listAppointments(p.id, activeRole), [p.id, activeRole]);
   const [allergy, setAllergy] = useState({ substance: "", category: "medication" as AllergyCategory, reaction: "" });
   const [vital, setVital] = useState({ label: "", value: "" });
+  const [lung, setLung] = useState({ location: "RUL" as LungSoundLocation, finding: "clear" as LungSoundFinding, notes: "" });
   const [error, setError] = useState("");
   const [now] = useState(() => Date.now());
 
@@ -75,7 +78,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         return {
           severity: "info" as const,
           title: "Waiting for vitals",
-          body: "The nurse records vitals. The visit note opens after that.",
+          body: "The nurse records vitals and lung sounds. The visit note opens after that.",
           action: null,
         };
       }
@@ -85,7 +88,9 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           title: phase === "closed" ? "Visit note is closed" : "Ready for the visit note",
           body: phase === "closed"
             ? "A clarification is a new note. The signed visit note stays closed."
-            : "The pharmacist or provider writes the note. The provider signs it closed.",
+            : p.viewerStation === "pharmacist"
+              ? "Write the visit note, and use Medications → Fill verification to verify or hold submitted fills."
+              : "The pharmacist or provider writes the note. The provider signs it closed. Pharmacists can also verify fills on the Medications tab.",
           action: noteButton,
         };
       }
@@ -196,6 +201,38 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
       </Paper>
       )}
 
+      {(p.emergencyContact?.name || p.emergencyContact?.phone || p.emergencyContact?.relationship) && (
+      <Paper sx={card}>
+        <Typography component="h2" variant="h6" sx={titleSx}>Emergency contact</Typography>
+        <Stack spacing={0.5}>
+          {p.emergencyContact.name && <Typography variant="body2"><strong>Name:</strong> {p.emergencyContact.name}</Typography>}
+          {p.emergencyContact.relationship && (
+            <Typography variant="body2"><strong>Relationship:</strong> {p.emergencyContact.relationship}</Typography>
+          )}
+          {p.emergencyContact.phone && <Typography variant="body2"><strong>Phone:</strong> {p.emergencyContact.phone}</Typography>}
+        </Stack>
+      </Paper>
+      )}
+
+      {(p.codeStatus || p.advanceDirectiveNotes || p.hipaaOnFile || p.hipaaNote) && (
+      <Paper sx={card}>
+        <Typography component="h2" variant="h6" sx={titleSx}>Directives & consent</Typography>
+        <Stack spacing={0.5}>
+          {p.codeStatus && <Typography variant="body2"><strong>Code status:</strong> {p.codeStatus}</Typography>}
+          {p.advanceDirectiveNotes && (
+            <Typography variant="body2"><strong>Advance directives:</strong> {p.advanceDirectiveNotes}</Typography>
+          )}
+          <Typography variant="body2">
+            <strong>HIPAA:</strong>{" "}
+            {p.hipaaOnFile
+              ? `On file${p.hipaaSignedAt ? ` (${formatDate(p.hipaaSignedAt)})` : ""}`
+              : "Not on file"}
+          </Typography>
+          {p.hipaaNote && <Typography variant="body2"><strong>Consent note:</strong> {p.hipaaNote}</Typography>}
+        </Stack>
+      </Paper>
+      )}
+
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
         <Paper sx={card}>
           <Typography component="h2" variant="h6" sx={titleSx}>Allergies</Typography>
@@ -268,6 +305,96 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           )}
         </Paper>
       </Box>
+
+      <Paper sx={card}>
+        <Typography component="h2" variant="h6" sx={titleSx}>Lung sounds</Typography>
+        {(p.lungSounds ?? []).filter((row) => (row.status ?? "recorded") === "recorded").length === 0 ? (
+          <Typography variant="body2" color="text.secondary">None documented</Typography>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Location</TableCell>
+                <TableCell>Finding</TableCell>
+                <TableCell>Notes</TableCell>
+                <TableCell>Recorded</TableCell>
+                {canEditSection(activeRole, p, "lung_sounds") && <TableCell />}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {[...(p.lungSounds ?? [])]
+                .filter((row) => (row.status ?? "recorded") === "recorded")
+                .map((row) => (
+                  <TableRow key={row.id ?? `${row.location}-${row.finding}-${row.recordedAt}`}>
+                    <TableCell>{row.location}</TableCell>
+                    <TableCell sx={{ textTransform: "capitalize" }}>{row.finding}</TableCell>
+                    <TableCell>{row.notes || "—"}</TableCell>
+                    <TableCell>
+                      {row.recordedAt ? formatDateTime(row.recordedAt) : "—"}
+                      {row.recordedByName ? ` · ${row.recordedByName}` : ""}
+                    </TableCell>
+                    {canEditSection(activeRole, p, "lung_sounds") && row.id && (
+                      <TableCell>
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={async () => {
+                            try { onChange(await markLungSoundEnteredInError(activeRole, p.id, row.id!)); }
+                            catch (e) { setError((e as Error).message); }
+                          }}
+                        >
+                          Entered in error
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        )}
+        {canEditSection(activeRole, p, "lung_sounds") && (
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }} alignItems="flex-start">
+            <TextField
+              select size="small" label="Location" value={lung.location}
+              onChange={(e) => setLung({ ...lung, location: e.target.value as LungSoundLocation })}
+              sx={{ minWidth: 120 }}
+            >
+              {LUNG_LOCATIONS.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            </TextField>
+            <TextField
+              select size="small" label="Finding" value={lung.finding}
+              onChange={(e) => setLung({ ...lung, finding: e.target.value as LungSoundFinding })}
+              sx={{ minWidth: 140 }}
+            >
+              {LUNG_FINDINGS.map((item) => <MenuItem key={item} value={item}>{item}</MenuItem>)}
+            </TextField>
+            <TextField
+              size="small" label="Notes" value={lung.notes}
+              onChange={(e) => setLung({ ...lung, notes: e.target.value })}
+              sx={{ flex: 1, minWidth: 160 }}
+            />
+            <Button variant="outlined" onClick={async () => {
+              try {
+                onChange(await addLungSound(activeRole, p.id, {
+                  location: lung.location,
+                  finding: lung.finding,
+                  notes: lung.notes.trim() || undefined,
+                }));
+                setLung({ location: "RUL", finding: "clear", notes: "" });
+              } catch (e) { setError((e as Error).message); }
+            }}>Add</Button>
+          </Stack>
+        )}
+        {(p.lungSounds ?? []).some((row) => (row.status ?? "recorded") === "recorded") && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+            Suggested Objective text:{" "}
+            {[...(p.lungSounds ?? [])]
+              .filter((row) => (row.status ?? "recorded") === "recorded")
+              .map((row) => `${row.location} ${row.finding}${row.notes ? ` (${row.notes})` : ""}`)
+              .join("; ")}.
+          </Typography>
+        )}
+      </Paper>
 
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.7fr) minmax(280px, 1fr)" }, alignItems: "stretch" }}>
         <Paper sx={card}>

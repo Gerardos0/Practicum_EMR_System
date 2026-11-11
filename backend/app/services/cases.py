@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clinical_sections import locks_or_default, prefill_or_default
+from app.clinical_sections import LUNG_SOUND_FINDINGS, LUNG_SOUND_LOCATIONS, locks_or_default, prefill_or_default
 from app.models.clinical import CaseAnswerKey, Course, Encounter, Patient
 from app.models.user import User
 from app.schemas.clinical import CaseIn
@@ -21,6 +21,8 @@ from app.services.charts import (
     load_patient,
     utcnow,
 )
+
+CODE_STATUS = {"Full code", "DNR", "DNI", "Other"}
 
 
 async def list_cases(db: AsyncSession, course_id: uuid.UUID) -> list[Patient]:
@@ -75,6 +77,14 @@ async def create_case(
         insurance_member_id=(body.insurance_member_id or "").strip() or None,
         insurance_group_number=(body.insurance_group_number or "").strip() or None,
         insurance_notes=(body.insurance_notes or "").strip() or None,
+        emergency_contact_name=(body.emergency_contact_name or "").strip() or None,
+        emergency_contact_phone=(body.emergency_contact_phone or "").strip() or None,
+        emergency_contact_relationship=(body.emergency_contact_relationship or "").strip() or None,
+        code_status=_code_status(body.code_status),
+        advance_directive_notes=(body.advance_directive_notes or "").strip() or None,
+        hipaa_on_file=bool(body.hipaa_on_file),
+        hipaa_signed_at=utcnow() if body.hipaa_on_file else None,
+        hipaa_note=(body.hipaa_note or "").strip() or None,
         lifecycle=body.lifecycle,
         encounter_status=body.encounter_status,
         care_setting=body.care_setting,
@@ -89,7 +99,10 @@ async def create_case(
     )
     db.add(patient)
     await db.flush()
-    await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+    await db.refresh(
+        patient,
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+    )
     await _replace_children(db, patient, _children(body))
     patient.updated_at = utcnow()
     await log_event(
@@ -115,7 +128,10 @@ async def update_case(
 ) -> Patient:
     """Replace this master only. Rows with source_patient_id pointing here are left alone."""
     _validate(body)
-    await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+    await db.refresh(
+        patient,
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+    )
     patient.first_name = body.first_name.strip()
     patient.last_name = body.last_name.strip()
     patient.preferred_name = (body.preferred_name or "").strip() or None
@@ -132,6 +148,17 @@ async def update_case(
     patient.insurance_member_id = (body.insurance_member_id or "").strip() or None
     patient.insurance_group_number = (body.insurance_group_number or "").strip() or None
     patient.insurance_notes = (body.insurance_notes or "").strip() or None
+    patient.emergency_contact_name = (body.emergency_contact_name or "").strip() or None
+    patient.emergency_contact_phone = (body.emergency_contact_phone or "").strip() or None
+    patient.emergency_contact_relationship = (body.emergency_contact_relationship or "").strip() or None
+    patient.code_status = _code_status(body.code_status)
+    patient.advance_directive_notes = (body.advance_directive_notes or "").strip() or None
+    patient.hipaa_note = (body.hipaa_note or "").strip() or None
+    if body.hipaa_on_file and not patient.hipaa_on_file:
+        patient.hipaa_signed_at = utcnow()
+    elif not body.hipaa_on_file:
+        patient.hipaa_signed_at = None
+    patient.hipaa_on_file = bool(body.hipaa_on_file)
     patient.lifecycle = body.lifecycle
     patient.encounter_status = body.encounter_status
     patient.care_setting = body.care_setting
@@ -165,6 +192,11 @@ async def update_case(
     return await _reload(db, patient)
 
 
+def _code_status(value: str | None) -> str | None:
+    cleaned = (value or "").strip()
+    return cleaned or None
+
+
 def _validate(body: CaseIn) -> None:
     if not body.first_name.strip() or not body.last_name.strip():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "First and last name are required.")
@@ -176,9 +208,21 @@ def _validate(body: CaseIn) -> None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown encounter status.")
     if body.care_setting not in CARE_SETTING:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown care setting.")
+    status_value = _code_status(body.code_status)
+    if status_value and status_value not in CODE_STATUS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown code status.")
     for lab in body.labs:
         if lab.name.strip() and lab.collected_at is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Lab {lab.name} needs a collected date.")
+    for row in body.lung_sounds:
+        if not row.location.strip() and not row.finding.strip():
+            continue
+        location = row.location.strip().upper()
+        finding = row.finding.strip().lower()
+        if location not in LUNG_SOUND_LOCATIONS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown lung sound location.")
+        if finding not in LUNG_SOUND_FINDINGS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown lung sound finding.")
 
 
 def _children(body: CaseIn) -> dict:
@@ -203,6 +247,10 @@ def _children(body: CaseIn) -> dict:
                 "adherence": _blank(row.adherence),
                 "access_cost": _blank(row.access_cost),
                 "prescribed": row.prescribed,
+                "is_compound": bool(row.is_compound),
+                "compound_ingredients": _blank(row.compound_ingredients) if row.is_compound else None,
+                "compound_vehicle": _blank(row.compound_vehicle) if row.is_compound else None,
+                "compound_reason": _blank(row.compound_reason) if row.is_compound else None,
                 "status": "active",
             }
             for row in body.medications
@@ -229,6 +277,17 @@ def _children(body: CaseIn) -> dict:
             {"label": row.label.strip(), "value": row.value.strip()}
             for row in body.vitals
             if row.label.strip()
+        ],
+        "lung_sounds": [
+            {
+                "location": row.location.strip().upper(),
+                "finding": row.finding.strip().lower(),
+                "notes": _blank(row.notes),
+                "recorded_by_name": "Chart baseline",
+                "status": "recorded",
+            }
+            for row in body.lung_sounds
+            if row.location.strip() and row.finding.strip()
         ],
     }
 
@@ -372,7 +431,10 @@ async def copy_case(
         await db.commit()
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only copy a case into a course you teach.")
     await ensure_destination_open(db, destination_id)
-    await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+    await db.refresh(
+        patient,
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+    )
     clone = Patient(
         mrn=await _unique_case_mrn(db),
         first_name=patient.first_name,
@@ -456,7 +518,7 @@ async def ensure_destination_open(db: AsyncSession, course_id: uuid.UUID) -> Non
 
 
 async def _copy_children(db: AsyncSession, source: Patient, clone: Patient) -> None:
-    from app.models.clinical import Allergy, LabResult, Medication, Problem, Vital
+    from app.models.clinical import Allergy, LabResult, LungSound, Medication, Problem, Vital
 
     for item in source.allergies:
         db.add(Allergy(
@@ -468,6 +530,10 @@ async def _copy_children(db: AsyncSession, source: Patient, clone: Patient) -> N
             patient_id=clone.id, name=item.name, dose=item.dose, route=item.route, frequency=item.frequency,
             indication=item.indication, adherence=item.adherence, access_cost=item.access_cost,
             status=item.status, prescribed=item.prescribed, discontinued_at=item.discontinued_at,
+            is_compound=bool(item.is_compound),
+            compound_ingredients=item.compound_ingredients,
+            compound_vehicle=item.compound_vehicle,
+            compound_reason=item.compound_reason,
             rxcui=item.rxcui, generic_name=item.generic_name, brand_names=list(item.brand_names or []),
             flags=list(item.flags or []),
         ))
@@ -483,12 +549,19 @@ async def _copy_children(db: AsyncSession, source: Patient, clone: Patient) -> N
             patient_id=clone.id, label=item.label, value=item.value,
             recorded_at=item.recorded_at, recorded_by_name=item.recorded_by_name, status=item.status or "recorded",
         ))
+    for item in source.lung_sounds:
+        db.add(LungSound(
+            patient_id=clone.id, location=item.location, finding=item.finding, notes=item.notes,
+            recorded_at=item.recorded_at, recorded_by_name=item.recorded_by_name, status=item.status or "recorded",
+        ))
 
 
 async def _reload(db: AsyncSession, patient: Patient) -> Patient:
     await db.flush()
     await db.refresh(
         patient,
-        attribute_names=["owner", "created_by", "allergies", "medications", "problems", "labs", "vitals", "encounter"],
+        attribute_names=[
+            "owner", "created_by", "allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter",
+        ],
     )
     return patient
