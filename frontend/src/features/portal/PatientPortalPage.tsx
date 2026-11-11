@@ -246,40 +246,10 @@ export default function PatientPortalPage({ previewMode = false }: { previewMode
   if (!chart.data || !intake.data) return <LinearProgress aria-label="Loading patient portal" />;
   const setTab = (next: TabId) => setParams({ tab: next }, { replace: true });
   const portal = (
-    <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "180px minmax(0, 1fr)" }, alignItems: "start" }}>
-      <Box
-        role="tablist"
-        aria-label="Patient portal sections"
-        sx={{ display: "flex", gap: 0.75, flexDirection: { xs: "row", md: "column" }, flexWrap: { xs: "nowrap", md: "wrap" }, overflowX: { xs: "auto", md: "visible" }, pb: { xs: 0.5, md: 0 } }}
-      >
-        {TABS.map((item) => {
-          const selected = tab === item.id;
-          return (
-            <Box
-              key={item.id}
-              component="button"
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setTab(item.id)}
-              sx={{
-                border: "none", cursor: "pointer", px: 1.75, py: 1, minHeight: 44, flexShrink: 0,
-                borderRadius: "999px", fontWeight: 700, fontSize: 14, fontFamily: "inherit",
-                bgcolor: selected ? utep.navy : "#fff", color: selected ? "#fff" : utep.navy,
-                boxShadow: selected ? "none" : `inset 0 0 0 1px ${utep.line}`,
-                "&:focus-visible": { outline: `3px solid ${utep.orange}`, outlineOffset: 2 },
-              }}
-            >
-              {item.label}
-            </Box>
-          );
-        })}
-      </Box>
-      <Box role="tabpanel" aria-label={TABS.find((item) => item.id === tab)?.label}>
-        {tab === "overview" && <Overview chart={chart.data} intake={intake.data} onComplete={() => setTab("my-information")} />}
-        {tab === "health-record" && <HealthRecord chart={chart.data} intake={intake.data} />}
-        {tab === "my-information" && <PatientIntakeForm intake={intake.data} onSaved={intake.setData} previewMode={previewMode} />}
-      </Box>
+    <Box role="tabpanel" aria-label={TABS.find((item) => item.id === tab)?.label}>
+      {tab === "overview" && <Overview chart={chart.data} intake={intake.data} onComplete={() => setTab("my-information")} />}
+      {tab === "health-record" && <HealthRecord chart={chart.data} intake={intake.data} />}
+      {tab === "my-information" && <PatientIntakeForm intake={intake.data} onSaved={intake.setData} previewMode={previewMode} />}
     </Box>
   );
 

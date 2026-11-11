@@ -13,7 +13,7 @@ import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
 import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import TextFieldsOutlined from "@mui/icons-material/TextFieldsOutlined";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/useSession";
 import { listReviewQueue } from "../api/notes";
 import { useDisplayPrefs } from "../theme/useDisplayPrefs";
@@ -23,7 +23,7 @@ import type { Role } from "../types";
 
 export const SIDENAV_WIDTH = 248;
 
-type NavItem = { to: string; label: string; icon: ReactNode; badge?: number };
+type NavItem = { to: string; label: string; icon: ReactNode; badge?: number; tabId?: string };
 
 const ICON = {
   dashboard: <DashboardOutlined fontSize="small" />,
@@ -75,7 +75,11 @@ function useNav(): NavItem[] {
       { to: "/admin/activity", label: "Activity log", icon: ICON.audit },
     ],
     front_desk: [{ to: "/patients", label: "Patients", icon: ICON.patients }],
-    patient: [{ to: "/portal", label: "My chart", icon: ICON.patients }],
+    patient: [
+      { to: "/portal?tab=overview", label: "Overview", icon: ICON.dashboard, tabId: "overview" },
+      { to: "/portal?tab=health-record", label: "Health record", icon: ICON.patients, tabId: "health-record" },
+      { to: "/portal?tab=my-information", label: "My information", icon: ICON.roster, tabId: "my-information" },
+    ],
   };
   return byRole[activeRole];
 }
@@ -120,16 +124,18 @@ function DisplayPrefsButton() {
 
 function NavContent({ onNavigate, collapsed }: { onNavigate?: () => void; collapsed?: boolean }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signOut } = useSession();
   const items = useNav();
+  const portalTab = new URLSearchParams(location.search).get("tab") ?? "overview";
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column", px: 2, py: 3.5, bgcolor: utep.navy }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, px: 1.25, pb: 3.5 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 1.25, px: collapsed ? 0 : 1.25, pb: 3.5 }}>
         <Box
           aria-hidden
           sx={{
-            width: 38, height: 38, borderRadius: "9px", bgcolor: utep.orange, color: utep.navy,
+            width: 38, height: 38, flexShrink: 0, borderRadius: "9px", bgcolor: utep.orange, color: utep.navy,
             display: "grid", placeItems: "center", fontWeight: 800, fontSize: 15,
           }}
         >
@@ -144,35 +150,58 @@ function NavContent({ onNavigate, collapsed }: { onNavigate?: () => void; collap
       </Box>
 
       <Box component="nav" aria-label="Main" sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-        {items.map((item) => (
-          <Button
-            key={item.to}
-            component={NavLink}
-            to={item.to}
-            end={item.to === "/dashboard" || item.to === "/admin"}
-            startIcon={item.icon}
-            onClick={onNavigate}
-            aria-label={item.label}
-            title={collapsed ? item.label : undefined}
-            sx={{ ...itemSx, px: collapsed ? 1 : 1.75, justifyContent: collapsed ? "center" : "flex-start" }}
-          >
-            {!collapsed && <Box component="span" sx={{ flex: 1, textAlign: "left" }}>{item.label}</Box>}
-            {item.badge ? (
-              <Box
-                component="span"
-                className="nav-badge"
-                aria-label={`${item.badge} awaiting review`}
-                sx={{
-                  minWidth: 22, height: 22, px: 0.5, borderRadius: "999px",
-                  bgcolor: utep.orange, color: utep.navy, fontSize: 12, fontWeight: 800,
-                  display: "grid", placeItems: "center",
-                }}
-              >
-                {item.badge}
-              </Box>
-            ) : null}
-          </Button>
-        ))}
+        {items.map((item) => {
+          const selectedPortalTab = Boolean(
+            item.tabId && location.pathname === "/portal" && portalTab === item.tabId,
+          );
+          const label = (
+            <>
+              {!collapsed && <Box component="span" sx={{ flex: 1, textAlign: "left" }}>{item.label}</Box>}
+              {item.badge ? (
+                <Box
+                  component="span"
+                  className="nav-badge"
+                  aria-label={`${item.badge} awaiting review`}
+                  sx={{
+                    minWidth: 22, height: 22, px: 0.5, borderRadius: "999px",
+                    bgcolor: utep.orange, color: utep.navy, fontSize: 12, fontWeight: 800,
+                    display: "grid", placeItems: "center",
+                  }}
+                >
+                  {item.badge}
+                </Box>
+              ) : null}
+            </>
+          );
+          const props = {
+            key: item.to,
+            startIcon: item.icon,
+            onClick: onNavigate,
+            "aria-label": item.label,
+            title: collapsed ? item.label : undefined,
+            sx: { ...itemSx, px: collapsed ? 1 : 1.75, justifyContent: collapsed ? "center" : "flex-start" },
+          };
+          return item.tabId ? (
+            <Button
+              {...props}
+              component={Link}
+              to={item.to}
+              className={selectedPortalTab ? "active" : ""}
+              aria-current={selectedPortalTab ? "page" : undefined}
+            >
+              {label}
+            </Button>
+          ) : (
+            <Button
+              {...props}
+              component={NavLink}
+              to={item.to}
+              end={item.to === "/dashboard" || item.to === "/admin"}
+            >
+              {label}
+            </Button>
+          );
+        })}
       </Box>
 
       <Box sx={{ flexGrow: 1, minHeight: 24 }} />
