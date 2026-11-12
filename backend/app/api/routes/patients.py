@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
-from app.models.clinical import ClinicalNote, Patient
+from app.models.clinical import ClinicalNote, Course, Patient
 from app.models.user import User
 from app.models.clinical import MedicationAdministration
 from app.schemas.clinical import (
@@ -31,6 +31,7 @@ from app.schemas.clinical import (
     VitalWrite,
 )
 from app.schemas.intake import IntakeData, StaffIntakeOut
+from app.schemas.portal_accounts import PortalInviteOut
 from app.services.chart_edits import (
     add_allergy,
     add_lab,
@@ -49,12 +50,13 @@ from app.services.chart_edits import (
     update_allergy,
     update_medication,
 )
-from app.services.access import can, ensure_course_open, ensure_student_may_enter, may_read_note, memberships_for, require, require_course
+from app.services.access import can, ensure_course_open, ensure_student_may_enter, may_read_note, memberships_for, require, require_course, require_held_role
 from app.services.answer_keys import deny_answer_key, read_answer_key
 from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
 from app.services.charts import apply_status, assign_case, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
 from app.services.intake import get_intake
+from app.services.portal_accounts import chart_is_claimed, create_invite, ensure_chart_eligible
 from app.services.serialize import patient_out
 
 router = APIRouter(prefix="/patients", tags=["patients"])
@@ -62,6 +64,39 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 
 def _ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+@router.post("/{patient_id}/portal-invite", response_model=PortalInviteOut)
+async def create_patient_portal_invite(
+    patient_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request
+):
+    rows = await memberships_for(db, user.id)
+    require_held_role(user, "admin", rows)
+    require("admin", "user:manage_access", "Your role can't create portal access.")
+    patient = await db.scalar(
+        select(Patient).where(Patient.id == patient_id, Patient.deleted_at.is_(None)).with_for_update()
+    )
+    if patient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This patient doesn't exist or was archived.")
+    course = await db.get(Course, patient.course_id)
+    ensure_chart_eligible(patient, course)
+    if await chart_is_claimed(db, patient.id):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This chart already has a portal login. Reset its password instead.",
+        )
+    code, invite = await create_invite(db, patient, user)
+    await log_event(
+        db,
+        action="portal.invite_created",
+        entity_type="patient",
+        actor_user_id=user.id,
+        entity_id=str(patient.id),
+        course_id=patient.course_id,
+        ip_address=_ip(request),
+    )
+    await db.commit()
+    return PortalInviteOut(code=f"{code[:4]}-{code[4:]}", expires_at=invite.expires_at)
 
 
 @router.get("", response_model=list[PatientRowOut], response_model_exclude_none=True)

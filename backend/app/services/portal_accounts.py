@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import re
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import hash_password
-from app.models.clinical import Course, Patient
+from app.models.clinical import Course, Patient, PortalInvite
 from app.models.user import Role, User
 
 PATIENT_LOGIN_DOMAIN = "patients.example.com"
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{3,29}$")
+INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def normalize_login(identifier: str) -> str:
@@ -68,3 +72,56 @@ async def create_patient_user(
     db.add(person)
     await db.flush()
     return person
+
+
+def generate_code() -> str:
+    return "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+
+
+def normalize_code(code: str) -> str:
+    return "".join(code.split()).replace("-", "").upper()
+
+
+def hash_code(code: str) -> str:
+    import hashlib
+    import hmac
+
+    return hmac.new(settings.JWT_SECRET_KEY.encode(), normalize_code(code).encode(), hashlib.sha256).hexdigest()
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def create_invite(db: AsyncSession, patient: Patient, admin: User) -> tuple[str, PortalInvite]:
+    now = utcnow()
+    previous = (await db.scalars(
+        select(PortalInvite).where(
+            PortalInvite.patient_id == patient.id,
+            PortalInvite.used_at.is_(None),
+            PortalInvite.revoked_at.is_(None),
+        ).with_for_update()
+    )).all()
+    for invite in previous:
+        invite.revoked_at = now
+    code = generate_code()
+    invite = PortalInvite(
+        patient_id=patient.id,
+        code_hash=hash_code(code),
+        created_by_user_id=admin.id,
+        expires_at=now + timedelta(days=14),
+    )
+    db.add(invite)
+    await db.flush()
+    return code, invite
+
+
+async def find_valid_invite(db: AsyncSession, code: str) -> PortalInvite | None:
+    query = select(PortalInvite).where(PortalInvite.code_hash == hash_code(code))
+    candidate = await db.scalar(query)
+    if candidate is None:
+        return None
+    patient = await db.scalar(select(Patient).where(Patient.id == candidate.patient_id).with_for_update())
+    if patient is None:
+        return None
+    return await db.scalar(query.with_for_update())
