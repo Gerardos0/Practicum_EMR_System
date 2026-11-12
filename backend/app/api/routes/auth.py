@@ -12,6 +12,7 @@ from app.schemas.auth import ChangePasswordRequest, RefreshRequest, Token
 from app.schemas.clinical import PublicUser
 from app.services.audit import log_event
 from app.services.auth import authenticate_user, get_user_by_email, get_user_by_id, is_usable
+from app.services.portal_accounts import normalize_login
 from app.services.serialize import user_out
 from app.services.sessions import issue_refresh_token, revoke_refresh_token, rotate_refresh_token
 
@@ -40,7 +41,7 @@ async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()],  # "username" field = email
     db: DbSession,
 ):
-    email = form.username.strip()
+    email = normalize_login(form.username)
     now = datetime.now(timezone.utc)
     existing = await get_user_by_email(db, email)
     if existing is not None and existing.locked_until is not None and existing.locked_until > now:

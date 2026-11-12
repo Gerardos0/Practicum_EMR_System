@@ -5,10 +5,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.security import hash_password
-from app.models.clinical import CourseMembership
+from app.models.clinical import Course, CourseMembership, Patient
 from app.models.user import Role, User
 from app.schemas.clinical import PortalAccess, PublicUser, TempPassword
 from app.schemas.users import AccountUpdate, DeleteAccount, UserActiveOut, UserActivePatch
@@ -17,6 +18,7 @@ from app.services.audit import log_event
 from app.services.charts import load_patient, utcnow
 from app.services.retention import RETENTION, anonymize_user, purge_expired
 from app.services.serialize import user_out
+from app.services.portal_accounts import chart_is_claimed, create_patient_user, ensure_chart_eligible
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -221,34 +223,41 @@ async def portal_access(body: PortalAccess, db: DbSession, user: CurrentUser, re
     rows = await memberships_for(db, user.id)
     require_held_role(user, "admin", rows)
     require("admin", "user:manage_access", "Your role can't create portal access.")
-    patient = await load_patient(db, body.patient_id)
+    patient = await db.scalar(
+        select(Patient).where(Patient.id == body.patient_id, Patient.deleted_at.is_(None)).with_for_update()
+    )
+    if patient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "This patient doesn't exist or was archived.")
+    course = await db.get(Course, patient.course_id)
+    ensure_chart_eligible(patient, course)
     email = body.email.strip().lower()
-    person = await db.scalar(select(User).where(User.email == email))
+    person = await db.scalar(
+        select(User).options(selectinload(User.roles)).where(User.email == email)
+    )
+    if await chart_is_claimed(db, patient.id, exclude_user_id=person.id if person else None):
+        raise HTTPException(status.HTTP_409_CONFLICT, "This chart already has a portal login.")
     temporary = None
     if person is None:
-        first, last = _split(body.full_name)
         temporary = secrets.token_urlsafe(9)
-        person = User(
+        person = await create_patient_user(
+            db,
+            patient,
             email=email,
-            first_name=first,
-            last_name=last,
-            hashed_password=hash_password(temporary),
+            password=temporary,
             must_change_password=True,
-            is_active=True,
-            portal_patient_id=patient.id,
         )
-        db.add(person)
-        await db.flush()
     else:
+        role_codes = {role.code for role in person.roles}
+        if (
+            role_codes != {"patient"}
+            or not person.is_active
+            or person.deleted_at is not None
+            or person.archived_at is not None
+            or person.purged_at is not None
+            or person.portal_patient_id not in (None, patient.id)
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, "That email already belongs to another account.")
         person.portal_patient_id = patient.id
-        person.is_active = True
-        person.archived_at = None
-    patient_role = await db.scalar(select(Role).where(Role.code == "patient"))
-    if patient_role is None:
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Roles are not seeded.")
-    await db.refresh(person, attribute_names=["roles"])
-    if patient_role not in person.roles:
-        person.roles.append(patient_role)
     await log_event(
         db,
         action="user.portal_access",
