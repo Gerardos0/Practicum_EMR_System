@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Link, Paper, TextField, Typography } from "@mui/material";
+import { Alert, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Link, Paper, Stack, TextField, Typography } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
 import { grantPortalAccess } from "../../api/users";
+import { createPortalInvite } from "../../api/portalAccounts";
 import { recordPresence, updatePlacement } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/useSession";
@@ -44,6 +45,9 @@ export default function PatientChartPage() {
   const [portalError, setPortalError] = useState("");
   const [portalGranted, setPortalGranted] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [portalInvite, setPortalInvite] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [portalInviteBusy, setPortalInviteBusy] = useState(false);
+  const [portalInviteCopied, setPortalInviteCopied] = useState(false);
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
   const notes = useAsync(() => listNotesForPatient(activeRole, patientId), [patientId, activeRole]);
@@ -113,6 +117,9 @@ export default function PatientChartPage() {
             setPortalError("");
             setPortalGranted(false);
             setTemporaryPassword("");
+            setPortalInvite(null);
+            setPortalInviteCopied(false);
+            setPortalInviteBusy(false);
             setPortalAccessOpen(true);
           }}>
             Grant portal access
@@ -217,6 +224,25 @@ export default function PatientChartPage() {
         <DialogTitle>Grant portal access</DialogTitle>
         <DialogContent>
           {portalError && <Alert severity="error" sx={{ mb: 2 }}>{portalError}</Alert>}
+          {portalInvite && (
+            <Stack spacing={1.5} sx={{ mb: 2 }}>
+              <Alert severity="info">
+                Share this code with the patient. It works once and expires on {new Date(portalInvite.expiresAt).toLocaleDateString()}.
+              </Alert>
+              <Paper variant="outlined" sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography component="code" sx={{ flex: 1, fontFamily: "monospace", fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>
+                  {portalInvite.code}
+                </Typography>
+                <Button size="small" onClick={() => {
+                  navigator.clipboard.writeText(portalInvite.code)
+                    .then(() => setPortalInviteCopied(true))
+                    .catch(() => setPortalError("Copy failed. Select and copy the code manually."));
+                }}>
+                  {portalInviteCopied ? "Copied" : "Copy"}
+                </Button>
+              </Paper>
+            </Stack>
+          )}
           {portalGranted ? (
             temporaryPassword ? (
               <Alert severity="success">
@@ -244,6 +270,23 @@ export default function PatientChartPage() {
           ) : (
             <>
               <Button onClick={() => setPortalAccessOpen(false)} disabled={portalBusy}>Cancel</Button>
+              <Button
+                disabled={portalInviteBusy || p.mode === "case"}
+                onClick={async () => {
+                  setPortalInviteBusy(true);
+                  setPortalError("");
+                  try {
+                    setPortalInvite(await createPortalInvite(p.id));
+                    setPortalInviteCopied(false);
+                  } catch (error) {
+                    setPortalError((error as Error).message);
+                  } finally {
+                    setPortalInviteBusy(false);
+                  }
+                }}
+              >
+                {portalInviteBusy ? "Creating…" : "Create activation code"}
+              </Button>
               <Button
                 variant="contained"
                 disabled={portalBusy || !portalEmail.trim() || !portalFullName.trim()}

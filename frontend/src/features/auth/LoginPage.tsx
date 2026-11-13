@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from "react";
 import {
-  Alert, Box, Button, IconButton, InputAdornment, Paper, Stack, TextField, Typography,
+  Alert, Box, Button, IconButton, InputAdornment, Link, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { login } from "../../api/auth";
 import { takeSignedOutNotice } from "../../api/client";
 import { homePathFor, uniqueRoles } from "../../utils/permissions";
@@ -118,6 +118,9 @@ export default function LoginPage() {
               )}
             </Stack>
           </Box>
+          <Typography variant="body2" sx={{ mt: 2.5 }}>
+            <Link component={RouterLink} to="/portal/login">Patient? Go to the patient portal</Link>
+          </Typography>
         </Paper>
       </Box>
     </Box>
