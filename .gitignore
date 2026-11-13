@@ -33,3 +33,5 @@ npm-debug.log*
 
 # Docker
 *.pid
+patient-logins*.csv
+*credentials*.csv

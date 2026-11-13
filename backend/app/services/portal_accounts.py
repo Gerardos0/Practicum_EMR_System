@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import re
 import secrets
+import string
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
@@ -17,6 +19,7 @@ from app.models.user import Role, User
 PATIENT_LOGIN_DOMAIN = "patients.example.com"
 USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{3,29}$")
 INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
 
 
 def normalize_login(identifier: str) -> str:
@@ -125,3 +128,114 @@ async def find_valid_invite(db: AsyncSession, code: str) -> PortalInvite | None:
     if patient is None:
         return None
     return await db.scalar(query.with_for_update())
+
+
+@dataclass
+class ProvisionRow:
+    username: str
+    temporary_password: str | None
+    patient_name: str
+    mrn: str
+    course_code: str
+    mode: str
+
+
+@dataclass
+class ProvisionResult:
+    eligible: int = 0
+    created: int = 0
+    skipped_claimed: int = 0
+    skipped_case_masters: int = 0
+    skipped_inactive_course: int = 0
+    remaining: int = 0
+    rows: list[ProvisionRow] = field(default_factory=list)
+
+
+def _base_username(mrn: str) -> str:
+    value = re.sub(r"[^a-z0-9._-]", "", mrn.lower())
+    if not value or not value[0].isalnum():
+        value = f"pt-{value}"
+    if len(value) < 4:
+        value = f"pt-{value}"
+    return value[:30]
+
+
+def _available_username(mrn: str, used_emails: set[str]) -> str:
+    base = _base_username(mrn)
+    candidate = base
+    suffix_number = 2
+    while username_to_email(candidate) in used_emails:
+        suffix = f"-{suffix_number}"
+        candidate = f"{base[:30 - len(suffix)]}{suffix}"
+        suffix_number += 1
+    used_emails.add(username_to_email(candidate))
+    return candidate
+
+
+async def provision_patient_logins(
+    db: AsyncSession,
+    *,
+    apply: bool,
+    modes: tuple[str, ...] = ("practice", "assessment"),
+    course_code: str | None = None,
+    limit: int = 500,
+) -> ProvisionResult:
+    result = ProvisionResult()
+    query = select(Patient, Course).join(Course, Course.id == Patient.course_id)
+    if apply:
+        query = query.with_for_update(of=Patient)
+    if course_code:
+        query = query.where(Course.code == course_code.strip())
+    charts = (await db.execute(query.order_by(Course.code, Patient.mrn))).all()
+    linked_ids = set((await db.scalars(
+        select(User.portal_patient_id).where(
+            User.portal_patient_id.is_not(None),
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+            User.archived_at.is_(None),
+            User.purged_at.is_(None),
+        )
+    )).all())
+    used_emails = {email.lower() for email in (await db.scalars(select(User.email))).all()}
+    selected_charts: list[tuple[Patient, Course]] = []
+    for patient, course in charts:
+        if patient.mode == "case":
+            result.skipped_case_masters += 1
+            continue
+        if patient.mode not in modes or patient.deleted_at is not None:
+            continue
+        if course.status != "active":
+            result.skipped_inactive_course += 1
+            continue
+        if patient.id in linked_ids:
+            result.skipped_claimed += 1
+            continue
+        selected_charts.append((patient, course))
+
+    result.eligible = len(selected_charts)
+    selected = selected_charts[:limit]
+    result.remaining = max(0, len(selected_charts) - limit)
+    for patient, course in selected:
+        username = _available_username(patient.mrn, used_emails)
+        temporary = (
+            "".join(secrets.choice(TEMP_PASSWORD_ALPHABET) for _ in range(12))
+            if apply else None
+        )
+        result.rows.append(ProvisionRow(
+            username=username,
+            temporary_password=temporary,
+            patient_name=f"{patient.first_name} {patient.last_name}".strip(),
+            mrn=patient.mrn,
+            course_code=course.code,
+            mode=patient.mode,
+        ))
+        if apply:
+            await create_patient_user(
+                db,
+                patient,
+                email=username_to_email(username),
+                password=temporary or "",
+                must_change_password=True,
+            )
+            result.created += 1
+    return result

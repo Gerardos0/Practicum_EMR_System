@@ -3,7 +3,7 @@ import secrets
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
@@ -13,12 +13,18 @@ from app.models.clinical import Course, CourseMembership, Patient
 from app.models.user import Role, User
 from app.schemas.clinical import PortalAccess, PublicUser, TempPassword
 from app.schemas.users import AccountUpdate, DeleteAccount, UserActiveOut, UserActivePatch
+from app.schemas.portal_accounts import ProvisionRequest, ProvisionResultOut
 from app.services.access import memberships_for, require, require_held_role
 from app.services.audit import log_event
 from app.services.charts import load_patient, utcnow
 from app.services.retention import RETENTION, anonymize_user, purge_expired
 from app.services.serialize import user_out
-from app.services.portal_accounts import chart_is_claimed, create_patient_user, ensure_chart_eligible
+from app.services.portal_accounts import (
+    chart_is_claimed,
+    create_patient_user,
+    ensure_chart_eligible,
+    provision_patient_logins,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -269,7 +275,79 @@ async def portal_access(body: PortalAccess, db: DbSession, user: CurrentUser, re
         detail=str(patient.id),
     )
     await db.commit()
-    return {"id": str(person.id), "email": person.email, "temporary_password": temporary}
+    return {"id": str(person.id), "email": person.email, "temporaryPassword": temporary}
+
+
+@router.post("/portal-logins/provision")
+async def provision_portal_logins(body: ProvisionRequest, db: DbSession, user: CurrentUser):
+    rows = await memberships_for(db, user.id)
+    _require_account_admin(user, rows)
+    result = await provision_patient_logins(
+        db,
+        apply=not body.dry_run,
+        modes=tuple(body.modes),
+        course_code=body.course_code,
+        limit=body.limit,
+    )
+    if body.dry_run:
+        return ProvisionResultOut(
+            eligible=result.eligible,
+            created=result.created,
+            skipped_claimed=result.skipped_claimed,
+            skipped_case_masters=result.skipped_case_masters,
+            skipped_inactive_course=result.skipped_inactive_course,
+            remaining=result.remaining,
+            rows=[
+                {
+                    "username": item.username,
+                    "patientName": item.patient_name,
+                    "mrn": item.mrn,
+                    "courseCode": item.course_code,
+                    "mode": item.mode,
+                }
+                for item in result.rows
+            ],
+        )
+
+    await log_event(
+        db,
+        action="portal.logins_provisioned",
+        entity_type="portal_logins",
+        actor_user_id=user.id,
+        details={
+            "eligible": result.eligible,
+            "created": result.created,
+            "skipped_claimed": result.skipped_claimed,
+            "skipped_case_masters": result.skipped_case_masters,
+            "skipped_inactive_course": result.skipped_inactive_course,
+            "remaining": result.remaining,
+        },
+    )
+    await db.commit()
+    from io import StringIO
+
+    output = StringIO(newline="")
+    import csv
+
+    writer = csv.writer(output)
+    writer.writerow(["username", "temporaryPassword", "patientName", "mrn", "course", "mode"])
+    for item in result.rows:
+        writer.writerow([
+            item.username,
+            item.temporary_password,
+            item.patient_name,
+            item.mrn,
+            item.course_code,
+            item.mode,
+        ])
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'attachment; filename="patient-logins.csv"',
+        },
+    )
 
 
 def _split(full_name: str) -> tuple[str, str]:

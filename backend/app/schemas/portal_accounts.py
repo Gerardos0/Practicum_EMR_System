@@ -44,6 +44,33 @@ class PortalInviteOut(APIModel):
 
 class ProvisionRequest(APIModel):
     dry_run: bool = True
+    modes: list[Literal["practice", "assessment"]] = Field(
+        default_factory=lambda: ["practice", "assessment"], min_length=1
+    )
+    course_code: str | None = None
+    limit: int = Field(default=500, ge=1, le=500)
+
+
+class ProvisionPlannedRowOut(APIModel):
+    username: str
+    patient_name: str
+    mrn: str
+    course_code: str
+    mode: str
+
+
+class ProvisionResultOut(APIModel):
+    eligible: int
+    created: int
+    skipped_claimed: int
+    skipped_case_masters: int
+    skipped_inactive_course: int
+    remaining: int
+    rows: list[ProvisionPlannedRowOut] = Field(default_factory=list)
+
+
+class ProvisionRequest(APIModel):
+    dry_run: bool = True
     modes: list[Literal["practice", "assessment"]] = Field(default_factory=lambda: ["practice", "assessment"], min_length=1)
     course_code: str | None = None
     limit: int = Field(default=500, ge=1, le=500)
