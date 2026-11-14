@@ -221,6 +221,8 @@ async def provision_patient_logins(
             "".join(secrets.choice(TEMP_PASSWORD_ALPHABET) for _ in range(12))
             if apply else None
         )
+        while temporary is not None and temporary.lower() == username:
+            temporary = "".join(secrets.choice(TEMP_PASSWORD_ALPHABET) for _ in range(12))
         result.rows.append(ProvisionRow(
             username=username,
             temporary_password=temporary,

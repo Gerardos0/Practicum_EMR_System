@@ -76,6 +76,8 @@ export default function App() {
                   </Route>
                   <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk"]} />}>
                     <Route path="/patients" element={<PatientListPage />} />
+                </Route>
+                <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk", "admin"]} />}>
                     <Route path="/patients/:patientId" element={<PatientChartPage />} />
                   </Route>
 

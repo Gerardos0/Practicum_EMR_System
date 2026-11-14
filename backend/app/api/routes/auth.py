@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import DbSession, get_current_user_allow_password_change
 from app.core.security import create_access_token, hash_password, verify_password
@@ -149,9 +150,13 @@ async def patient_signup(body: PatientSignupIn, request: Request, db: DbSession)
     if await get_user_by_email(db, email) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "That username is taken. Try another.")
 
-    person = await create_patient_user(
-        db, patient, email=email, password=body.password, must_change_password=False
-    )
+    try:
+        person = await create_patient_user(
+            db, patient, email=email, password=body.password, must_change_password=False
+        )
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "That username is taken. Try another.")
     person.last_login_at = now
     invite.used_at = now
     invite.used_by_user_id = person.id
