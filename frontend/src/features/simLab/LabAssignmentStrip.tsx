@@ -50,19 +50,16 @@ export default function LabAssignmentStrip() {
         <Typography sx={{ color: utep.ink2, fontSize: 13, fontWeight: 600, flex: "1 1 auto" }}>
           Your lab today · {summary}
         </Typography>
-        <Box sx={{ display: { xs: "none", sm: "block" } }}>
-          <LabFloorMap rooms={rooms.data ?? []} highlightNumber={row.room.number} compact />
-        </Box>
         <Button
           size="small"
           onClick={() => setOpen((v) => !v)}
           sx={{ textTransform: "none", color: utep.navy, fontWeight: 600 }}
         >
-          {open ? "Hide map" : "Map"}
+          {open ? "Hide map" : "Show map"}
         </Button>
       </Box>
       <Collapse in={open}>
-        <Box sx={{ pt: 1.25, display: "flex", justifyContent: { xs: "stretch", sm: "flex-start" } }}>
+        <Box sx={{ pt: 1.25 }}>
           <LabFloorMap rooms={rooms.data ?? []} highlightNumber={row.room.number} />
         </Box>
       </Collapse>

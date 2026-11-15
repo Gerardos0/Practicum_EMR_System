@@ -116,16 +116,26 @@ export default function LabCheckinPage() {
   };
 
   return (
-    <Box sx={{ display: "grid", gap: 2.5, maxWidth: 1100 }}>
-      <Typography sx={{ color: utep.ink2, maxWidth: 640 }}>
-        Assign students to Sim Center rooms. Bed, role, and time block are optional.
-        Big labs are for the day; testing and exam rooms can use hour blocks.
+    <Box sx={{ display: "grid", gap: 2.5, maxWidth: 1180 }}>
+      <Typography sx={{ color: utep.ink2, maxWidth: 720 }}>
+        Assign students to Sim Center rooms. Click a room on the map or use the dropdown.
+        Bed, role, and time block are optional. Big labs are for the day; testing and exam rooms can use hour blocks.
       </Typography>
 
       {error && <Alert severity="error">{error}</Alert>}
       {message && <Alert severity="success" onClose={() => setMessage("")}>{message}</Alert>}
 
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1.1fr 0.9fr" } }}>
+      <LabFloorMap
+        rooms={rooms.data ?? []}
+        selectedId={roomId || null}
+        onSelectRoom={(r) => {
+          setRoomId(r.id);
+          setBed("");
+          setTimeBlock("");
+        }}
+      />
+
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
         <Box sx={{ display: "grid", gap: 1.5, p: 2, border: `1px solid ${utep.line}`, borderRadius: 2, bgcolor: utep.paper }}>
           <TextField
             label="Lab date"
@@ -219,51 +229,39 @@ export default function LabCheckinPage() {
           </Button>
         </Box>
 
-        <Box>
-          <LabFloorMap
-            rooms={rooms.data ?? []}
-            selectedId={roomId || null}
-            onSelectRoom={(r) => {
-              setRoomId(r.id);
-              setBed("");
-              setTimeBlock("");
-            }}
-          />
-        </Box>
-      </Box>
-
-      <Box sx={{ border: `1px solid ${utep.line}`, borderRadius: 2, overflow: "hidden", bgcolor: utep.paper }}>
-        <Typography sx={{ px: 2, py: 1.25, fontWeight: 700, borderBottom: `1px solid ${utep.line}` }}>
-          Checked in · {sessionDate}
-        </Typography>
-        {board.loading && !board.data ? (
-          <LinearProgress />
-        ) : (board.data?.length ?? 0) === 0 ? (
-          <Typography sx={{ p: 2, color: utep.ink2 }}>No students checked in for this date yet.</Typography>
-        ) : (
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Student</TableCell>
-                <TableCell>Assignment</TableCell>
-                <TableCell align="right"> </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(board.data ?? []).map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.studentName}</TableCell>
-                  <TableCell>{assignmentSummary(row)}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" disabled={busy} onClick={() => clearRow(row.id)}>
-                      Clear
-                    </Button>
-                  </TableCell>
+        <Box sx={{ border: `1px solid ${utep.line}`, borderRadius: 2, overflow: "hidden", bgcolor: utep.paper }}>
+          <Typography sx={{ px: 2, py: 1.25, fontWeight: 700, borderBottom: `1px solid ${utep.line}` }}>
+            Checked in · {sessionDate}
+          </Typography>
+          {board.loading && !board.data ? (
+            <LinearProgress />
+          ) : (board.data?.length ?? 0) === 0 ? (
+            <Typography sx={{ p: 2, color: utep.ink2 }}>No students checked in for this date yet.</Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Student</TableCell>
+                  <TableCell>Assignment</TableCell>
+                  <TableCell align="right"> </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+              </TableHead>
+              <TableBody>
+                {(board.data ?? []).map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{row.studentName}</TableCell>
+                    <TableCell>{assignmentSummary(row)}</TableCell>
+                    <TableCell align="right">
+                      <Button size="small" disabled={busy} onClick={() => clearRow(row.id)}>
+                        Clear
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Box>
       </Box>
     </Box>
   );
