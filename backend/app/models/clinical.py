@@ -382,3 +382,40 @@ class MedicationOrder(UUIDPrimaryKeyMixin, Base):
     medication: Mapped[Medication] = relationship(lazy="selectin")
     submitted_by: Mapped[User] = relationship(foreign_keys=[submitted_by_id], lazy="selectin")
     reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id], lazy="selectin")
+
+
+class SimLabRoom(UUIDPrimaryKeyMixin, Base):
+    """UTEP Sim Center room catalog for lab check-in (assignable rooms only)."""
+
+    __tablename__ = "sim_lab_rooms"
+
+    number: Mapped[str] = mapped_column(String(20), unique=True)
+    label: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(20))  # ward | big_lab | testing | exam
+    bed_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    timing: Mapped[str] = mapped_column(String(20), default="day", server_default="day")  # day | hour
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    map_x: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    map_y: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    map_w: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
+    map_h: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
+
+
+class SimLabAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Instructor check-in: student → room (bed/role/block optional)."""
+
+    __tablename__ = "sim_lab_assignments"
+
+    course_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    room_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sim_lab_rooms.id", ondelete="RESTRICT"), index=True)
+    session_date: Mapped[date] = mapped_column(Date, index=True)
+    bed: Mapped[str | None] = mapped_column(String(8))
+    role_label: Mapped[str | None] = mapped_column(String(40))
+    time_block: Mapped[str | None] = mapped_column(String(40))
+    assigned_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    room: Mapped[SimLabRoom] = relationship(lazy="selectin")
+    user: Mapped[User] = relationship(foreign_keys=[user_id], lazy="selectin")
+    assigned_by: Mapped[User] = relationship(foreign_keys=[assigned_by_id], lazy="selectin")

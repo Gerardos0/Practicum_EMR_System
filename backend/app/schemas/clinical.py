@@ -740,3 +740,42 @@ class NoteTemplateOut(APIModel):
     sensitive: bool = False
     sensitivity: str = "standard"
     sections: list[TemplateSectionIn]
+
+
+class SimLabRoomOut(APIModel):
+    id: uuid.UUID
+    number: str
+    label: str
+    kind: str
+    bed_count: int
+    timing: str
+    sort_order: int
+    map_x: int
+    map_y: int
+    map_w: int
+    map_h: int
+    soft_capacity: int | None = None
+    bed_options: list[str] = []
+
+
+class SimLabAssignmentWrite(APIModel):
+    user_id: uuid.UUID
+    room_id: uuid.UUID
+    session_date: date
+    bed: str | None = None
+    role_label: str | None = None
+    time_block: str | None = None
+
+
+class SimLabAssignmentOut(APIModel):
+    id: uuid.UUID
+    course_id: uuid.UUID
+    user_id: uuid.UUID
+    student_name: str
+    room: SimLabRoomOut
+    session_date: date
+    bed: str | None = None
+    role_label: str | None = None
+    time_block: str | None = None
+    assigned_by_name: str
+    created_at: datetime

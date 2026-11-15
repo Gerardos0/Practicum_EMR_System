@@ -23,6 +23,7 @@ import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import PatientPortalPage from "./features/portal/PatientPortalPage";
 import TeachingPage from "./features/teaching/TeachingPage";
+import LabCheckinPage from "./features/simLab/LabCheckinPage";
 import AboutPage from "./features/about/AboutPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import { homePathFor } from "./utils/permissions";
@@ -97,6 +98,7 @@ export default function App() {
                     <Route path="/cases" element={<CaseListPage />} />
                     <Route path="/cases/new" element={<CaseEditorPage />} />
                     <Route path="/cases/:caseId" element={<CaseEditorPage />} />
+                    <Route path="/lab-checkin" element={<LabCheckinPage />} />
                   </Route>
 
                   <Route path="*" element={<NotFoundPage />} />

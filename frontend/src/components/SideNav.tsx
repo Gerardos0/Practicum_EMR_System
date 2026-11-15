@@ -10,6 +10,7 @@ import SchoolOutlined from "@mui/icons-material/SchoolOutlined";
 import QueryStatsOutlined from "@mui/icons-material/QueryStatsOutlined";
 import AssessmentOutlined from "@mui/icons-material/AssessmentOutlined";
 import MenuBookOutlined from "@mui/icons-material/MenuBookOutlined";
+import MeetingRoomOutlined from "@mui/icons-material/MeetingRoomOutlined";
 import GroupsOutlined from "@mui/icons-material/GroupsOutlined";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import TextFieldsOutlined from "@mui/icons-material/TextFieldsOutlined";
@@ -34,6 +35,7 @@ const ICON = {
   courses: <SchoolOutlined fontSize="small" />,
   reports: <QueryStatsOutlined fontSize="small" />,
   cases: <MenuBookOutlined fontSize="small" />,
+  lab: <MeetingRoomOutlined fontSize="small" />,
   teaching: <AssessmentOutlined fontSize="small" />,
 };
 
@@ -55,6 +57,7 @@ function useNav(): NavItem[] {
       { to: "/review", label: "Review queue", icon: ICON.review, badge: pending },
       { to: "/patients", label: "Patients", icon: ICON.patients },
       { to: "/cases", label: "Cases", icon: ICON.cases },
+      { to: "/lab-checkin", label: "Lab check-in", icon: ICON.lab },
       { to: "/teaching", label: "Grades and time", icon: ICON.teaching },
       { to: "/audit", label: "Activity log", icon: ICON.audit },
     ],
@@ -63,6 +66,7 @@ function useNav(): NavItem[] {
       { to: "/review", label: "Review queue", icon: ICON.review, badge: pending },
       { to: "/patients", label: "Patients", icon: ICON.patients },
       { to: "/cases", label: "Cases", icon: ICON.cases },
+      { to: "/lab-checkin", label: "Lab check-in", icon: ICON.lab },
       { to: "/admin/roster", label: "Instructors", icon: ICON.roster },
       { to: "/teaching", label: "Grades and time", icon: ICON.teaching },
       { to: "/audit", label: "Activity log", icon: ICON.audit },

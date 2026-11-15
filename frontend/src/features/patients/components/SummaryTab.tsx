@@ -353,7 +353,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           </Table>
         )}
         {canEditSection(activeRole, p, "lung_sounds") && (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }} alignItems="flex-start">
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5, alignItems: "flex-start" }}>
             <TextField
               select size="small" label="Location" value={lung.location}
               onChange={(e) => setLung({ ...lung, location: e.target.value as LungSoundLocation })}

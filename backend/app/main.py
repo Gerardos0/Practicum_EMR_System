@@ -8,7 +8,7 @@ from app.core.headers import SecurityHeadersMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes import audit, auth, cases, courses, notes, patients, portal, reference, reports, scheduling, templates, users
+from app.api.routes import audit, auth, cases, courses, notes, patients, portal, reference, reports, scheduling, sim_lab, templates, users
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal, get_db
 from app.services.audit import log_event
@@ -54,6 +54,7 @@ app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reference.router, prefix=settings.API_V1_PREFIX)
 app.include_router(templates.router, prefix=settings.API_V1_PREFIX)
 app.include_router(portal.router, prefix=settings.API_V1_PREFIX)
+app.include_router(sim_lab.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 async def root():
