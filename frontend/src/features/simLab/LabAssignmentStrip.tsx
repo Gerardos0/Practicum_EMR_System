@@ -6,7 +6,7 @@ import { utep } from "../../theme/tokens";
 
 function studentLine(row: SimLabAssignment) {
   const parts = [`Room ${row.room.number}`];
-  if (row.bed) parts.push(`Bed ${row.bed}`);
+  if (row.bed && row.room.bedCount > 1) parts.push(`Bed ${row.bed}`);
   if (row.timeBlock) parts.push(row.timeBlock);
   return `Your bed · ${parts.join(" · ")}`;
 }
@@ -38,13 +38,19 @@ export default function LabAssignmentStrip() {
       sx={{
         mb: 2,
         border: `1px solid ${utep.line}`,
+        borderLeft: `3px solid ${utep.orange}`,
         borderRadius: 1.5,
         bgcolor: utep.paper,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 40,
         px: { xs: 1.5, md: 2 },
-        py: 1,
+        py: 0.75,
+        textAlign: "center",
       }}
     >
-      <Typography sx={{ color: utep.ink2, fontSize: 13, fontWeight: 600 }}>
+      <Typography sx={{ color: utep.navy, fontSize: 13, fontWeight: 700, lineHeight: 1.4 }}>
         {text}
       </Typography>
     </Box>

@@ -451,11 +451,6 @@ export default function CaseEditorPage() {
             />
           ))}
         </Box>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { sm: "1fr 1fr 1fr" }, mt: 1 }}>
-          <TextField label="Unit" value={draft.unit} onChange={(e) => set({ unit: e.target.value })} />
-          <TextField label="Room" value={draft.room} onChange={(e) => set({ room: e.target.value })} />
-          <TextField label="Bed" value={draft.bed} onChange={(e) => set({ bed: e.target.value })} />
-        </Box>
       </Paper>
 
       <Paper sx={{ p: { xs: 2, md: 2.5 }, overflowX: "auto" }}>

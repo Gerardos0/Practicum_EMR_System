@@ -141,7 +141,7 @@ async def import_cases(db: AsyncSession, *, payload: bytes, actor: User, course_
         )
         db.add(patient)
         await db.flush()
-        await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"])
+        await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"])
         await _replace_children(db, patient, _children(values, index))
         created += 1
     await log_event(

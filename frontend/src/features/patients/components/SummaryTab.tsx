@@ -182,13 +182,6 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 
-      {(p.unit || p.room || p.bed) && (
-        <Paper sx={card}>
-          <Typography component="h2" variant="h6" sx={titleSx}>Location</Typography>
-          <Typography variant="body2">{[p.unit, p.room && `Room ${p.room}`, p.bed && `Bed ${p.bed}`].filter(Boolean).join(", ")}</Typography>
-        </Paper>
-      )}
-
       {(p.insurance?.payer || p.insurance?.memberId || p.insurance?.groupNumber || p.insurance?.notes) && (
       <Paper sx={card}>
         <Typography component="h2" variant="h6" sx={titleSx}>Insurance</Typography>

@@ -3,7 +3,7 @@ import { Alert, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, 
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
 import { grantPortalAccess } from "../../api/users";
-import { recordPresence, updatePlacement } from "../../api/chart";
+import { recordPresence } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
@@ -37,7 +37,6 @@ export default function PatientChartPage() {
   const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "summary") as TabId;
   const { user, activeRole } = useSession();
   const [statusOpen, setStatusOpen] = useState(false);
-  const [placement, setPlacement] = useState({ unit: "", room: "", bed: "" });
   const [portalAccessOpen, setPortalAccessOpen] = useState(false);
   const [portalEmail, setPortalEmail] = useState("");
   const [portalFullName, setPortalFullName] = useState("");
@@ -110,19 +109,9 @@ export default function PatientChartPage() {
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
 
-      {(can(activeRole, "user:manage_access") || can(activeRole, "patient:update_status")) && (
-        <Box sx={{ px: 0, py: 1.5, my: 1.5, display: "flex", gap: 1.25, flexWrap: "wrap", alignItems: "center", borderBottom: `1px solid ${utep.lineSoft}` }}>
-          {can(activeRole, "patient:update_status") && (
-            <>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: utep.navy }}>Placement</Typography>
-              <TextField size="small" label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} sx={{ width: 120 }} />
-              <TextField size="small" label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} sx={{ width: 110 }} />
-              <TextField size="small" label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} sx={{ width: 100 }} />
-              <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save</Button>
-            </>
-          )}
-          {can(activeRole, "user:manage_access") && (
-            <Button size="small" sx={{ ml: { sm: "auto" } }} onClick={() => {
+      {can(activeRole, "user:manage_access") && (
+        <Box sx={{ px: 0, py: 1.5, my: 1.5, display: "flex", justifyContent: "flex-end", alignItems: "center", borderBottom: `1px solid ${utep.lineSoft}` }}>
+          <Button size="small" onClick={() => {
               setPortalEmail("");
               setPortalFullName(`${p.firstName} ${p.lastName}`);
               setPortalError("");
@@ -132,7 +121,6 @@ export default function PatientChartPage() {
             }}>
               Portal access
             </Button>
-          )}
         </Box>
       )}
 

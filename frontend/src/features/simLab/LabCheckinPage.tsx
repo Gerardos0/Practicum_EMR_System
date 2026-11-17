@@ -23,6 +23,23 @@ function todayISO() {
 const ROLE_OPTIONS = ["", "Patient", "Nurse", "Provider"];
 const BLOCK_OPTIONS = ["", "8:00–9:00", "9:00–10:00", "10:00–11:00", "11:00–12:00", "13:00–14:00", "14:00–15:00"];
 
+function formatDay(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  if (!year || !month || !day) return iso;
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
+
+function Swatch({ color, label }: { color: string; label: string }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+      <Box sx={{ width: 14, height: 10, borderRadius: "2px", bgcolor: color, border: `1px solid ${color}` }} />
+      <Typography sx={{ color: utep.ink2, fontSize: 12, lineHeight: 1 }}>{label}</Typography>
+    </Box>
+  );
+}
+
 export default function LabCheckinPage() {
   usePageHeading("Lab check-in");
   const { activeRole, courseId } = useSession();
@@ -76,6 +93,10 @@ export default function LabCheckinPage() {
     setMessage("");
     if (!userId || !rid) {
       setError("Pick a student and a bed.");
+      return;
+    }
+    if (room && room.bedCount > 1 && !chosenBed) {
+      setError("Pick a bed.");
       return;
     }
     setBusy(true);
@@ -134,30 +155,34 @@ export default function LabCheckinPage() {
   };
 
   return (
-    <Box sx={{ display: "grid", gap: 2.5, maxWidth: 1180 }}>
-      <Typography sx={{ color: utep.ink2, maxWidth: 720 }}>
-        Pick a student, then click an open bed. A reserved bed stays locked so it cannot be assigned again.
-        Testing and exam rooms can use a time block; a different block can reuse that bed.
+    <Box sx={{ display: "grid", gap: 2, maxWidth: 1100, mx: "auto" }}>
+      <Typography sx={{ color: utep.ink2, textAlign: "center", maxWidth: 640, mx: "auto", lineHeight: 1.5 }}>
+        Pick a student, then click an open bed. A reserved bed stays locked.
+        Testing and exam rooms can reuse a bed at a different time.
       </Typography>
 
-      <Box>
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
         <LabFloorMap
           rooms={rooms.data}
           assignments={board.data ?? []}
           timeBlock={timeBlock}
           onPick={pickBed}
         />
-        <Typography sx={{ mt: 0.75, color: utep.ink2, fontSize: 12 }}>
-          Orange beds are open. Navy beds are reserved.
-          {selectedRoom?.timing === "hour" ? " Choose a time block to see which hour is free." : ""}
-        </Typography>
+        <Box sx={{ display: "flex", gap: 2.5, justifyContent: "center", alignItems: "center", mt: 1.25 }}>
+          <Swatch color={utep.orange} label="Open" />
+          <Swatch color={utep.navy} label="Reserved" />
+        </Box>
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
       {message && <Alert severity="success" onClose={() => setMessage("")}>{message}</Alert>}
 
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
-        <Box sx={{ display: "grid", gap: 1.5, p: 2, border: `1px solid ${utep.line}`, borderRadius: 2, bgcolor: utep.paper }}>
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, alignItems: "start" }}>
+        <Box sx={{ display: "flex", flexDirection: "column", border: `1px solid ${utep.line}`, borderRadius: 2, overflow: "hidden", bgcolor: utep.paper }}>
+          <Typography sx={{ px: 2, py: 1.25, fontWeight: 700, lineHeight: 1.4, borderBottom: `1px solid ${utep.line}` }}>
+            Assign
+          </Typography>
+          <Box sx={{ display: "grid", gap: 1.5, p: 2 }}>
           <TextField
             label="Lab date"
             type="date"
@@ -203,14 +228,13 @@ export default function LabCheckinPage() {
           </FormControl>
           {selectedRoom && selectedRoom.bedCount > 1 && (
             <FormControl size="small" fullWidth>
-              <InputLabel id="bed-label">Bed (optional)</InputLabel>
+              <InputLabel id="bed-label">Bed</InputLabel>
               <Select
                 labelId="bed-label"
-                label="Bed (optional)"
+                label="Bed"
                 value={bed}
                 onChange={(e) => setBed(e.target.value)}
               >
-                <MenuItem value="">None</MenuItem>
                 {selectedRoom.bedOptions.map((b) => (
                   <MenuItem key={b} value={b}>Bed {b}</MenuItem>
                 ))}
@@ -245,34 +269,35 @@ export default function LabCheckinPage() {
               </Select>
             </FormControl>
           )}
-          <Button variant="contained" disabled={busy} onClick={() => save()} sx={{ justifySelf: "start" }}>
+          <Button variant="contained" disabled={busy} onClick={() => save()}>
             Check in
           </Button>
+          </Box>
         </Box>
 
-        <Box sx={{ border: `1px solid ${utep.line}`, borderRadius: 2, overflow: "hidden", bgcolor: utep.paper }}>
-          <Typography sx={{ px: 2, py: 1.25, fontWeight: 700, borderBottom: `1px solid ${utep.line}` }}>
-            Checked in · {sessionDate}
+        <Box sx={{ border: `1px solid ${utep.line}`, borderRadius: 2, overflow: "hidden", bgcolor: utep.paper, display: "flex", flexDirection: "column" }}>
+          <Typography sx={{ px: 2, py: 1.25, fontWeight: 700, lineHeight: 1.4, borderBottom: `1px solid ${utep.line}` }}>
+            Checked in · {formatDay(sessionDate)}
           </Typography>
           {board.loading && !board.data ? (
             <LinearProgress />
           ) : (board.data?.length ?? 0) === 0 ? (
-            <Typography sx={{ p: 2, color: utep.ink2 }}>No students checked in for this date yet.</Typography>
+            <Typography sx={{ p: 2, color: utep.ink2, textAlign: "center" }}>No students checked in for this date.</Typography>
           ) : (
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Student</TableCell>
-                  <TableCell>Assignment</TableCell>
-                  <TableCell align="right"> </TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Student</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Assignment</TableCell>
+                  <TableCell align="right" sx={{ width: 88 }} />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {(board.data ?? []).map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>{row.studentName}</TableCell>
-                    <TableCell>{assignmentSummary(row)}</TableCell>
-                    <TableCell align="right">
+                    <TableCell sx={{ verticalAlign: "middle" }}>{row.studentName}</TableCell>
+                    <TableCell sx={{ verticalAlign: "middle" }}>{assignmentSummary(row)}</TableCell>
+                    <TableCell align="right" sx={{ verticalAlign: "middle" }}>
                       <Button size="small" disabled={busy} onClick={() => clearRow(row.id)}>
                         Clear
                       </Button>

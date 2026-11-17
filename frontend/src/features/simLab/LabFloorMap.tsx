@@ -24,14 +24,8 @@ function isReserved(spot: LabBedSpot, room: SimLabRoom | undefined, rows: SimLab
   return people.some((row) => !row.timeBlock || row.timeBlock === timeBlock);
 }
 
-function labelFor(spot: LabBedSpot, room: SimLabRoom | undefined, rows: SimLabAssignment[], timeBlock: string) {
-  const people = rows.filter((row) => holdsBed(row, spot, room?.bedCount ?? 1));
-  const shown = !room || room.timing === "day" || !timeBlock
-    ? people
-    : people.filter((row) => !row.timeBlock || row.timeBlock === timeBlock);
-  if (shown.length === 0) return spot.bed;
-  const name = shown[0].studentName;
-  return name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+function placeName(spot: LabBedSpot, room: SimLabRoom) {
+  return room.bedCount <= 1 ? `Room ${spot.room}` : `Room ${spot.room}, bed ${spot.bed}`;
 }
 
 export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: Props) {
@@ -60,9 +54,11 @@ export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: P
         if (!room) return null;
         const reserved = isReserved(spot, room, assignments, timeBlock);
         const people = assignments.filter((row) => holdsBed(row, spot, room.bedCount));
+        const place = placeName(spot, room);
         const title = reserved
-          ? `Room ${spot.room} bed ${spot.bed} reserved for ${people.map((row) => row.studentName).join(", ")}`
-          : `Room ${spot.room} bed ${spot.bed}`;
+          ? `${place}, reserved for ${people.map((row) => row.studentName).join(", ")}`
+          : place;
+        const showLetter = !reserved && room.bedCount > 1;
         return (
           <Box
             key={`${spot.room}-${spot.bed}`}
@@ -78,21 +74,26 @@ export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: P
               top: `${(spot.y / PLAN_H) * 100}%`,
               width: `${(spot.w / PLAN_W) * 100}%`,
               height: `${(spot.h / PLAN_H) * 100}%`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               p: 0,
               m: 0,
-              borderRadius: "2px",
-              border: reserved ? `2px solid ${utep.navy}` : `1.5px solid ${utep.orange}`,
-              bgcolor: reserved ? "rgba(14, 34, 80, 0.82)" : "rgba(238, 139, 60, 0.28)",
-              color: reserved ? "#fff" : utep.navy,
-              fontSize: 10,
+              borderRadius: "1px",
+              border: reserved ? `1.5px solid ${utep.navy}` : `1.5px solid ${utep.orange}`,
+              bgcolor: reserved ? "rgba(14, 34, 80, 0.78)" : "rgba(238, 139, 60, 0.22)",
+              color: utep.navy,
+              fontSize: 9,
               fontWeight: 700,
               lineHeight: 1,
+              textAlign: "center",
+              overflow: "hidden",
               cursor: reserved ? "not-allowed" : "pointer",
               "&:hover": reserved ? undefined : { bgcolor: "rgba(238, 139, 60, 0.72)" },
               "&:disabled": { opacity: 1 },
             }}
           >
-            {labelFor(spot, room, assignments, timeBlock)}
+            {showLetter ? spot.bed : ""}
           </Box>
         );
       })}

@@ -592,7 +592,7 @@ async def _demo_case_work(db, maya, andre, ana, clarissa, luis, gerardo, pharmac
     for master in (maya, andre):
         await db.refresh(
             master,
-            attribute_names=["allergies", "medications", "problems", "labs", "vitals", "encounter"],
+            attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
         )
 
     maya_ana = await _ensure_chart(db, "TR-CASE-MAYA-AR", lambda: _clone_case(db, maya, "TR-CASE-MAYA-AR", ana))

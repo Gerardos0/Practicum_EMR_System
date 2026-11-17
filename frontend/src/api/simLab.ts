@@ -82,7 +82,7 @@ export function clearSimLabAssignment(
 
 export function assignmentSummary(row: SimLabAssignment): string {
   const parts = [`Room ${row.room.number}`];
-  if (row.bed) parts.push(`Bed ${row.bed}`);
+  if (row.bed && row.room.bedCount > 1) parts.push(`Bed ${row.bed}`);
   if (row.roleLabel) parts.push(row.roleLabel);
   if (row.timeBlock) parts.push(row.timeBlock);
   return parts.join(" · ");
