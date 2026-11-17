@@ -12,8 +12,18 @@ from sqlalchemy.orm import selectinload
 
 from app.models.clinical import CourseMembership, SimLabAssignment, SimLabRoom
 from app.models.user import User
+from app.services.access import full_name
 
 BED_LETTERS = "ABCDEFGHIJ"
+
+
+def _same_bed_hold(timing: str, new_block: str | None, other_block: str | None) -> bool:
+    """Day rooms hold a bed all session. Hour rooms conflict on the same block, or when either side has no block."""
+    if timing == "day":
+        return True
+    if not new_block or not other_block:
+        return True
+    return new_block == other_block
 
 
 def bed_options(bed_count: int) -> list[str]:
@@ -104,6 +114,20 @@ async def assign_student(
     block_clean = (time_block or "").strip() or None
     if room.timing == "day":
         block_clean = None
+
+    if bed_clean:
+        others = await active_assignments(db, course_id=course_id, session_date=session_date)
+        for other in others:
+            if other.user_id == user_id or other.room_id != room.id:
+                continue
+            if (other.bed or "").upper() != bed_clean:
+                continue
+            if _same_bed_hold(room.timing, block_clean, other.time_block):
+                who = full_name(other.user) if other.user else "another student"
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    f"Bed {bed_clean} in room {room.number} is already reserved for {who}.",
+                )
 
     existing = await db.scalar(
         select(SimLabAssignment)

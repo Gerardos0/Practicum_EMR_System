@@ -1,20 +1,24 @@
-import { useState } from "react";
-import { Box, Button, Collapse, Typography } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
-import { assignmentSummary, listSimLabRooms, mySimLabAssignments } from "../../api/simLab";
+import { mySimLabAssignments, type SimLabAssignment } from "../../api/simLab";
 import { utep } from "../../theme/tokens";
-import LabFloorMap from "./LabFloorMap";
+
+function studentLine(row: SimLabAssignment) {
+  const parts = [`Room ${row.room.number}`];
+  if (row.bed) parts.push(`Bed ${row.bed}`);
+  if (row.timeBlock) parts.push(row.timeBlock);
+  return `Your bed · ${parts.join(" · ")}`;
+}
 
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Quiet strip: assignment + optional map. Hidden when nothing is assigned. */
+/** Quiet strip when a student has a lab room for today. Hidden otherwise. */
 export default function LabAssignmentStrip() {
   const { activeRole, courseId } = useSession();
-  const [open, setOpen] = useState(false);
   const day = todayISO();
 
   const mine = useAsync(
@@ -23,17 +27,11 @@ export default function LabAssignmentStrip() {
       : Promise.resolve([])),
     [activeRole, courseId, day],
   );
-  const rooms = useAsync(
-    () => (activeRole === "student" && courseId && (mine.data?.length ?? 0) > 0
-      ? listSimLabRooms(courseId, activeRole)
-      : Promise.resolve([])),
-    [activeRole, courseId, mine.data],
-  );
 
   const row = mine.data?.[0];
   if (activeRole !== "student" || !courseId || !row) return null;
 
-  const summary = assignmentSummary(row);
+  const text = studentLine(row);
 
   return (
     <Box
@@ -46,23 +44,9 @@ export default function LabAssignmentStrip() {
         py: 1,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
-        <Typography sx={{ color: utep.ink2, fontSize: 13, fontWeight: 600, flex: "1 1 auto" }}>
-          Your lab today · {summary}
-        </Typography>
-        <Button
-          size="small"
-          onClick={() => setOpen((v) => !v)}
-          sx={{ textTransform: "none", color: utep.navy, fontWeight: 600 }}
-        >
-          {open ? "Hide map" : "Show map"}
-        </Button>
-      </Box>
-      <Collapse in={open}>
-        <Box sx={{ pt: 1.25 }}>
-          <LabFloorMap rooms={rooms.data ?? []} highlightNumber={row.room.number} />
-        </Box>
-      </Collapse>
+      <Typography sx={{ color: utep.ink2, fontSize: 13, fontWeight: 600 }}>
+        {text}
+      </Typography>
     </Box>
   );
 }

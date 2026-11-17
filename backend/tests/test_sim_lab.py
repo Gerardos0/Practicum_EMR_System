@@ -93,3 +93,86 @@ async def test_instructor_assigns_student_sees_mine_and_clear(client):
     )
     assert empty.status_code == 200
     assert empty.json() == []
+
+
+@pytest.mark.asyncio
+async def test_reserved_bed_cannot_be_assigned_twice(client):
+    instructor, _ = await login(client, "gerardo.sillas@utep.edu")
+    _, daniel = await login(client, "daniel.reyes@miners.utep.edu")
+    _, peter = await login(client, "peter.parker@miners.utep.edu")
+    course = await course_id(client, instructor, "PHAR 5320")
+    today = date.today().isoformat()
+    rooms = await client.get(
+        f"/api/v1/courses/{course}/sim-lab/rooms",
+        headers=instructor,
+        params={"role": "instructor"},
+    )
+    room_109 = next(r for r in rooms.json() if r["number"] == "109")
+    room_106 = next(r for r in rooms.json() if r["number"] == "106")
+
+    first = await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments",
+        headers=instructor,
+        params={"role": "instructor"},
+        json={"userId": daniel["user"]["id"], "roomId": room_109["id"], "sessionDate": today, "bed": "C"},
+    )
+    assert first.status_code == 200, first.text
+
+    taken = await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments",
+        headers=instructor,
+        params={"role": "instructor"},
+        json={"userId": peter["user"]["id"], "roomId": room_109["id"], "sessionDate": today, "bed": "C"},
+    )
+    assert taken.status_code == 409, taken.text
+
+    other_hour = await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments",
+        headers=instructor,
+        params={"role": "instructor"},
+        json={
+            "userId": daniel["user"]["id"],
+            "roomId": room_106["id"],
+            "sessionDate": today,
+            "bed": "A",
+            "timeBlock": "9:00–10:00",
+        },
+    )
+    assert other_hour.status_code == 200, other_hour.text
+    same_hour = await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments",
+        headers=instructor,
+        params={"role": "instructor"},
+        json={
+            "userId": peter["user"]["id"],
+            "roomId": room_106["id"],
+            "sessionDate": today,
+            "bed": "A",
+            "timeBlock": "9:00–10:00",
+        },
+    )
+    assert same_hour.status_code == 409, same_hour.text
+    later = await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments",
+        headers=instructor,
+        params={"role": "instructor"},
+        json={
+            "userId": peter["user"]["id"],
+            "roomId": room_106["id"],
+            "sessionDate": today,
+            "bed": "A",
+            "timeBlock": "10:00–11:00",
+        },
+    )
+    assert later.status_code == 200, later.text
+
+    await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments/{other_hour.json()['id']}/clear",
+        headers=instructor,
+        params={"role": "instructor"},
+    )
+    await client.post(
+        f"/api/v1/courses/{course}/sim-lab/assignments/{later.json()['id']}/clear",
+        headers=instructor,
+        params={"role": "instructor"},
+    )

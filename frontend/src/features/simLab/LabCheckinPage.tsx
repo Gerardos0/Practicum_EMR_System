@@ -68,23 +68,28 @@ export default function LabCheckinPage() {
   if (rooms.error) return <PageError error={rooms.error} />;
   if (!rooms.data) return <LinearProgress aria-label="Loading rooms" />;
 
-  async function save() {
+  async function save(next?: { roomId: string; bed: string }) {
+    const rid = next?.roomId ?? roomId;
+    const chosenBed = next?.bed ?? bed;
+    const room = rooms.data?.find((item) => item.id === rid);
     setError("");
     setMessage("");
-    if (!userId || !roomId) {
-      setError("Pick a student and a room.");
+    if (!userId || !rid) {
+      setError("Pick a student and a bed.");
       return;
     }
     setBusy(true);
     try {
       const row = await assignSimLab(courseId, activeRole, {
         userId,
-        roomId,
+        roomId: rid,
         sessionDate,
-        bed: bed || undefined,
+        bed: chosenBed || undefined,
         roleLabel: roleLabel || undefined,
-        timeBlock: selectedRoom?.timing === "hour" ? (timeBlock || undefined) : undefined,
+        timeBlock: room?.timing === "hour" ? (timeBlock || undefined) : undefined,
       });
+      setRoomId(rid);
+      setBed(chosenBed);
       setMessage(`Checked in ${row.studentName} — ${assignmentSummary(row)}`);
       setTick((n) => n + 1);
     } catch (err) {
@@ -92,6 +97,19 @@ export default function LabCheckinPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function pickBed(nextRoomId: string, nextBed: string) {
+    setRoomId(nextRoomId);
+    setBed(nextBed);
+    const room = rooms.data?.find((item) => item.id === nextRoomId);
+    if (room?.timing !== "hour") setTimeBlock("");
+    if (!userId) {
+      setError("Pick a student to reserve this bed.");
+      setMessage("");
+      return;
+    }
+    void save({ roomId: nextRoomId, bed: nextBed });
   }
 
   async function clearRow(id: string) {
@@ -118,22 +136,25 @@ export default function LabCheckinPage() {
   return (
     <Box sx={{ display: "grid", gap: 2.5, maxWidth: 1180 }}>
       <Typography sx={{ color: utep.ink2, maxWidth: 720 }}>
-        Assign students to Sim Center rooms. Click a room on the map or use the dropdown.
-        Bed, role, and time block are optional. Big labs are for the day; testing and exam rooms can use hour blocks.
+        Pick a student, then click an open bed. A reserved bed stays locked so it cannot be assigned again.
+        Testing and exam rooms can use a time block; a different block can reuse that bed.
       </Typography>
+
+      <Box>
+        <LabFloorMap
+          rooms={rooms.data}
+          assignments={board.data ?? []}
+          timeBlock={timeBlock}
+          onPick={pickBed}
+        />
+        <Typography sx={{ mt: 0.75, color: utep.ink2, fontSize: 12 }}>
+          Orange beds are open. Navy beds are reserved.
+          {selectedRoom?.timing === "hour" ? " Choose a time block to see which hour is free." : ""}
+        </Typography>
+      </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
       {message && <Alert severity="success" onClose={() => setMessage("")}>{message}</Alert>}
-
-      <LabFloorMap
-        rooms={rooms.data ?? []}
-        selectedId={roomId || null}
-        onSelectRoom={(r) => {
-          setRoomId(r.id);
-          setBed("");
-          setTimeBlock("");
-        }}
-      />
 
       <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
         <Box sx={{ display: "grid", gap: 1.5, p: 2, border: `1px solid ${utep.line}`, borderRadius: 2, bgcolor: utep.paper }}>
@@ -224,7 +245,7 @@ export default function LabCheckinPage() {
               </Select>
             </FormControl>
           )}
-          <Button variant="contained" disabled={busy} onClick={save} sx={{ justifySelf: "start" }}>
+          <Button variant="contained" disabled={busy} onClick={() => save()} sx={{ justifySelf: "start" }}>
             Check in
           </Button>
         </Box>
