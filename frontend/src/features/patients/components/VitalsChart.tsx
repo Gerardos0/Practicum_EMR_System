@@ -100,8 +100,8 @@ function scaleFor(series: Series, values: number[]) {
   const lo = Math.min(...values);
   const hi = Math.max(...values);
   const label = series.label;
-  let min = lo;
-  let max = hi;
+  let min: number;
+  let max: number;
   if (series.id === "hr") { min = Math.min(50, lo); max = Math.max(120, hi); }
   else if (series.id === "sys") { min = Math.min(80, lo); max = Math.max(180, hi); }
   else if (series.id === "dia") { min = Math.min(40, lo); max = Math.max(110, hi); }
