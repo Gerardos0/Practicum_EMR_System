@@ -32,6 +32,44 @@ async def get_intake(db: AsyncSession, patient_id: uuid.UUID) -> PatientIntake |
     return await db.scalar(select(PatientIntake).where(PatientIntake.patient_id == patient_id))
 
 
+async def get_prechart_intake(db: AsyncSession, user_id: uuid.UUID) -> PatientIntake | None:
+    return await db.scalar(select(PatientIntake).where(PatientIntake.user_id == user_id))
+
+
+async def upsert_prechart_intake(db: AsyncSession, data: IntakeData, user: User) -> list[str]:
+    row = await get_prechart_intake(db, user.id)
+    previous = IntakeData.model_validate(row.data) if row is not None else IntakeData(email=user.email)
+    changed = [
+        name for name in IntakeData.model_fields
+        if getattr(previous, name) != getattr(data, name)
+    ]
+    new_data = data.model_dump(mode="json", by_alias=False)
+    if row is None:
+        row = PatientIntake(user_id=user.id, data=new_data, updated_by_user_id=user.id)
+        db.add(row)
+    else:
+        row.data = new_data
+        row.updated_by_user_id = user.id
+    await db.flush()
+    return changed
+
+
+async def attach_prechart_intake(db: AsyncSession, user: User, patient: Patient) -> None:
+    prechart = await get_prechart_intake(db, user.id)
+    if prechart is None:
+        return
+    chart_intake = await get_intake(db, patient.id)
+    if chart_intake is None:
+        prechart.user_id = None
+        prechart.patient_id = patient.id
+        prechart.updated_by_user_id = user.id
+    else:
+        chart_intake.data = prechart.data
+        chart_intake.updated_by_user_id = user.id
+        await db.delete(prechart)
+    await db.flush()
+
+
 async def upsert_intake(
     db: AsyncSession, patient: Patient, data: IntakeData, user: User
 ) -> list[str]:

@@ -59,6 +59,7 @@ async def create_case(
         first_name=body.first_name.strip(),
         last_name=body.last_name.strip(),
         preferred_name=(body.preferred_name or "").strip() or None,
+        portal_email=(body.portal_email or "").strip().lower() or None,
         dob=body.dob,
         sex_at_birth=body.sex_at_birth.strip(),
         pronouns=(body.pronouns or "").strip() or None,
@@ -135,6 +136,7 @@ async def update_case(
     patient.first_name = body.first_name.strip()
     patient.last_name = body.last_name.strip()
     patient.preferred_name = (body.preferred_name or "").strip() or None
+    patient.portal_email = (body.portal_email or "").strip().lower() or None
     patient.dob = body.dob
     patient.sex_at_birth = body.sex_at_birth.strip()
     patient.pronouns = (body.pronouns or "").strip() or None
@@ -440,6 +442,7 @@ async def copy_case(
         first_name=patient.first_name,
         last_name=patient.last_name,
         preferred_name=patient.preferred_name,
+        portal_email=patient.portal_email,
         dob=patient.dob,
         sex_at_birth=patient.sex_at_birth,
         pronouns=patient.pronouns,

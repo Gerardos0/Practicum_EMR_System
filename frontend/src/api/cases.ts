@@ -7,6 +7,7 @@ export interface CaseInput {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  portalEmail?: string;
   dob: string;
   sexAtBirth: "Male" | "Female";
   pronouns?: string;

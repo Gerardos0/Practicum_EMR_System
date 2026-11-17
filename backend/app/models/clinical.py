@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,6 +52,7 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     mrn: Mapped[str] = mapped_column(String(40), unique=True)
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
+    portal_email: Mapped[str | None] = mapped_column(String(120))
     preferred_name: Mapped[str | None] = mapped_column(String(100))
     dob: Mapped[date] = mapped_column(Date)
     sex_at_birth: Mapped[str] = mapped_column(String(20))
@@ -114,9 +115,18 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
 
 class PatientIntake(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "patient_intakes"
+    __table_args__ = (
+        CheckConstraint(
+            "(patient_id IS NOT NULL AND user_id IS NULL) OR (patient_id IS NULL AND user_id IS NOT NULL)",
+            name="ck_patient_intakes_owner",
+        ),
+    )
 
-    patient_id: Mapped[uuid.UUID] = mapped_column(
+    patient_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("patients.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
     )
     data: Mapped[dict[str, Any]] = mapped_column(
         JSONB, default=dict, server_default=text("'{}'::jsonb"), nullable=False
@@ -124,6 +134,25 @@ class PatientIntake(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+
+
+class PortalInvite(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "portal_invites"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"), index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    used_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Allergy(UUIDPrimaryKeyMixin, Base):

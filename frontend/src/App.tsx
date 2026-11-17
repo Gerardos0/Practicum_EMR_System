@@ -22,6 +22,7 @@ import AdminPeoplePage from "./features/admin/AdminPeoplePage";
 import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import PatientPortalPage from "./features/portal/PatientPortalPage";
+import PatientSignupPage from "./features/portal/PatientSignupPage";
 import TeachingPage from "./features/teaching/TeachingPage";
 import LabCheckinPage from "./features/simLab/LabCheckinPage";
 import AboutPage from "./features/about/AboutPage";
@@ -46,6 +47,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LoginRoute />} />
             <Route path="/portal/preview" element={<PatientPortalPage previewMode />} />
+            <Route path="/portal/login" element={<Navigate to="/" replace />} />
+            <Route path="/portal/signup" element={<PatientSignupPage />} />
 
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route path="/change-password" element={<ChangePasswordPage />} />
@@ -73,6 +76,8 @@ export default function App() {
                   </Route>
                   <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk"]} />}>
                     <Route path="/patients" element={<PatientListPage />} />
+                </Route>
+                <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk", "admin"]} />}>
                     <Route path="/patients/:patientId" element={<PatientChartPage />} />
                   </Route>
 

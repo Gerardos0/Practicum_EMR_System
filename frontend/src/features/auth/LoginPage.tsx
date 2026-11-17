@@ -4,7 +4,7 @@ import {
 } from "@mui/material";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { login } from "../../api/auth";
 import { takeSignedOutNotice } from "../../api/client";
 import { homePathFor, uniqueRoles } from "../../utils/permissions";
@@ -15,7 +15,7 @@ import { useAuth } from "./useSession";
 export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
@@ -25,8 +25,8 @@ export default function LoginPage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setError("Enter your email to continue.");
+    if (!identifier.trim()) {
+      setError("Enter your email or username to continue.");
       return;
     }
     if (!password) {
@@ -35,7 +35,7 @@ export default function LoginPage() {
     }
     setBusy(true);
     setError("");
-    login(email, password)
+    login(identifier, password)
       .then((result) => {
         signIn(result.user, result.accessToken, result.mustChangePassword, result.refreshToken);
         if (result.mustChangePassword) {
@@ -132,8 +132,8 @@ export default function LoginPage() {
           <Box component="form" noValidate onSubmit={submit}>
             <Stack spacing={2}>
               <TextField
-                label="Email" type="email" autoComplete="username" autoFocus fullWidth size="medium"
-                placeholder="you@utep.edu" value={email} onChange={(e) => setEmail(e.target.value)}
+                label="Email or username" type="text" autoComplete="username" autoFocus fullWidth
+                placeholder="you@example.com" value={identifier} onChange={(e) => setIdentifier(e.target.value)}
               />
               <TextField
                 label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password"
@@ -181,6 +181,9 @@ export default function LoginPage() {
               )}
             </Stack>
           </Box>
+          <Typography variant="body2" sx={{ mt: 2.5 }}>
+            <Link component={RouterLink} to="/portal/signup">New patient? Create your account</Link>
+          </Typography>
         </Box>
       </Box>
     </Box>

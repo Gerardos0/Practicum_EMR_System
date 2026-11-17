@@ -92,7 +92,7 @@ export interface IntakeData {
 
 export interface PortalIntake {
   data: IntakeData;
-  identity: { firstName: string; lastName: string; dob: string; sexAtBirth: string; mrn: string };
+  identity: { firstName: string; lastName: string; dob: string | null; sexAtBirth: string | null; mrn: string | null };
   source: "chart" | "patient";
   updatedAt?: string | null;
   editable: boolean;

@@ -18,6 +18,7 @@ from app.models.clinical import (  # noqa: F401
     NoteComment,
     Patient,
     PatientIntake,
+    PortalInvite,
     Problem,
     SavedNoteTemplate,
     Referral,

@@ -46,6 +46,7 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
         "first_name": patient.first_name,
         "last_name": patient.last_name,
         "preferred_name": patient.preferred_name,
+        "portal_email": patient.portal_email if patient.mode == "case" and viewer_role in {"admin", "instructor", "course_coordinator"} else None,
         "dob": patient.dob,
         "age_years": _age(patient.dob),
         "sex_at_birth": patient.sex_at_birth,

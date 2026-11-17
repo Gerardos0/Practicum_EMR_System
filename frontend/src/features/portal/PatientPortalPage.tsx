@@ -11,7 +11,7 @@ import PatientIntakeForm from "./PatientIntakeForm";
 import { intakeCompleteness } from "./intakeUtils";
 
 interface PortalChart {
-  patient: { name: string; dob: string; mrn: string };
+  patient: { name: string; dob: string; mrn: string } | null;
   labs: { name: string; value: string; unit: string; reference_range: string; flag?: string; collected_at?: string }[];
   last_visit: { date?: string; type?: string; summary?: string | null };
   prescribed_medications: { name: string; dose: string; route: string; frequency: string }[];
@@ -93,13 +93,19 @@ function Overview({ chart, intake, onComplete }: { chart: PortalChart; intake: P
     <Stack spacing={2}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
         <Box>
-          <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>{chart.patient.name}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            DOB {formatDate(chart.patient.dob)} · MRN {chart.patient.mrn}
-          </Typography>
+          <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>{chart.patient?.name ?? "Patient portal"}</Typography>
+          {chart.patient && (
+            <Typography variant="body2" color="text.secondary">
+              DOB {formatDate(chart.patient.dob)} · MRN {chart.patient.mrn}
+            </Typography>
+          )}
         </Box>
       </Box>
-      <ProfileCompleteness intake={intake} onComplete={onComplete} />
+      {chart.patient ? (
+        <ProfileCompleteness intake={intake} onComplete={onComplete} />
+      ) : (
+        <Alert severity="info">There is no patient chart linked to this account yet. Chart details, lab results, and medications will appear here when available.</Alert>
+      )}
       <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Last visit</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -116,7 +122,7 @@ function Overview({ chart, intake, onComplete }: { chart: PortalChart; intake: P
           <ValueRow label="Plan type" value={intake.data.insurancePlanType} />
           <ValueRow label="Member ID" value={intake.data.insuranceMemberId} />
           <ValueRow label="Group number" value={intake.data.insuranceGroupNumber} />
-          <ValueRow label="Subscriber" value={intake.data.insuranceSubscriberIsPatient ? "Patient" : intake.data.insuranceSubscriberName} />
+          <ValueRow label="Subscriber" value={chart.patient ? (intake.data.insuranceSubscriberIsPatient ? "Patient" : intake.data.insuranceSubscriberName) : ""} />
           <ValueRow label="Relationship" value={intake.data.insuranceRelationship} />
           <ValueRow label="Effective date" value={intake.data.insuranceEffectiveDate ?? ""} />
           <ValueRow label="Secondary carrier" value={intake.data.secondaryInsurancePayer} />

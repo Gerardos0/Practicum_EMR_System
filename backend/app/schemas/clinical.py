@@ -175,6 +175,7 @@ class PatientOut(APIModel):
     first_name: str
     last_name: str
     preferred_name: str | None = None
+    portal_email: str | None = None
     dob: date
     age_years: int
     sex_at_birth: str
@@ -461,6 +462,7 @@ class CaseIn(APIModel):
     first_name: str
     last_name: str
     preferred_name: str | None = None
+    portal_email: str | None = Field(default=None, max_length=120, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     dob: date
     sex_at_birth: str
     pronouns: str | None = None

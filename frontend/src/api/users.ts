@@ -1,6 +1,20 @@
 import type { User } from "../types";
 import { request } from "./client";
 import type { TempPassword } from "./roster";
+import type { IntakeData } from "./intake";
+
+export interface PrechartIntake {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  data: IntakeData;
+  updatedAt: string;
+}
+
+export async function listPrechartIntakes(): Promise<PrechartIntake[]> {
+  return request<PrechartIntake[]>("/users/prechart-intakes");
+}
 
 export async function updateAccount(userId: string, body: { fullName: string; email: string; universityId?: string }): Promise<User> {
   return request<User>(`/users/${userId}`, { method: "PATCH", json: body });

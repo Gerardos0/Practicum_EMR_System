@@ -404,6 +404,7 @@ async def assign_case(
         first_name=source.first_name,
         last_name=source.last_name,
         preferred_name=source.preferred_name,
+        portal_email=source.portal_email,
         dob=source.dob,
         sex_at_birth=source.sex_at_birth,
         pronouns=source.pronouns,

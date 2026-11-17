@@ -113,9 +113,9 @@ class IntakeData(StrictModel):
 class IntakeIdentity(APIModel):
     first_name: str
     last_name: str
-    dob: date
-    sex_at_birth: str
-    mrn: str
+    dob: date | None = None
+    sex_at_birth: str | None = None
+    mrn: str | None = None
 
 
 class PortalIntakeOut(APIModel):
@@ -131,3 +131,12 @@ class StaffIntakeOut(APIModel):
     submitted: bool
     data: IntakeData | None = None
     updated_at: datetime | None = None
+
+
+class PrechartIntakeOut(APIModel):
+    user_id: str
+    email: str
+    first_name: str
+    last_name: str
+    data: IntakeData
+    updated_at: datetime
