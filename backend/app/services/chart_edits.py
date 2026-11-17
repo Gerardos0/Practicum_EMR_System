@@ -11,6 +11,8 @@ from app.clinical_sections import ALLERGY_CATEGORIES, LUNG_SOUND_FINDINGS, LUNG_
 from app.models.clinical import (
     Allergy,
     ChartSession,
+    ClinicalOrder,
+    Course,
     LabResult,
     LungSound,
     Medication,
@@ -21,6 +23,7 @@ from app.models.clinical import (
     Vital,
     current_encounter,
 )
+from app.services.course_track import PHARMACY, course_track
 from app.models.user import User
 from app.services.access import can, full_name
 from app.services.audit import log_event
@@ -520,6 +523,98 @@ async def review_medication_order(
         detail=f"{order.name} → {order.status}",
     )
     return order
+
+
+async def _require_pharmacy_orders(db: AsyncSession, patient: Patient, actor: User, role: str) -> None:
+    ensure_student_may_chart(patient, actor, role)
+    if role != "student" and not (can(role, "case:author") or can(role, "patient:update_status") or can(role, "note:cosign")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't enter orders.")
+    course = await db.get(Course, patient.course_id)
+    if course_track(course) != PHARMACY:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Lab and procedure orders belong to the pharmacy course.")
+
+
+def _clean_order_text(value: str | None, limit: int) -> str | None:
+    text = (value or "").strip()
+    return text[:limit] or None
+
+
+async def create_clinical_order(db: AsyncSession, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> ClinicalOrder:
+    await _require_pharmacy_orders(db, patient, actor, role)
+    kind = body.get("kind")
+    if kind not in {"lab", "procedure"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Choose a lab or a procedure.")
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Name the order.")
+    priority = body.get("priority") or "routine"
+    if priority not in {"routine", "stat"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Priority is routine or STAT.")
+    visit = current_encounter(patient)
+    order = ClinicalOrder(
+        patient_id=patient.id,
+        encounter_id=visit.id if visit else None,
+        kind=kind,
+        name=name[:120],
+        priority=priority,
+        specimen=_clean_order_text(body.get("specimen"), 80) if kind == "lab" else None,
+        instructions=_clean_order_text(body.get("instructions"), 2000),
+        status="ordered",
+        ordered_by_id=actor.id,
+        ordered_by_name=full_name(actor),
+        ordered_at=utcnow(),
+    )
+    db.add(order)
+    await db.flush()
+    label = "Lab" if kind == "lab" else "Procedure"
+    await _touch(db, patient, actor, ip, "clinical_order.create", f"{label}: {order.name}")
+    return order
+
+
+async def update_clinical_order(
+    db: AsyncSession, patient: Patient, actor: User, role: str, order_id: uuid.UUID, body: dict, ip: str | None
+) -> ClinicalOrder:
+    await _require_pharmacy_orders(db, patient, actor, role)
+    order = await db.get(ClinicalOrder, order_id)
+    if order is None or order.patient_id != patient.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found on this chart.")
+    if order.status == "cancelled":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This order is cancelled.")
+    if "name" in body and body.get("name") is not None:
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Name the order.")
+        order.name = name[:120]
+    if body.get("priority") in {"routine", "stat"}:
+        order.priority = body["priority"]
+    if order.kind == "lab" and "specimen" in body:
+        order.specimen = _clean_order_text(body.get("specimen"), 80)
+    if "instructions" in body:
+        order.instructions = _clean_order_text(body.get("instructions"), 2000)
+    if body.get("status") == "cancelled":
+        order.status = "cancelled"
+    elif body.get("status") not in {None, "ordered"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "An order can stay ordered or be cancelled.")
+    order.updated_at = utcnow()
+    await _touch(db, patient, actor, ip, "clinical_order.update", f"{order.name} → {order.status}")
+    return order
+
+
+def clinical_order_out(order: ClinicalOrder) -> dict:
+    return {
+        "id": str(order.id),
+        "patient_id": str(order.patient_id),
+        "encounter_id": str(order.encounter_id) if order.encounter_id else None,
+        "kind": order.kind,
+        "name": order.name,
+        "priority": order.priority,
+        "specimen": order.specimen,
+        "instructions": order.instructions,
+        "status": order.status,
+        "ordered_by_name": order.ordered_by_name,
+        "ordered_at": order.ordered_at,
+        "updated_at": order.updated_at,
+    }
 
 
 def medication_order_out(order: MedicationOrder) -> dict:

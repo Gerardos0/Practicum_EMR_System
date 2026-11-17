@@ -9,6 +9,7 @@ import SearchRounded from "@mui/icons-material/SearchRounded";
 import TextIncreaseOutlined from "@mui/icons-material/TextIncreaseOutlined";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/useSession";
+import { usePharmacyCourse } from "../features/patients/usePharmacyCourse";
 import { getCourse, listCoursesForUser } from "../api/courses";
 import { useDisplayPrefs } from "../theme/useDisplayPrefs";
 import { brandAccentBar, fontDisplay, utep } from "../theme/tokens";
@@ -28,6 +29,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
   const location = useLocation();
   const heading = usePageHeadingValue();
   const { user, activeRole, discipline, courseId, switchRole, selectCourse } = useSession();
+  const pharmacy = usePharmacyCourse();
   const { prefs, setPrefs } = useDisplayPrefs();
   const roles = uniqueRoles(user);
   const [q, setQ] = useState("");
@@ -48,14 +50,16 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
       ? `${course.data.code}: ${course.data.title}${course.data.term ? `, ${course.data.term}` : ""}`
       : " ";
 
+  const searchPath = pharmacy && location.pathname === "/dashboard" ? "/dashboard" : "/patients";
+
   const search = (e: FormEvent) => {
     e.preventDefault();
     const term = q.trim();
-    const next = new URLSearchParams(location.pathname === "/patients" ? location.search : "");
+    const next = new URLSearchParams(location.pathname === searchPath ? location.search : "");
     if (term) next.set("q", term);
     else next.delete("q");
     const qs = next.toString();
-    navigate(qs ? `/patients?${qs}` : "/patients");
+    navigate(qs ? `${searchPath}?${qs}` : searchPath);
   };
 
   return (
@@ -120,13 +124,13 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
                 value={q} onChange={(e) => {
                   const value = e.target.value;
                   setQ(value);
-                  if (location.pathname !== "/patients") return;
+                  if (location.pathname !== searchPath) return;
                   const next = new URLSearchParams(location.search);
                   const term = value.trim();
                   if (term) next.set("q", term);
                   else next.delete("q");
                   const qs = next.toString();
-                  navigate(qs ? `/patients?${qs}` : "/patients", { replace: true });
+                  navigate(qs ? `${searchPath}?${qs}` : searchPath, { replace: true });
                 }}
                 sx={{ flex: 1, fontSize: 14 }}
                 placeholder={activeRole === "student" ? "Search name, MRN, or date of birth" : "Search patient, MRN, date of birth, or student"}

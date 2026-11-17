@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.models.clinical import ClinicalNote, Course, Patient
 from app.models.user import User
-from app.models.clinical import MedicationAdministration, MedicationOrder
+from app.models.clinical import ClinicalOrder, MedicationAdministration, MedicationOrder
 from app.schemas.clinical import (
     AdministerWrite,
     AdministrationReview,
@@ -17,6 +17,9 @@ from app.schemas.clinical import (
     AnswerKeyOut,
     AssignCase,
     ChartPresence,
+    ClinicalOrderCreate,
+    ClinicalOrderOut,
+    ClinicalOrderUpdate,
     HistoryWrite,
     LabWrite,
     MedicationOrderCreate,
@@ -40,6 +43,8 @@ from app.schemas.portal_accounts import PortalInviteOut
 from app.services.chart_edits import (
     add_allergy,
     add_lab,
+    clinical_order_out,
+    create_clinical_order,
     add_lung_sound,
     add_medication,
     add_problem,
@@ -58,6 +63,7 @@ from app.services.chart_edits import (
     set_placement,
     submit_medication_order,
     update_allergy,
+    update_clinical_order,
     update_medication,
 )
 from app.services.access import can, ensure_course_open, ensure_student_may_enter, may_read_note, memberships_for, require, require_course
@@ -756,3 +762,49 @@ async def review_medication_order_route(
     await db.commit()
     order = await db.get(MedicationOrder, order_id)
     return medication_order_out(order)
+
+
+@router.get("/{patient_id}/orders", response_model=list[ClinicalOrderOut], response_model_exclude_none=True)
+async def list_clinical_orders(patient_id: uuid.UUID, db: DbSession, user: CurrentUser, request: Request, role: Annotated[str, Query()]):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    rows = (
+        await db.scalars(
+            select(ClinicalOrder)
+            .where(ClinicalOrder.patient_id == patient.id)
+            .order_by(ClinicalOrder.ordered_at.desc())
+        )
+    ).all()
+    return [clinical_order_out(row) for row in rows]
+
+
+@router.post("/{patient_id}/orders", response_model=ClinicalOrderOut, response_model_exclude_none=True)
+async def post_clinical_order(
+    patient_id: uuid.UUID,
+    body: ClinicalOrderCreate,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    order = await create_clinical_order(db, patient, user, role, body.model_dump(), _ip(request))
+    await db.commit()
+    order = await db.get(ClinicalOrder, order.id)
+    return clinical_order_out(order)
+
+
+@router.patch("/{patient_id}/orders/{order_id}", response_model=ClinicalOrderOut, response_model_exclude_none=True)
+async def patch_clinical_order(
+    patient_id: uuid.UUID,
+    order_id: uuid.UUID,
+    body: ClinicalOrderUpdate,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await _open_chart(patient_id, db, user, request, role)
+    order = await update_clinical_order(db, patient, user, role, order_id, body.model_dump(exclude_unset=True), _ip(request))
+    await db.commit()
+    order = await db.get(ClinicalOrder, order.id)
+    return clinical_order_out(order)

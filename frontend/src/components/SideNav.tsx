@@ -16,6 +16,7 @@ import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import TextFieldsOutlined from "@mui/icons-material/TextFieldsOutlined";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../features/auth/useSession";
+import { usePharmacyCourse } from "../features/patients/usePharmacyCourse";
 import { listReviewQueue } from "../api/notes";
 import { useDisplayPrefs } from "../theme/useDisplayPrefs";
 import { useAsync } from "../utils/useAsync";
@@ -42,6 +43,7 @@ const ICON = {
 
 function useNav(): NavItem[] {
   const { user, activeRole, courseId } = useSession();
+  const pharmacy = usePharmacyCourse();
   const queue = useAsync(
     () => (activeRole === "instructor" || activeRole === "course_coordinator") ? listReviewQueue(courseId, activeRole) : Promise.resolve([]),
     [user.id, activeRole, courseId],
@@ -51,7 +53,7 @@ function useNav(): NavItem[] {
   const byRole: Record<Role, NavItem[]> = {
     student: [
       { to: "/dashboard", label: "Dashboard", icon: ICON.dashboard },
-      { to: "/patients", label: "My Patients", icon: ICON.patients },
+      { to: "/patients", label: pharmacy ? "EMR" : "My Patients", icon: ICON.patients },
       { to: "/my-activity", label: "My activity", icon: ICON.audit },
     ],
     instructor: [

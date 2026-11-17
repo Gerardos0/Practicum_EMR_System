@@ -14,11 +14,15 @@ from app.models.user import User
 
 class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "courses"
-    __table_args__ = (UniqueConstraint("code", "term", name="uq_courses_code_term"),)
+    __table_args__ = (
+        UniqueConstraint("code", "term", name="uq_courses_code_term"),
+        CheckConstraint("track IS NULL OR track IN ('pharmacy', 'nursing')", name="ck_courses_track"),
+    )
 
     code: Mapped[str] = mapped_column(String(30))
     title: Mapped[str] = mapped_column(String(200))
     term: Mapped[str] = mapped_column(String(40))
+    track: Mapped[str | None] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
     inactivity_days: Mapped[int] = mapped_column(Integer, default=7, server_default="7")
     rubric_file_name: Mapped[str | None] = mapped_column(String(255))
@@ -469,6 +473,32 @@ class MedicationOrder(UUIDPrimaryKeyMixin, Base):
     medication: Mapped[Medication] = relationship(lazy="selectin")
     submitted_by: Mapped[User] = relationship(foreign_keys=[submitted_by_id], lazy="selectin")
     reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id], lazy="selectin")
+
+
+class ClinicalOrder(UUIDPrimaryKeyMixin, Base):
+    """Lab or procedure order entered on a pharmacy chart."""
+
+    __tablename__ = "clinical_orders"
+    __table_args__ = (
+        CheckConstraint("kind IN ('lab', 'procedure')", name="ck_clinical_orders_kind"),
+        CheckConstraint("priority IN ('routine', 'stat')", name="ck_clinical_orders_priority"),
+        CheckConstraint("status IN ('ordered', 'cancelled')", name="ck_clinical_orders_status"),
+    )
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    encounter_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("encounters.id", ondelete="SET NULL"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    name: Mapped[str] = mapped_column(String(120))
+    priority: Mapped[str] = mapped_column(String(20), default="routine", server_default="routine")
+    specimen: Mapped[str | None] = mapped_column(String(80))
+    instructions: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="ordered", server_default="ordered")
+    ordered_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    ordered_by_name: Mapped[str] = mapped_column(String(120))
+    ordered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    ordered_by: Mapped[User] = relationship(foreign_keys=[ordered_by_id], lazy="selectin")
 
 
 class SimLabRoom(UUIDPrimaryKeyMixin, Base):

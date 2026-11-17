@@ -1,13 +1,19 @@
 import { Alert, Box, LinearProgress } from "@mui/material";
 import { useSession } from "../auth/useSession";
 import { usePageHeading } from "../../components/usePageHeading";
+import { usePharmacyCourse } from "../patients/usePharmacyCourse";
 import StudentDashboard from "./StudentDashboard";
 import InstructorDashboard from "./InstructorDashboard";
+import PharmacyDashboard from "./PharmacyDashboard";
 
 export default function DashboardPage() {
   const { activeRole } = useSession();
+  const pharmacy = usePharmacyCourse();
   usePageHeading("Dashboard");
 
+  if (pharmacy && (activeRole === "student" || activeRole === "instructor" || activeRole === "course_coordinator")) {
+    return <PharmacyDashboard />;
+  }
   if (activeRole === "student") return <StudentDashboard />;
   if (activeRole === "instructor" || activeRole === "course_coordinator") return <InstructorDashboard />;
 

@@ -14,6 +14,7 @@ import { formatDate, formatDateTime } from "../../../utils/format";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";
 import { simulationNoteAction } from "../simulation";
+import { usePharmacyCourse } from "../usePharmacyCourse";
 
 const FLOW: EncounterStatus[] = ["Scheduled", "Checked in", "Roomed", "In progress", "Checked out"];
 const ADVANCE_LABEL: Partial<Record<EncounterStatus, string>> = {
@@ -45,6 +46,7 @@ const CATEGORIES: { id: AllergyCategory; label: string }[] = [
 export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: Props) {
   const navigate = useNavigate();
   const { user, activeRole } = useSession();
+  const pharmacy = usePharmacyCourse();
   const chartable = canChartPatient(activeRole, p, user.id);
   const isAuthor = can(activeRole, "note:author") && chartable;
   const appts = useAsync(() => listAppointments(p.id, activeRole), [p.id, activeRole]);
@@ -251,8 +253,8 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
       </Paper>
       )}
 
-      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
-        <Paper sx={card}>
+      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: pharmacy ? "1fr" : { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
+        {!pharmacy && <Paper sx={card}>
           <Typography component="h2" variant="h6" sx={titleSx}>Allergies</Typography>
           {CATEGORIES.map((category) => {
             const rows = p.allergies.filter((item) => (item.category ?? "medication") === category.id);
@@ -287,7 +289,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
               }}>Add</Button>
             </Stack>
           )}
-        </Paper>
+        </Paper>}
         <Paper sx={card}>
           <Typography component="h2" variant="h6" sx={titleSx}>Current vitals</Typography>
           <LatestVitals patient={p} />

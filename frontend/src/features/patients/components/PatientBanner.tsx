@@ -15,11 +15,12 @@ interface Props {
   patient: Patient;
   onEditStatus?: () => void;
   compact?: boolean;
+  extraStatus?: [string, string][];
 }
 
 const card = { borderRadius: 1, overflow: "hidden", border: "none", boxShadow: `inset 0 0 0 1px ${utep.lineSoft}` } as const;
 
-export default function PatientBanner({ patient: p, onEditStatus, compact }: Props) {
+export default function PatientBanner({ patient: p, onEditStatus, compact, extraStatus = [] }: Props) {
   const { activeRole } = useSession();
   const opened = useAsync(
     () => (p.mode === "simulation" ? listOpened(activeRole, p.id) : Promise.resolve([])),
@@ -49,6 +50,8 @@ export default function PatientBanner({ patient: p, onEditStatus, compact }: Pro
     .join(" ");
   const emergencyLine = [emergency, p.emergencyContact?.phone].filter(Boolean).join(" · ");
   const codeAlert = p.codeStatus === "DNR" || p.codeStatus === "DNI";
+  const height = latestVital(p, "Height");
+  const weight = latestVital(p, "Weight");
   const location = placeLabel(p);
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
@@ -56,8 +59,8 @@ export default function PatientBanner({ patient: p, onEditStatus, compact }: Pro
     ["Setting", p.status.careSetting],
     ["Record", p.status.lifecycle],
     ...(p.status.program ? ([["Program", p.status.program]] as [string, string][]) : []),
-    ...(p.codeStatus ? ([["Code status", p.codeStatus]] as [string, string][]) : []),
     ...(emergencyLine ? ([["Emergency", emergencyLine]] as [string, string][]) : []),
+    ...extraStatus,
   ];
 
   return (
@@ -98,6 +101,7 @@ export default function PatientBanner({ patient: p, onEditStatus, compact }: Pro
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
+            {`, Height ${height || "not recorded"}, Weight ${weight || "not recorded"}, Code status ${p.codeStatus || "not documented"}`}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
             {statusLabel && <Chip size="small" label={statusLabel} sx={statusChip} />}
@@ -160,4 +164,12 @@ export default function PatientBanner({ patient: p, onEditStatus, compact }: Pro
       </Box>
     </Paper>
   );
+}
+
+function latestVital(patient: Patient, label: string): string {
+  const rows = patient.vitals.filter(
+    (item) => item.status !== "entered_in_error" && item.label.toLowerCase() === label.toLowerCase(),
+  );
+  rows.sort((a, b) => (b.recordedAt ?? "").localeCompare(a.recordedAt ?? ""));
+  return rows[0]?.value.trim() ?? "";
 }

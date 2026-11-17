@@ -11,6 +11,7 @@ from app.models.clinical import (  # noqa: F401
     Encounter,
     LabResult,
     ChartSession,
+    ClinicalOrder,
     Medication,
     MedicationAdministration,
     MedicationOrder,
