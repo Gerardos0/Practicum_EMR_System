@@ -14,7 +14,7 @@ import { useAuth } from "./useSession";
 export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -23,8 +23,8 @@ export default function LoginPage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setError("Enter your email to continue.");
+    if (!identifier.trim()) {
+      setError("Enter your email or username to continue.");
       return;
     }
     if (!password) {
@@ -33,7 +33,7 @@ export default function LoginPage() {
     }
     setBusy(true);
     setError("");
-    login(email, password)
+    login(identifier, password)
       .then((result) => {
         signIn(result.user, result.accessToken, result.mustChangePassword, result.refreshToken);
         if (result.mustChangePassword) {
@@ -70,18 +70,14 @@ export default function LoginPage() {
       <Box component="main" sx={{ flex: 1, display: "grid", placeItems: "center", px: 2, py: 5 }}>
         <Paper component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>
           <Typography id="login-title" component="h1" variant="h5" sx={{ mb: 0.5 }}>Sign in</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            For authorized EMR accounts. Every patient here is simulated training data — never real PHI.
-          </Typography>
-
           {notice && <Alert severity="info" sx={{ mb: 2 }}>{notice}</Alert>}
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
           <Box component="form" noValidate onSubmit={submit}>
             <Stack spacing={2}>
               <TextField
-                label="Email" type="email" autoComplete="username" autoFocus fullWidth
-                placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
+                label="Email or username" type="text" autoComplete="username" autoFocus fullWidth
+                placeholder="you@example.com" value={identifier} onChange={(e) => setIdentifier(e.target.value)}
               />
               <TextField
                 label="Password" type={showPassword ? "text" : "password"} autoComplete="current-password"
@@ -119,7 +115,7 @@ export default function LoginPage() {
             </Stack>
           </Box>
           <Typography variant="body2" sx={{ mt: 2.5 }}>
-            <Link component={RouterLink} to="/portal/login">Patient? Go to the patient portal</Link>
+            <Link component={RouterLink} to="/portal/signup">New patient? Create your account</Link>
           </Typography>
         </Paper>
       </Box>

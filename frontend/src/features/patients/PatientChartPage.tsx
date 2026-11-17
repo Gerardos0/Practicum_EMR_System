@@ -3,7 +3,6 @@ import { Alert, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, 
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
 import { grantPortalAccess } from "../../api/users";
-import { createPortalInvite } from "../../api/portalAccounts";
 import { recordPresence, updatePlacement } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/useSession";
@@ -46,7 +45,6 @@ export default function PatientChartPage() {
   const [portalGranted, setPortalGranted] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [portalInvite, setPortalInvite] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [portalInviteBusy, setPortalInviteBusy] = useState(false);
   const [portalInviteCopied, setPortalInviteCopied] = useState(false);
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
@@ -119,7 +117,6 @@ export default function PatientChartPage() {
             setTemporaryPassword("");
             setPortalInvite(null);
             setPortalInviteCopied(false);
-            setPortalInviteBusy(false);
             setPortalAccessOpen(true);
           }}>
             Grant portal access
@@ -270,23 +267,6 @@ export default function PatientChartPage() {
           ) : (
             <>
               <Button onClick={() => setPortalAccessOpen(false)} disabled={portalBusy}>Cancel</Button>
-              <Button
-                disabled={portalInviteBusy || p.mode === "case"}
-                onClick={async () => {
-                  setPortalInviteBusy(true);
-                  setPortalError("");
-                  try {
-                    setPortalInvite(await createPortalInvite(p.id));
-                    setPortalInviteCopied(false);
-                  } catch (error) {
-                    setPortalError((error as Error).message);
-                  } finally {
-                    setPortalInviteBusy(false);
-                  }
-                }}
-              >
-                {portalInviteBusy ? "Creating…" : "Create activation code"}
-              </Button>
               <Button
                 variant="contained"
                 disabled={portalBusy || !portalEmail.trim() || !portalFullName.trim()}

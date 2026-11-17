@@ -77,6 +77,28 @@ async def create_patient_user(
     return person
 
 
+async def create_unlinked_patient_user(
+    db: AsyncSession, *, email: str, password: str
+) -> User:
+    role = await db.scalar(select(Role).where(Role.code == "patient"))
+    if role is None:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Roles are not seeded.")
+    display_name = email.partition("@")[0].replace(".", " ").replace("_", " ").replace("-", " ").strip()
+    person = User(
+        email=email.strip().lower(),
+        first_name="Patient",
+        last_name=display_name[:100] or "Portal account",
+        hashed_password=hash_password(password),
+        must_change_password=False,
+        is_active=True,
+        portal_patient_id=None,
+        roles=[role],
+    )
+    db.add(person)
+    await db.flush()
+    return person
+
+
 def generate_code() -> str:
     return "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
 

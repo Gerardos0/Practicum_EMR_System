@@ -9,11 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.security import hash_password
-from app.models.clinical import Course, CourseMembership, Patient
+from app.models.clinical import Course, CourseMembership, Patient, PatientIntake
 from app.models.user import Role, User
 from app.schemas.clinical import PortalAccess, PublicUser, TempPassword
 from app.schemas.users import AccountUpdate, DeleteAccount, UserActiveOut, UserActivePatch
 from app.schemas.portal_accounts import ProvisionRequest, ProvisionResultOut
+from app.schemas.intake import IntakeData, PrechartIntakeOut
 from app.services.access import memberships_for, require, require_held_role
 from app.services.audit import log_event
 from app.services.charts import load_patient, utcnow
@@ -25,6 +26,7 @@ from app.services.portal_accounts import (
     ensure_chart_eligible,
     provision_patient_logins,
 )
+from app.services.intake import attach_prechart_intake
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -224,6 +226,44 @@ async def purge(db: DbSession, user: CurrentUser, request: Request):
     return {"purged": count}
 
 
+@router.get("/prechart-intakes", response_model=list[PrechartIntakeOut])
+async def list_prechart_intakes(db: DbSession, user: CurrentUser, request: Request):
+    rows = await memberships_for(db, user.id)
+    _require_account_admin(user, rows)
+    records = (await db.execute(
+        select(PatientIntake, User)
+        .join(User, User.id == PatientIntake.user_id)
+        .where(
+            PatientIntake.patient_id.is_(None),
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+            User.archived_at.is_(None),
+            User.purged_at.is_(None),
+        )
+        .order_by(PatientIntake.updated_at.desc())
+    )).all()
+    await log_event(
+        db,
+        action="portal.intake.prechart.list",
+        entity_type="portal_intake_queue",
+        actor_user_id=user.id,
+        ip_address=request.client.host if request.client else None,
+        detail=str(len(records)),
+    )
+    await db.commit()
+    return [
+        PrechartIntakeOut(
+            user_id=str(person.id),
+            email=person.email,
+            first_name=person.first_name,
+            last_name=person.last_name,
+            data=IntakeData.model_validate(intake.data),
+            updated_at=intake.updated_at,
+        )
+        for intake, person in records
+    ]
+
+
 @router.post("/portal-access")
 async def portal_access(body: PortalAccess, db: DbSession, user: CurrentUser, request: Request):
     rows = await memberships_for(db, user.id)
@@ -264,6 +304,7 @@ async def portal_access(body: PortalAccess, db: DbSession, user: CurrentUser, re
         ):
             raise HTTPException(status.HTTP_409_CONFLICT, "That email already belongs to another account.")
         person.portal_patient_id = patient.id
+    await attach_prechart_intake(db, person, patient)
     await log_event(
         db,
         action="user.portal_access",

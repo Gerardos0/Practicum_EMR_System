@@ -9,7 +9,14 @@ from app.schemas.intake import IntakeData, IntakeIdentity, PortalIntakeOut
 from app.services.access import ensure_course_open, memberships_for, require, require_held_role
 from app.services.audit import log_event
 from app.services.charts import load_patient
-from app.services.intake import defaults_from_patient, editability, get_intake, upsert_intake
+from app.services.intake import (
+    defaults_from_patient,
+    editability,
+    get_intake,
+    get_prechart_intake,
+    upsert_intake,
+    upsert_prechart_intake,
+)
 
 router = APIRouter(prefix="/portal", tags=["portal"])
 
@@ -31,6 +38,17 @@ def _intake_out(patient: Patient, intake, editable: bool, reason: str | None) ->
     )
 
 
+def _empty_portal_chart() -> dict:
+    return {
+        "patient": None,
+        "labs": [],
+        "last_visit": {"date": None, "type": None, "summary": None},
+        "insurance": {"payer": None, "member_id": None, "group_number": None},
+        "prescribed_medications": [],
+        "medication_list": [],
+    }
+
+
 @router.get("")
 async def portal_chart(
     db: DbSession,
@@ -41,8 +59,19 @@ async def portal_chart(
     rows = await memberships_for(db, user.id)
     require_held_role(user, "patient", rows)
     require(role, "portal:view", "The portal is view-only for patient accounts.")
-    if user.portal_patient_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "This login is not linked to a chart.")
+    patient = await db.get(Patient, user.portal_patient_id) if user.portal_patient_id is not None else None
+    if patient is None or patient.deleted_at is not None:
+        await log_event(
+            db,
+            action="portal.view",
+            entity_type="user",
+            entity_id=str(user.id),
+            actor_user_id=user.id,
+            ip_address=request.client.host if request.client else None,
+            detail="Portal viewed without a linked chart.",
+        )
+        await db.commit()
+        return _empty_portal_chart()
     patient = await load_patient(db, user.portal_patient_id)
     note = await db.scalar(
         select(ClinicalNote)
@@ -127,8 +156,23 @@ async def portal_intake(
     rows = await memberships_for(db, user.id)
     require_held_role(user, "patient", rows)
     require(role, "portal:view", "The portal is view-only for patient accounts.")
-    if user.portal_patient_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "This login is not linked to a chart.")
+    patient = await db.get(Patient, user.portal_patient_id) if user.portal_patient_id is not None else None
+    if patient is None or patient.deleted_at is not None:
+        intake = await get_prechart_intake(db, user.id)
+        return PortalIntakeOut(
+            data=IntakeData.model_validate(intake.data) if intake is not None else IntakeData(email=user.email),
+            identity=IntakeIdentity(
+                first_name=user.first_name,
+                last_name=user.last_name,
+                dob=None,
+                sex_at_birth=None,
+                mrn=None,
+            ),
+            source="patient",
+            updated_at=intake.updated_at if intake is not None else None,
+            editable=True,
+            not_editable_reason=None,
+        )
     patient = await load_patient(db, user.portal_patient_id)
     intake = await get_intake(db, patient.id)
     editable, reason = await editability(db, patient)
@@ -146,8 +190,34 @@ async def save_portal_intake(
     rows = await memberships_for(db, user.id)
     require_held_role(user, "patient", rows)
     require(role, "portal:edit", "Your role can't edit portal information.")
-    if user.portal_patient_id is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "This login is not linked to a chart.")
+    patient = await db.get(Patient, user.portal_patient_id) if user.portal_patient_id is not None else None
+    if patient is None or patient.deleted_at is not None:
+        changed = await upsert_prechart_intake(db, body, user)
+        await log_event(
+            db,
+            action="portal.intake.prechart.update",
+            entity_type="user",
+            entity_id=str(user.id),
+            actor_user_id=user.id,
+            ip_address=request.client.host if request.client else None,
+            detail="Updated: " + ", ".join(changed),
+        )
+        await db.commit()
+        intake = await get_prechart_intake(db, user.id)
+        return PortalIntakeOut(
+            data=IntakeData.model_validate(intake.data) if intake is not None else body,
+            identity=IntakeIdentity(
+                first_name=user.first_name,
+                last_name=user.last_name,
+                dob=None,
+                sex_at_birth=None,
+                mrn=None,
+            ),
+            source="patient",
+            updated_at=intake.updated_at if intake is not None else None,
+            editable=True,
+            not_editable_reason=None,
+        )
     patient = await load_patient(db, user.portal_patient_id)
     if patient.mode == "case":
         raise HTTPException(status.HTTP_409_CONFLICT, "Portal information is not available on case masters.")

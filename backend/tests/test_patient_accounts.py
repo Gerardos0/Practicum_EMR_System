@@ -93,6 +93,57 @@ async def test_invite_signup_creates_patient_and_returns_portal_token(client, db
 
 
 @pytest.mark.asyncio
+async def test_email_signup_links_chart_or_creates_login_without_chart(client, db_session):
+    admin, patient_out = await _admin_chart(client)
+    patient = await db_session.get(Patient, uuid.UUID(patient_out["id"]))
+    patient.portal_email = "rosa.chart@example.com"
+    await db_session.flush()
+
+    response = await client.post(
+        "/api/v1/auth/patient-signup-by-email",
+        json={"email": " Rosa.Chart@Example.com ", "password": "patient-pass-123"},
+    )
+    assert response.status_code == 200, response.text
+    token = response.json()
+    assert token["user"]["email"] == "rosa.chart@example.com"
+    portal = await client.get("/api/v1/portal", headers={"Authorization": f"Bearer {token['access_token']}"})
+    assert portal.status_code == 200, portal.text
+    assert portal.json()["patient"]["mrn"] == patient_out["mrn"]
+
+    missing = await client.post(
+        "/api/v1/auth/patient-signup-by-email",
+        json={"email": "no.chart@example.com", "password": "patient-pass-123"},
+    )
+    assert missing.status_code == 200, missing.text
+    empty_token = missing.json()
+    assert empty_token["user"]["email"] == "no.chart@example.com"
+    empty_headers = {"Authorization": f"Bearer {empty_token['access_token']}"}
+    empty_chart = await client.get("/api/v1/portal", headers=empty_headers)
+    assert empty_chart.status_code == 200, empty_chart.text
+    assert empty_chart.json() == {
+        "patient": None,
+        "labs": [],
+        "last_visit": {"date": None, "type": None, "summary": None},
+        "insurance": {"payer": None, "member_id": None, "group_number": None},
+        "prescribed_medications": [],
+        "medication_list": [],
+    }
+    empty_intake = await client.get("/api/v1/portal/intake", headers=empty_headers)
+    assert empty_intake.status_code == 200, empty_intake.text
+    assert empty_intake.json()["identity"]["mrn"] is None
+    assert empty_intake.json()["editable"] is True
+    prechart_data = empty_intake.json()["data"]
+    prechart_data["phone"] = "915-555-0142"
+    prechart_data["confirmedAccurate"] = True
+    saved = await client.put("/api/v1/portal/intake", headers=empty_headers, json=prechart_data)
+    assert saved.status_code == 200, saved.text
+    queue = await client.get("/api/v1/users/prechart-intakes", headers=admin)
+    assert queue.status_code == 200, queue.text
+    submission = next(row for row in queue.json() if row["email"] == "no.chart@example.com")
+    assert submission["data"]["phone"] == "915-555-0142"
+
+
+@pytest.mark.asyncio
 async def test_invalid_expired_used_and_revoked_codes_are_generic(client, db_session):
     admin, patient = await _admin_chart(client)
     missing = await _signup(client, "NOPE-NOPE")

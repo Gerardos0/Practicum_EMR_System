@@ -106,6 +106,7 @@ export default function PatientIntakeForm({ intake, onSaved, previewMode = false
       onSaved(result);
       setDraft(result.data);
       setSaved(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -135,9 +136,9 @@ export default function PatientIntakeForm({ intake, onSaved, previewMode = false
         <Box sx={gridSx}>
           <TextField label="Legal first name" value={intake.identity.firstName} disabled />
           <TextField label="Legal last name" value={intake.identity.lastName} disabled />
-          <TextField label="Date of birth" type="date" value={intake.identity.dob} disabled slotProps={{ inputLabel: { shrink: true } }} />
-          <TextField label="Sex at birth" value={intake.identity.sexAtBirth} disabled />
-          <TextField label="MRN" value={intake.identity.mrn} disabled />
+          <TextField label="Date of birth" type="date" value={intake.identity.dob ?? ""} disabled slotProps={{ inputLabel: { shrink: true } }} />
+          <TextField label="Sex at birth" value={intake.identity.sexAtBirth ?? ""} disabled />
+          <TextField label="MRN" value={intake.identity.mrn ?? ""} disabled />
           {textField("Preferred name", "preferredName")}
           {textField("Pronouns", "pronouns")}
           {selectField("Gender identity", "genderIdentity", genderIdentityOptions)}

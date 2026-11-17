@@ -22,7 +22,6 @@ import AdminPeoplePage from "./features/admin/AdminPeoplePage";
 import ReportsPage from "./features/admin/ReportsPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
 import PatientPortalPage from "./features/portal/PatientPortalPage";
-import PatientLoginPage from "./features/portal/PatientLoginPage";
 import PatientSignupPage from "./features/portal/PatientSignupPage";
 import TeachingPage from "./features/teaching/TeachingPage";
 import AboutPage from "./features/about/AboutPage";
@@ -47,7 +46,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LoginRoute />} />
             <Route path="/portal/preview" element={<PatientPortalPage previewMode />} />
-            <Route path="/portal/login" element={<PatientLoginPage />} />
+            <Route path="/portal/login" element={<Navigate to="/" replace />} />
             <Route path="/portal/signup" element={<PatientSignupPage />} />
 
             <Route element={<RequireAuth needsCourse={false} />}>

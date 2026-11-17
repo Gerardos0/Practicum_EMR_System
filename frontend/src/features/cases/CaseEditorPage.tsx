@@ -23,6 +23,7 @@ interface Draft {
   firstName: string;
   lastName: string;
   preferredName: string;
+  portalEmail: string;
   dob: string;
   sexAtBirth: "Male" | "Female";
   pronouns: string;
@@ -81,7 +82,7 @@ const DEFAULT_LOCKS: Record<string, boolean> = {
 
 function emptyDraft(): Draft {
   return {
-    firstName: "", lastName: "", preferredName: "", dob: "", sexAtBirth: "Female", pronouns: "",
+    firstName: "", lastName: "", preferredName: "", portalEmail: "", dob: "", sexAtBirth: "Female", pronouns: "",
     chiefComplaint: "", hpi: "", pastMedicalHistory: "", surgicalHistory: "", familyHistory: "", socialHistory: "",
     insurancePayer: "", insuranceMemberId: "", insuranceGroupNumber: "", insuranceNotes: "",
     encounterType: "Office visit", careSetting: "Outpatient", lifecycle: "Active", encounterStatus: "Scheduled",
@@ -101,6 +102,7 @@ function draftFrom(item: AuthoredCase): Draft {
     firstName: item.firstName,
     lastName: item.lastName,
     preferredName: item.preferredName ?? "",
+    portalEmail: item.portalEmail ?? "",
     dob: item.dob.slice(0, 10),
     sexAtBirth: item.sexAtBirth,
     pronouns: item.pronouns ?? "",
@@ -168,6 +170,7 @@ export default function CaseEditorPage() {
       firstName: draft.firstName.trim(),
       lastName: draft.lastName.trim(),
       preferredName: draft.preferredName.trim() || undefined,
+      portalEmail: draft.portalEmail.trim().toLowerCase() || undefined,
       dob: draft.dob,
       sexAtBirth: draft.sexAtBirth,
       pronouns: draft.pronouns.trim() || undefined,
@@ -304,6 +307,7 @@ export default function CaseEditorPage() {
           <TextField label="Surgical history" value={draft.surgicalHistory} onChange={(e) => set({ surgicalHistory: e.target.value })} fullWidth multiline minRows={2} />
           <TextField label="Family history" value={draft.familyHistory} onChange={(e) => set({ familyHistory: e.target.value })} fullWidth multiline minRows={2} />
           <TextField label="Social history" value={draft.socialHistory} onChange={(e) => set({ socialHistory: e.target.value })} fullWidth multiline minRows={2} />
+          <TextField label="Patient portal email" type="email" helperText="Used to match patient sign-up to this chart." value={draft.portalEmail} onChange={(e) => set({ portalEmail: e.target.value })} fullWidth />
         </Stack>
       </Paper>
 

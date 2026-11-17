@@ -34,6 +34,20 @@ export async function patientSignup(body: { code: string; username: string; pass
   };
 }
 
+export async function patientSignupByEmail(body: { email: string; password: string }): Promise<LoginResult> {
+  const result = await request<TokenResponse>("/auth/patient-signup-by-email", {
+    method: "POST",
+    json: body,
+    auth: false,
+  });
+  return {
+    accessToken: result.access_token,
+    refreshToken: result.refresh_token,
+    mustChangePassword: result.mustChangePassword,
+    user: result.user,
+  };
+}
+
 export async function createPortalInvite(patientId: string): Promise<{ code: string; expiresAt: string }> {
   return request<{ code: string; expiresAt: string }>(`/patients/${patientId}/portal-invite`, { method: "POST" });
 }

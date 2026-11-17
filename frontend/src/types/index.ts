@@ -171,6 +171,7 @@ export interface Patient {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  portalEmail?: string | null;
   dob: string;
   ageYears: number;
   sexAtBirth: "Male" | "Female";

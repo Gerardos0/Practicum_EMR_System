@@ -1,10 +1,26 @@
 from datetime import datetime
+import re
 from typing import Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.common import APIModel
 from app.services.portal_accounts import USERNAME_RE, normalize_code
+
+
+class PatientEmailSignupIn(APIModel):
+    model_config = ConfigDict(**APIModel.model_config, extra="forbid", str_strip_whitespace=True)
+
+    email: str = Field(min_length=3, max_length=120)
+    password: str = Field(min_length=10, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        value = value.lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+            raise ValueError("Enter a valid email address.")
+        return value
 
 
 class PatientSignupIn(APIModel):
