@@ -66,13 +66,19 @@ export default function App() {
                   <Route path="/portal" element={<PatientPortalPage />} />
                 </Route>
 
+                <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk", "admin"]} courseOptionalFor={["admin"]} />}>
+                  <Route path="/patients/:patientId" element={<PatientChartPage />} />
+                </Route>
+                <Route element={<RequireAuth roles={["instructor", "course_coordinator", "admin"]} courseOptionalFor={["admin"]} />}>
+                  <Route path="/review/:noteId" element={<NoteReviewPage />} />
+                </Route>
+
                 <Route element={<RequireAuth />}>
                   <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator"]} />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
                   </Route>
                   <Route element={<RequireAuth roles={["student", "instructor", "course_coordinator", "front_desk"]} />}>
                     <Route path="/patients" element={<PatientListPage />} />
-                    <Route path="/patients/:patientId" element={<PatientChartPage />} />
                   </Route>
 
                   <Route element={<RequireAuth roles={["student"]} />}>
@@ -81,7 +87,6 @@ export default function App() {
 
                   <Route element={<RequireAuth roles={["instructor", "course_coordinator"]} />}>
                     <Route path="/review" element={<ReviewQueuePage />} />
-                    <Route path="/review/:noteId" element={<NoteReviewPage />} />
                   </Route>
 
                   <Route element={<RequireAuth roles={["instructor", "course_coordinator"]} />}>

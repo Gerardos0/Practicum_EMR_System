@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Autocomplete, Box, Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  Divider, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
+  Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  Divider, LinearProgress, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { ClinicalNote, CptSelection, IcdCode, Patient, User } from "../../types";
 import { getPatient } from "../../api/patients";
 import { addAddendum, createDraft, getNote, listNotesForPatient, saveDraft, signNote } from "../../api/notes";
@@ -17,6 +17,7 @@ import { useAsync } from "../../utils/useAsync";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import PageError from "../../components/PageError";
 import PatientBanner from "../patients/components/PatientBanner";
+import BackLink from "../../components/BackLink";
 import ChartReference from "../patients/components/ChartReference";
 import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
@@ -24,6 +25,7 @@ import FeedbackThread from "./components/FeedbackThread";
 import Addenda from "./components/Addenda";
 import CourseRubricPanel from "./components/CourseRubricPanel";
 import { defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templateName, templatesFor, type NoteTemplate } from "./noteTemplates";
+import { canChartPatient } from "../chart/access";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -76,6 +78,10 @@ export default function NoteEditorPage() {
         const p = await getPatient(activeRole, patientId);
         if (!alive) return;
         setPatient(p);
+        if (noteId === "new" && !canChartPatient(activeRole, p, user.id)) {
+          setLoadError(new Error("You can review this chart, but only the assigned student can write on it."));
+          return;
+        }
         const people = await listInstructors(courseId);
         if (!alive) return;
         setInstructors(people);
@@ -225,11 +231,7 @@ export default function NoteEditorPage() {
 
   return (
     <Stack spacing={2}>
-      <Breadcrumbs aria-label="Breadcrumb">
-        <Link component={RouterLink} to="/patients" underline="hover">My patients</Link>
-        <Link component={RouterLink} to={`/patients/${patient.id}`} underline="hover">{patient.lastName}, {patient.firstName}</Link>
-        <Typography color="text.primary">{current?.name ?? templateName(templateId)}</Typography>
-      </Breadcrumbs>
+      <BackLink to={`/patients/${patient.id}`} label="Return to chart" />
 
       <PatientBanner patient={patient} compact />
 

@@ -41,23 +41,6 @@ async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: s
         )
         await db.commit()
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Case masters are only available to instructors.")
-    if role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
-        await log_event(
-            db,
-            action="chart.view",
-            entity_type="patient",
-            entity_id=str(patient.id),
-            actor_user_id=user.id,
-            result="denied",
-            course_id=patient.course_id,
-            ip_address=request_ip,
-            detail="Assessment case belongs to another student.",
-        )
-        await db.commit()
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            "This case belongs to another student. Each assessment case is private to the student it was assigned to.",
-        )
     if role not in {"student", "instructor", "course_coordinator", "admin", "front_desk"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't open charts.")
 
@@ -68,7 +51,40 @@ def owner_name_for(patient: Patient, role: str) -> str | None:
     return full_name(patient.owner)
 
 
+def student_may_chart(patient: Patient, user: User) -> bool:
+    """Shared practice charts stay open to the class. Every other chart belongs to its assigned student."""
+    if patient.mode == "practice" and patient.owner_id is None:
+        return True
+    return patient.owner_id == user.id
+
+
+def ensure_student_may_chart(patient: Patient, user: User, role: str) -> None:
+    if role != "student" or student_may_chart(patient, user):
+        return
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        "You can review this chart, but only the assigned student can change it.",
+    )
+
+
 async def apply_status(db, patient: Patient, user: User, role: str, patch: dict, ip: str | None) -> None:
+    if role == "student" and not student_may_chart(patient, user):
+        await log_event(
+            db,
+            action="patient.update_status",
+            entity_type="patient",
+            entity_id=str(patient.id),
+            actor_user_id=user.id,
+            result="denied",
+            course_id=patient.course_id,
+            ip_address=ip,
+            detail="Chart is not assigned to this student.",
+        )
+        await db.commit()
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "You can review this chart, but only the assigned student can change it.",
+        )
     provided = {key: value for key, value in patch.items() if value is not None}
     only_encounter = set(provided) <= {"encounter"}
     allowed = can_status(role, only_encounter)

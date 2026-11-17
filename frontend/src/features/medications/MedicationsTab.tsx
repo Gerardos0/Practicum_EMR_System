@@ -10,15 +10,16 @@ import {
 import { lexicompInteractions, lexicompStatus, searchMedications, type LexicompInteractions, type LexicompStatus } from "../../api/reference";
 import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
-import { canEditSection } from "../chart/access";
+import { canChartPatient, canEditSection } from "../chart/access";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
 
 const blank = { name: "", dose: "", route: "", frequency: "", indication: "", adherence: "", accessCost: "", prescribed: false };
 
 export default function MedicationsTab({ patient, onChange }: { patient: Patient; onChange: (patient: Patient) => void }) {
-  const { activeRole } = useSession();
-  const editable = canEditSection(activeRole, patient, "medications");
+  const { user, activeRole } = useSession();
+  const editable = canEditSection(activeRole, patient, "medications", user.id);
+  const chartable = canChartPatient(activeRole, patient, user.id);
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState<string>();
   const [names, setNames] = useState<string[]>([]);
@@ -122,7 +123,7 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
         rows={active}
         empty="No active medications"
         editable={editable}
-        inpatient={patient.status.careSetting === "Inpatient" && activeRole === "student"}
+        inpatient={patient.status.careSetting === "Inpatient" && activeRole === "student" && chartable}
         onEdit={(row) => {
           setEditingId(row.id);
           setForm({

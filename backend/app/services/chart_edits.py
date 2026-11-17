@@ -12,7 +12,7 @@ from app.models.clinical import Allergy, ChartSession, LabResult, Medication, Me
 from app.models.user import User
 from app.services.access import can, full_name
 from app.services.audit import log_event
-from app.services.charts import utcnow
+from app.services.charts import ensure_student_may_chart, utcnow
 
 
 def _locked(patient: Patient, section: str) -> bool:
@@ -31,9 +31,14 @@ def _deny(section: str) -> None:
     raise HTTPException(status.HTTP_403_FORBIDDEN, f"This case locks the {section.replace('_', ' ')} section.")
 
 
+def _require_section(role: str, patient: Patient, actor: User, section: str) -> None:
+    ensure_student_may_chart(patient, actor, role)
+    if not _can_edit_section(role, patient, section):
+        _deny(section)
+
+
 async def add_allergy(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "allergies"):
-        _deny("allergies")
+    _require_section(role, patient, actor, "allergies")
     category = body.get("category") or "medication"
     if category not in ALLERGY_CATEGORIES:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Allergy category must be medication, food, or environmental.")
@@ -52,8 +57,7 @@ async def add_allergy(db, patient: Patient, actor: User, role: str, body: dict, 
 
 
 async def update_allergy(db, patient: Patient, actor: User, role: str, allergy_id: uuid.UUID, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "allergies"):
-        _deny("allergies")
+    _require_section(role, patient, actor, "allergies")
     row = _find(patient.allergies, allergy_id, "Allergy")
     if "substance" in body:
         row.substance = (body.get("substance") or "").strip() or row.substance
@@ -67,8 +71,7 @@ async def update_allergy(db, patient: Patient, actor: User, role: str, allergy_i
 
 
 async def delete_allergy(db, patient: Patient, actor: User, role: str, allergy_id: uuid.UUID, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "allergies"):
-        _deny("allergies")
+    _require_section(role, patient, actor, "allergies")
     row = _find(patient.allergies, allergy_id, "Allergy")
     name = row.substance
     patient.allergies.remove(row)
@@ -77,8 +80,7 @@ async def delete_allergy(db, patient: Patient, actor: User, role: str, allergy_i
 
 
 async def add_medication(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "medications"):
-        _deny("medications")
+    _require_section(role, patient, actor, "medications")
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Name the medication.")
@@ -99,8 +101,7 @@ async def add_medication(db, patient: Patient, actor: User, role: str, body: dic
 
 
 async def update_medication(db, patient: Patient, actor: User, role: str, medication_id: uuid.UUID, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "medications"):
-        _deny("medications")
+    _require_section(role, patient, actor, "medications")
     row = _find(patient.medications, medication_id, "Medication")
     if row.status == "entered_in_error":
         raise HTTPException(status.HTTP_409_CONFLICT, "That medication was removed as a mistake.")
@@ -114,8 +115,7 @@ async def update_medication(db, patient: Patient, actor: User, role: str, medica
 
 
 async def discontinue_medication(db, patient: Patient, actor: User, role: str, medication_id: uuid.UUID, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "medications"):
-        _deny("medications")
+    _require_section(role, patient, actor, "medications")
     row = _find(patient.medications, medication_id, "Medication")
     if row.status != "active":
         raise HTTPException(status.HTTP_409_CONFLICT, "Only an active medication can be discontinued.")
@@ -125,8 +125,7 @@ async def discontinue_medication(db, patient: Patient, actor: User, role: str, m
 
 
 async def delete_medication(db, patient: Patient, actor: User, role: str, medication_id: uuid.UUID, reason: str | None, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "medications"):
-        _deny("medications")
+    _require_section(role, patient, actor, "medications")
     if reason != "entered_in_error":
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -138,8 +137,7 @@ async def delete_medication(db, patient: Patient, actor: User, role: str, medica
 
 
 async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "vitals"):
-        _deny("vitals")
+    _require_section(role, patient, actor, "vitals")
     label = (body.get("label") or "").strip()
     value = (body.get("value") or "").strip()
     if not label or not value:
@@ -157,8 +155,7 @@ async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip
 
 
 async def mark_vital_entered_in_error(db, patient: Patient, actor: User, role: str, vital_id: uuid.UUID, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "vitals"):
-        _deny("vitals")
+    _require_section(role, patient, actor, "vitals")
     row = _find(patient.vitals, vital_id, "Vital")
     if row.status == "entered_in_error":
         raise HTTPException(status.HTTP_409_CONFLICT, "That vital was already marked entered in error.")
@@ -167,8 +164,7 @@ async def mark_vital_entered_in_error(db, patient: Patient, actor: User, role: s
 
 
 async def add_lab(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "labs"):
-        _deny("labs")
+    _require_section(role, patient, actor, "labs")
     name = (body.get("name") or "").strip()
     if not name:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Name the lab test.")
@@ -189,8 +185,7 @@ async def add_lab(db, patient: Patient, actor: User, role: str, body: dict, ip: 
 
 
 async def add_problem(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
-    if not _can_edit_section(role, patient, "diagnoses"):
-        _deny("diagnoses")
+    _require_section(role, patient, actor, "diagnoses")
     description = (body.get("description") or "").strip()
     if not description:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Name the diagnosis.")
@@ -207,8 +202,7 @@ async def add_problem(db, patient: Patient, actor: User, role: str, body: dict, 
 async def set_history(db, patient: Patient, actor: User, role: str, section: str, value: str, ip: str | None) -> None:
     if section not in {"medical_history", "surgical_history", "chief_complaint"}:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That section can't be edited here.")
-    if not _can_edit_section(role, patient, section):
-        _deny(section)
+    _require_section(role, patient, actor, section)
     text = value.strip()
     if section == "medical_history":
         patient.past_medical_history = text
@@ -231,6 +225,7 @@ async def set_placement(db, patient: Patient, actor: User, role: str, body: dict
 async def administer_medication(db, patient: Patient, actor: User, role: str, medication_id: uuid.UUID, dose: str, ip: str | None) -> None:
     if role != "student":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Students record administration. An instructor reviews it afterward.")
+    ensure_student_may_chart(patient, actor, role)
     if patient.care_setting != "Inpatient":
         raise HTTPException(status.HTTP_409_CONFLICT, "Medication administration is recorded for inpatient scenarios.")
     row = _find(patient.medications, medication_id, "Medication")

@@ -41,18 +41,44 @@ async def test_me_returns_frontend_role_shape(client):
 
 
 @pytest.mark.asyncio
-async def test_student_cannot_see_another_students_assessment(client):
+async def test_student_can_review_another_students_chart_but_not_edit_it(client):
     headers, _ = await login(client, "daniel.reyes@miners.utep.edu")
     course = await course_id(client, headers, "PHAR 5320")
     listed = await client.get("/api/v1/patients", headers=headers, params={"course_id": course, "role": "student"})
     mrns = {row["patient"]["mrn"] for row in listed.json()}
     assert "TR-20001" in mrns
-    assert "TR-10057-ST" not in mrns
+    assert "TR-10057-ST" in mrns
 
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     sam = await patient_by_mrn(client, instructor, course, "instructor", "TR-10057-ST")
-    denied = await client.get(f"/api/v1/patients/{sam['id']}", headers=headers, params={"role": "student"})
-    assert denied.status_code == 403
+    viewed = await client.get(f"/api/v1/patients/{sam['id']}", headers=headers, params={"role": "student"})
+    assert viewed.status_code == 200, viewed.text
+    assert viewed.json()["lastName"]
+
+    edited = await client.post(
+        f"/api/v1/patients/{sam['id']}/allergies",
+        headers=headers,
+        params={"role": "student"},
+        json={"substance": "Peanuts", "category": "food", "reaction": "hives"},
+    )
+    assert edited.status_code == 403
+    assert "assigned" in edited.json()["detail"].lower()
+
+    status_change = await client.patch(
+        f"/api/v1/patients/{sam['id']}/status",
+        headers=headers,
+        params={"role": "student"},
+        json={"encounter": "Roomed"},
+    )
+    assert status_change.status_code == 403
+
+    note = await client.post(
+        f"/api/v1/patients/{sam['id']}/notes",
+        headers=headers,
+        params={"role": "student"},
+        json={"templateId": "pharmacy_mtm", "discipline": "pharmacy"},
+    )
+    assert note.status_code == 403
 
 
 @pytest.mark.asyncio

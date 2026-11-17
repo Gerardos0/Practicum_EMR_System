@@ -7,35 +7,35 @@ export const CASELOAD_VIEWS = [
   {
     id: "assigned",
     label: "Assigned patients",
-    description: "Cases your instructor assigned to you. Each one is your own copy: no one else's notes appear on it.",
+    short: "Assigned",
     emptyTitle: "No assigned patients yet",
     emptyBody: "Your instructor will assign cases here.",
   },
   {
     id: "in-clinic",
     label: "In clinic now",
-    description: "Patients who are checked in, roomed, or in a visit right now.",
+    short: "In clinic",
     emptyTitle: "No one is in clinic right now",
     emptyBody: "Checked-in, roomed, and in-progress visits show up here.",
   },
   {
     id: "returned",
     label: "Returned notes",
-    description: "Notes your instructor sent back for you to revise and resubmit.",
+    short: "Returned",
     emptyTitle: "No returned notes",
     emptyBody: "When an instructor returns a note, that patient shows up here.",
   },
   {
     id: "awaiting",
     label: "Awaiting review",
-    description: "Notes you submitted that are waiting on your instructor.",
+    short: "Awaiting",
     emptyTitle: "No notes awaiting review",
     emptyBody: "Submitted notes waiting for an instructor appear here.",
   },
   {
     id: "practice",
     label: "Practice cases",
-    description: "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions.",
+    short: "Practice",
     emptyTitle: "No practice cases",
     emptyBody: "Practice patients for this course will show up here.",
   },
@@ -57,15 +57,16 @@ export function caseloadHref(view: CaseloadView, query = "") {
   return `/patients?${params.toString()}`;
 }
 
-export function matchesCaseload(row: PatientRow, view: CaseloadView): boolean {
+export function matchesCaseload(row: PatientRow, view: CaseloadView, userId?: string): boolean {
   if (row.patient.mode === "case") return false;
   switch (view) {
     case "assigned":
-      return row.patient.mode === "assessment";
+      return row.patient.mode === "assessment" && (!userId || row.patient.ownerId === userId);
     case "practice":
       return row.patient.mode === "practice";
     case "in-clinic":
-      return IN_CLINIC.has(row.patient.status.encounter);
+      return IN_CLINIC.has(row.patient.status.encounter)
+        && (!userId || row.patient.mode === "practice" || row.patient.ownerId === userId);
     case "returned":
       return row.latestNote?.status === "returned";
     case "awaiting":

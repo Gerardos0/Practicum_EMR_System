@@ -1,18 +1,20 @@
 import { useState } from "react";
 import {
-  Alert, Box, Breadcrumbs, Button, Divider, LinearProgress, Link, Paper, Stack, TextField, Typography,
+  Alert, Box, Button, Divider, LinearProgress, Paper, Stack, TextField, Typography,
 } from "@mui/material";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { commentOnNote, cosignNote, getNote, instructorEditNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
 import { getChartGradingGuide } from "../../api/cases";
 import { useSession } from "../auth/useSession";
+import { can } from "../../utils/permissions";
 import { useAsync } from "../../utils/useAsync";
 import { formatDateTime } from "../../utils/format";
 import { disciplineLabel } from "../../utils/labels";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import PageError from "../../components/PageError";
 import PatientBanner from "../patients/components/PatientBanner";
+import BackLink from "../../components/BackLink";
 import ChartReference from "../patients/components/ChartReference";
 import NoteFields from "./components/NoteFields";
 import NoteProgress from "./components/NoteProgress";
@@ -51,6 +53,7 @@ export default function NoteReviewPage() {
   if (!load.data) return <LinearProgress aria-label="Loading note" />;
   const { note, patient } = load.data;
   const pending = note.status === "pending_review";
+  const canReview = can(activeRole, "note:cosign");
 
   const act = async (kind: "cosign" | "return") => {
     if (kind === "return" && !comment.trim()) {
@@ -79,12 +82,12 @@ export default function NoteReviewPage() {
 
   return (
     <Stack spacing={2}>
-      <Breadcrumbs aria-label="Breadcrumb">
-        <Link component={RouterLink} to="/review" underline="hover">Review queue</Link>
-        <Typography color="text.primary">{note.authorName}</Typography>
-      </Breadcrumbs>
+      <BackLink
+        to={activeRole === "admin" ? `/patients/${patient.id}` : "/review"}
+        label={activeRole === "admin" ? "Return to chart" : "Return to review queue"}
+      />
 
-      <PatientBanner patient={patient} ownerName={patient.ownerName} compact />
+      <PatientBanner patient={patient} compact />
 
       <Box
         sx={{
@@ -104,7 +107,7 @@ export default function NoteReviewPage() {
               </Typography>
             </Box>
             <NoteStatusChip status={note.status} />
-            {pending && !note.bodyLocked && (
+            {canReview && pending && !note.bodyLocked && (
               <Button size="small" variant="outlined" onClick={() => {
                 if (editing) {
                   setEditing(false);
@@ -127,7 +130,7 @@ export default function NoteReviewPage() {
               [id]: typeof next === "function" ? next(current[id] ?? "") : next,
             })) : undefined}
             onDiagnoses={editing ? setDraftDiagnoses : undefined}
-            onComment={pending && !editing ? async (sectionId, body) => {
+            onComment={canReview && pending && !editing ? async (sectionId, body) => {
               const updated = await commentOnNote(activeRole, note.id, { sectionId, body });
               load.setData({ note: updated, patient });
             } : undefined}
@@ -166,7 +169,7 @@ export default function NoteReviewPage() {
               <Box sx={{ mt: 2 }}><FeedbackThread items={note.feedback} /></Box>
             )}
 
-            {pending && (
+            {canReview && pending && (
               <Stack spacing={1.5} sx={{ mt: 2 }}>
                 {error && <Alert severity="error">{error}</Alert>}
                 <TextField
@@ -185,7 +188,7 @@ export default function NoteReviewPage() {
                 </Typography>
               </Stack>
             )}
-            {(pending || note.status === "cosigned") && (
+            {canReview && (pending || note.status === "cosigned") && (
               <ScoreForm
                 key={(guide.data?.criteria ?? []).map((item) => item.id).join()}
                 role={activeRole}

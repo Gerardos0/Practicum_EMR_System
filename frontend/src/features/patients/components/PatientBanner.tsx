@@ -9,14 +9,13 @@ import { useSession } from "../../auth/useSession";
 
 interface Props {
   patient: Patient;
-  ownerName?: string;
   onEditStatus?: () => void;
   compact?: boolean;
 }
 
 const card = { borderRadius: "16px", overflow: "hidden" } as const;
 
-export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
+export default function PatientBanner({ patient: p, onEditStatus, compact }: Props) {
   const { activeRole } = useSession();
   const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`;
   const [photo, setPhoto] = useState<{ id: string; src: string }>();
@@ -76,12 +75,8 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap" }}>
-            {p.mode === "case" ? (
+            {p.mode === "case" && (
               <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
-            ) : p.mode === "assessment" ? (
-              <Chip size="small" label={ownerName ? `Assessment case: ${ownerName}` : "Assessment case: only your work appears here"} sx={{ bgcolor: utep.navy, color: "#fff" }} />
-            ) : (
-              <Chip size="small" label={`${p.practiceLabel ?? "Practice patient"}: shared, not graded`} variant="outlined" />
             )}
             <Chip size="small" label="Simulated patient" sx={{ bgcolor: utep.orangeSoft, color: utep.navy }} />
           </Box>

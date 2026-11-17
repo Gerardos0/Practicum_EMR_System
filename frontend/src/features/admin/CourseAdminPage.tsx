@@ -104,7 +104,7 @@ export default function CourseAdminPage() {
       </Box>
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 
-      <Paper component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 2.5 } }}>
+      <Paper component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 2.5 }, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Add a class</Typography>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ alignItems: { md: "flex-start" } }}>
           <TextField size="small" label="Course code" value={code} onChange={(e) => setCode(e.target.value)} required slotProps={{ htmlInput: { maxLength: 30 } }} />
@@ -114,7 +114,7 @@ export default function CourseAdminPage() {
         </Stack>
       </Paper>
 
-      <Paper>
+      <Paper sx={{ overflow: "hidden", borderRadius: "16px" }}>
         {courses.loading && <LinearProgress />}
         <Box sx={{ px: 2.5, pt: 2 }}>
           <Typography component="h2" variant="h6">Classes ({courses.data?.length ?? 0})</Typography>
@@ -154,7 +154,7 @@ export default function CourseAdminPage() {
         </Box>
       </Paper>
 
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6">Activity for every class</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           One workbook with a row per student in each class. Case charts are not included.

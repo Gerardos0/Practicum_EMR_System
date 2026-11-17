@@ -48,7 +48,7 @@ function useNav(): NavItem[] {
   const byRole: Record<Role, NavItem[]> = {
     student: [
       { to: "/dashboard", label: "Dashboard", icon: ICON.dashboard },
-      { to: "/patients", label: "My Patients", icon: ICON.patients },
+      { to: "/patients", label: "Patients", icon: ICON.patients },
     ],
     instructor: [
       { to: "/dashboard", label: "Dashboard", icon: ICON.dashboard },

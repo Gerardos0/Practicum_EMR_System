@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, MenuItem, Paper, TextField, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { copyCase, downloadCaseTemplate, importCases, listCases } from "../../api/cases";
 import { listCoursesForUser } from "../../api/courses";
@@ -10,6 +10,7 @@ import { courseIdsForRole } from "../../utils/permissions";
 import { usePageHeading } from "../../components/usePageHeading";
 import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
+import CensusRow from "../../components/CensusRow";
 import AssignCaseDialog from "../patients/components/AssignCaseDialog";
 import type { AuthoredCase } from "../../types";
 
@@ -59,35 +60,27 @@ export default function CaseListPage() {
           Start from a blank chart. Students will not see the master.
         </EmptyState>
       ) : (
-        <Paper sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Patient</TableCell>
-                <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>MRN</TableCell>
-                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Discipline</TableCell>
-                <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Updated</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {cases.data?.map((item) => (
-                <TableRow key={item.id} hover sx={{ cursor: "pointer" }} onClick={() => navigate(`/cases/${item.id}`)}>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{item.lastName}, {item.firstName}</Typography>
-                    <Typography variant="caption" color="text.secondary">{item.chiefComplaint || "No chief complaint yet"}</Typography>
-                  </TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>{item.mrn}</TableCell>
-                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{item.status.program || "—"}</TableCell>
-                  <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{formatDateTime(item.updatedAt)}</TableCell>
-                  <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                    <Button size="small" onClick={() => setCopyTarget(item)}>Copy to course</Button>
-                    <Button size="small" onClick={() => setAssignCase(item)}>Assign</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <Paper sx={{ overflow: "hidden", borderRadius: "16px" }}>
+          <Box component="ul" aria-label="Case masters" sx={{ listStyle: "none", m: 0, p: 0, containerType: "inline-size" }}>
+            {cases.data?.map((item) => (
+              <CensusRow
+                key={item.id}
+                initials={`${item.firstName[0] ?? ""}${item.lastName[0] ?? ""}`.toUpperCase()}
+                title={`${item.lastName}, ${item.firstName}`}
+                meta={item.mrn}
+                primary={item.chiefComplaint || "No chief complaint yet"}
+                secondary={[item.status.program, formatDateTime(item.updatedAt)].filter(Boolean).join(" · ")}
+                onOpen={() => navigate(`/cases/${item.id}`)}
+                ariaLabel={`Open case for ${item.lastName}, ${item.firstName}`}
+                actions={(
+                  <>
+                    <Button size="small" onClick={() => setCopyTarget(item)} sx={{ display: { xs: "none", sm: "inline-flex" } }}>Copy</Button>
+                    <Button size="small" variant="contained" color="secondary" onClick={() => setAssignCase(item)}>Assign</Button>
+                  </>
+                )}
+              />
+            ))}
+          </Box>
         </Paper>
       )}
 

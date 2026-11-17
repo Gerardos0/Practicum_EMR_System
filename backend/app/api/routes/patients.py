@@ -88,8 +88,6 @@ async def list_patients(
     )
     visible = []
     for patient in patients:
-        if role == "student" and not (patient.mode == "practice" or patient.owner_id == user.id):
-            continue
         if role not in {"student", "instructor", "course_coordinator", "admin", "front_desk"}:
             continue
         author_id = user.id if role == "student" else patient.owner_id

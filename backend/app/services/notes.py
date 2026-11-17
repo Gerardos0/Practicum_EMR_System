@@ -9,7 +9,7 @@ from app.models.user import Discipline, User
 from app.services.access import can, require
 from app.services.audit import log_event
 from app.services.note_prefill import diagnoses_from_patient, prefill_from_patient
-from app.services.charts import utcnow
+from app.services.charts import ensure_student_may_chart, utcnow
 from app.services.note_templates import allowed_section_ids, assert_usable, is_sensitive
 
 EDITABLE = {"draft", "returned"}
@@ -38,6 +38,7 @@ async def create_draft(
     ip: str | None,
 ) -> ClinicalNote:
     require(role, "note:author", "Your role can't write notes.")
+    ensure_student_may_chart(patient, author, role)
     if patient.mode == "case":
         raise HTTPException(status.HTTP_409_CONFLICT, "Edit the case instead of writing a note on the master.")
     if patient.encounter is None:

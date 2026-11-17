@@ -1,61 +1,53 @@
 import { useMemo, useState } from "react";
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
+  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  LinearProgress, Paper, Typography,
 } from "@mui/material";
-import Check from "@mui/icons-material/Check";
 import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import { listPatients, resetPracticePatient, unassignCase, type PatientRow } from "../../api/patients";
 import { useSession } from "../auth/useSession";
-import { can } from "../../utils/permissions";
-import { formatDate, formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
-import NoteStatusChip from "../../components/NoteStatusChip";
+import CountTabs from "../../components/CountTabs";
 import EmptyState from "../../components/EmptyState";
 import { usePageHeading } from "../../components/usePageHeading";
 import AssignCaseDialog from "./components/AssignCaseDialog";
-import { CASELOAD_VIEWS, caseloadHref, caseloadViewMeta, matchesCaseload, parseCaseloadView } from "./caseload";
-import type { CaseMode } from "../../types";
+import { CASELOAD_VIEWS, caseloadViewMeta, matchesCaseload, parseCaseloadView, type CaseloadView } from "./caseload";
+import StatusBoard from "./StatusBoard";
+import TrackerRow from "./TrackerRow";
+import { byPatientName, matchesPatientQuery } from "./tracker";
 
 export default function PatientListPage() {
   const navigate = useNavigate();
-  const { activeRole, courseId } = useSession();
+  const { user, activeRole, courseId } = useSession();
   const isStudent = activeRole === "student";
   const [params, setParams] = useSearchParams();
-  const mode: CaseMode = params.get("mode") === "practice" ? "practice" : "assessment";
   const query = params.get("q") ?? "";
   const view = isStudent ? parseCaseloadView(params.get("view")) : undefined;
   const viewMeta = view ? caseloadViewMeta(view) : undefined;
-  usePageHeading(viewMeta?.label ?? (isStudent ? "My Patients" : "Patients"));
+  usePageHeading(viewMeta?.label ?? "Patients");
   const [resetTarget, setResetTarget] = useState<PatientRow>();
   const [unassignTarget, setUnassignTarget] = useState<PatientRow>();
   const [assignOpen, setAssignOpen] = useState(false);
   const [flash, setFlash] = useState<{ severity: "success" | "error"; text: string }>();
 
   const rows = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
-  const canAssign = can(activeRole, "patient:create");
 
   const clinical = useMemo(
     () => (rows.data ?? []).filter((r) => r.patient.mode !== "case"),
     [rows.data],
   );
-  const counts = useMemo(() => ({
-    assessment: clinical.filter((r) => r.patient.mode === "assessment").length,
-    practice: clinical.filter((r) => r.patient.mode === "practice").length,
-  }), [clinical]);
 
-  const visible = clinical
-    .filter((r) => (view ? matchesCaseload(r, view) : r.patient.mode === mode))
-    .filter((r) => {
-      const q = query.trim().toLowerCase();
-      if (!q) return true;
-      const p = r.patient;
-      const dob = (p.dob || "").slice(0, 10);
-      const [year, month, day] = dob.split("-");
-      const numericDob = year && month && day ? `${month}/${day}/${year}` : "";
-      return [p.firstName, p.lastName, p.mrn, r.ownerName ?? "", dob, numericDob, dob ? formatDate(dob) : ""]
-        .some((v) => v.toLowerCase().includes(q));
-    });
+  const scopeId = isStudent ? user.id : undefined;
+  const searched = clinical.filter((r) => matchesPatientQuery(r, query));
+  const visible = view
+    ? searched.filter((r) => matchesCaseload(r, view, scopeId)).sort(byPatientName)
+    : searched;
+
+  const selectCategory = (id: CaseloadView) => {
+    const next = new URLSearchParams(params);
+    next.set("view", id);
+    setParams(next, { replace: true });
+  };
 
   const doReset = async () => {
     if (!resetTarget) return;
@@ -94,168 +86,64 @@ export default function PatientListPage() {
       {flash && (
         <Alert severity={flash.severity} onClose={() => setFlash(undefined)} sx={{ mb: 2 }}>{flash.text}</Alert>
       )}
-      <Paper>
-        {view && viewMeta ? (
-          <Box sx={{ px: 2.5, pt: 2.5, pb: 1 }}>
-            <Typography sx={{ fontSize: 28, fontWeight: 500, color: "#202124", lineHeight: 1.2 }}>
-              Filter by category
-            </Typography>
-            <Typography sx={{ mt: 0.5, fontSize: 16, color: "#5F6368" }}>{viewMeta.description}</Typography>
-            <Box
-              role="navigation"
-              aria-label="Patient categories"
-              sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mt: 2.5 }}
-            >
-              {CASELOAD_VIEWS.map((item) => {
-                const selected = item.id === view;
-                const count = clinical.filter((r) => matchesCaseload(r, item.id)).length;
-                return (
-                  <Chip
-                    key={item.id}
-                    component={RouterLink}
-                    to={caseloadHref(item.id, query)}
-                    clickable
-                    variant="outlined"
-                    icon={selected ? <Check /> : undefined}
-                    label={`${item.label} (${count})`}
-                    aria-current={selected ? "page" : undefined}
-                    sx={categoryChipSx(selected)}
-                  />
-                );
-              })}
-            </Box>
-            <Button
-              component={RouterLink}
-              to={query ? `/patients?q=${encodeURIComponent(query)}` : "/patients"}
-              sx={{
-                mt: 2.5, alignSelf: "flex-start", bgcolor: "#F1F3F4", color: "#3C4043",
-                borderRadius: "10px", px: 2.75, py: 1.25, minHeight: 48, fontSize: 15, fontWeight: 600,
-                "&:hover": { bgcolor: "#E8EAED" },
-              }}
-            >
-              All patients
-            </Button>
-          </Box>
-        ) : (
-        <Tabs
-          value={mode} onChange={(_, v) => setParams({ mode: v, ...(query ? { q: query } : {}) }, { replace: true })}
-          sx={{ px: 1, borderBottom: 1, borderColor: "divider" }} aria-label="Case type"
-        >
-          <Tab value="assessment" label={`${isStudent ? "Assigned cases" : "Assessment cases"} (${counts.assessment})`} />
-          <Tab value="practice" label={`Practice patients (${counts.practice})`} />
-        </Tabs>
-        )}
-
-        {!view && (
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 2, pt: 1.5, flexWrap: "wrap" }}>
-          <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 220 }}>
-            {mode === "assessment"
-              ? isStudent
-                ? "Cases your instructor assigned to you. Each one is your own copy: no one else's notes appear on it."
-                : "One private copy per student. Open a case to see that student's work, or remove it from them."
-              : "Shared patients for learning the system. Nothing here is graded, and instructors reset them between sessions."}
-          </Typography>
-          {canAssign && (
-            <Button size="small" variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button>
-          )}
-        </Box>
-        )}
-
-        {rows.loading && <LinearProgress sx={{ mt: 1 }} aria-label="Loading patients" />}
-
-        <Box sx={{ overflowX: "auto", p: 1 }}>
-          {rows.loading ? null : visible.length === 0 ? (
-            <Box sx={{ p: 2 }}>
-              <EmptyState
-                title={query ? "No patients match that search" : viewMeta ? viewMeta.emptyTitle : mode === "assessment" ? "No cases assigned yet" : "No practice patients in this course"}
-                action={!query && !view && mode === "assessment" && canAssign ? <Button variant="contained" onClick={() => setAssignOpen(true)}>Assign case</Button> : undefined}
+      {rows.loading && !rows.data ? (
+        <LinearProgress aria-label="Loading patients" />
+      ) : !view ? (
+          <StatusBoard
+            rows={searched}
+            query={query}
+            onAssign={() => setAssignOpen(true)}
+            onReset={setResetTarget}
+            onUnassign={setUnassignTarget}
+          />
+      ) : viewMeta ? (
+        <Paper sx={{ overflow: "hidden", borderRadius: "16px" }}>
+          <CountTabs
+            ariaLabel="Patient categories"
+            idPrefix="category-tab"
+            panelId="category-panel"
+            value={view}
+            onChange={(id) => selectCategory(id as CaseloadView)}
+            tabs={CASELOAD_VIEWS.map((item) => ({
+              id: item.id,
+              label: item.short,
+              count: searched.filter((r) => matchesCaseload(r, item.id, scopeId)).length,
+            }))}
+            action={(
+              <Button
+                component={RouterLink}
+                to={query ? `/patients?q=${encodeURIComponent(query)}` : "/patients"}
+                size="small"
+                variant="contained"
+                color="secondary"
               >
-                {query ? "Try a last name, a date of birth, or the full MRN." : viewMeta ? viewMeta.emptyBody : mode === "assessment" && isStudent ? "Your instructor will assign cases here. Try a practice patient in the meantime." : mode === "assessment" && canAssign ? "Pick students and a case to create their private copies." : undefined}
-              </EmptyState>
-            </Box>
-          ) : (
-            <Table size="small" sx={{ minWidth: { xs: 0, sm: 640 } }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Patient</TableCell>
-                  {!isStudent && mode === "assessment" && (
-                    <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>Student</TableCell>
-                  )}
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Age, sex</TableCell>
-                  <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>Visit</TableCell>
-                  <TableCell>{isStudent ? "My note" : "Latest note"}</TableCell>
-                  <TableCell align="right"><Box component="span" sx={visuallyHidden}>Actions</Box></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visible.map((r) => {
-                  const p = r.patient;
-                  const open = () => navigate(`/patients/${p.id}`);
-                  return (
-                    <TableRow
-                      key={p.id}
-                      hover
-                      onClick={open}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
-                      tabIndex={0}
-                      sx={{ cursor: "pointer" }}
-                      aria-label={`Open chart for ${p.lastName}, ${p.firstName}`}
-                    >
-                      <TableCell sx={{ maxWidth: { xs: 140, sm: "none" } }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {p.lastName}, {p.firstName}
-                          {p.practiceLabel && <Chip size="small" label={p.practiceLabel} variant="outlined" sx={{ ml: 1 }} />}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">MRN {p.mrn}</Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: { xs: "block", sm: "none" } }}
-                        >
-                          {p.ageYears} y, {p.sexAtBirth} · {p.status.encounter}
-                        </Typography>
-                      </TableCell>
-                      {!isStudent && mode === "assessment" && (
-                        <TableCell sx={{ display: { xs: "none", md: "table-cell" } }}>{r.ownerName}</TableCell>
-                      )}
-                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                        {p.ageYears} y, {p.sexAtBirth}
-                      </TableCell>
-                      <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                        <Chip size="small" label={p.status.encounter} color={p.status.encounter === "Checked in" || p.status.encounter === "Roomed" || p.status.encounter === "In progress" ? "info" : "default"} variant="outlined" />
-                      </TableCell>
-                      <TableCell>
-                        <NoteStatusChip status={r.latestNote?.status} />
-                        {r.latestNote && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: { xs: "none", sm: "block" } }}
-                          >
-                            {formatDateTime(r.latestNote.updatedAt)}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="right" sx={{ whiteSpace: "nowrap", pl: { xs: 0.5, sm: 2 } }} onClick={(e) => e.stopPropagation()}>
-                        {mode === "practice" && can(activeRole, "patient:reset_practice") && (
-                          <Button size="small" color="inherit" onClick={() => setResetTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>Reset</Button>
-                        )}
-                        {mode === "assessment" && canAssign && (
-                          <Button size="small" color="inherit" onClick={() => setUnassignTarget(r)} sx={{ mr: 1, display: { xs: "none", sm: "inline-flex" } }}>Remove</Button>
-                        )}
-                        <Button size="small" variant="contained" onClick={open}>
-                          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Open chart</Box>
-                          <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Open</Box>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </Box>
-      </Paper>
+                All patients
+              </Button>
+            )}
+          />
+          <Box role="tabpanel" id="category-panel" aria-labelledby={`category-tab-${view}`} sx={{ bgcolor: "#fff" }}>
+            {visible.length === 0 ? (
+              <Box sx={{ px: 2, py: 2.5 }}>
+                <EmptyState title={query ? "No patients match that search" : viewMeta.emptyTitle}>
+                  {query ? "Try a last name, a date of birth, or the full MRN." : viewMeta.emptyBody}
+                </EmptyState>
+              </Box>
+            ) : (
+              <Box component="ul" aria-label={viewMeta.label} sx={{ listStyle: "none", m: 0, p: 0, containerType: "inline-size" }}>
+                {visible.map((row) => (
+                  <TrackerRow
+                    key={row.patient.id}
+                    row={row}
+                    isStudent
+                    userId={user.id}
+                    onOpen={() => navigate(`/patients/${row.patient.id}`)}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      ) : null}
 
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
         Every record is simulated and excluded from reporting.
@@ -306,28 +194,3 @@ export default function PatientListPage() {
     </Box>
   );
 }
-
-const CATEGORY_BLUE = "#1A73E8";
-
-function categoryChipSx(selected: boolean) {
-  return {
-    height: 42,
-    borderRadius: "999px",
-    px: 0.25,
-    fontSize: 15,
-    fontWeight: 600,
-    textDecoration: "none",
-    bgcolor: "#fff",
-    color: selected ? CATEGORY_BLUE : "#3C4043",
-    borderColor: selected ? CATEGORY_BLUE : "#DADCE0",
-    "& .MuiChip-icon": { color: CATEGORY_BLUE, fontSize: 20, ml: "12px" },
-    "& .MuiChip-label": { px: 1.75 },
-    "&:hover, &.MuiChip-clickable:hover": {
-      bgcolor: selected ? "rgba(26,115,232,0.06)" : "#F8F9FA",
-    },
-  } as const;
-}
-
-const visuallyHidden = {
-  position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
-} as const;
