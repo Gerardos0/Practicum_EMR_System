@@ -104,7 +104,7 @@ function Overview({ chart, intake, onComplete }: { chart: PortalChart; intake: P
       {chart.patient ? (
         <ProfileCompleteness intake={intake} onComplete={onComplete} />
       ) : (
-        <Alert severity="info">There is no patient chart linked to this account yet. Chart details, lab results, and medications will appear here when available.</Alert>
+        <Alert severity="info">No chart is linked to this account yet.</Alert>
       )}
       <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Last visit</Typography>
@@ -270,8 +270,8 @@ export default function PatientPortalPage({ previewMode = false }: { previewMode
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", p: { xs: 2, sm: 3 } }}>
           <Box>
             <Typography variant="overline" sx={{ fontWeight: 700, letterSpacing: "0.06em", color: utep.ink2 }}>Patient portal</Typography>
-            <Typography component="h1" variant="h4" sx={{ lineHeight: 1.15 }}>Your health, at a glance</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Visit details, medications, and recent lab results.</Typography>
+            <Typography component="h1" variant="h4" sx={{ lineHeight: 1.15 }}>Your record</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Visits, medications, and labs.</Typography>
           </Box>
         </Stack>
       </Box>

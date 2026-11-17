@@ -1,15 +1,17 @@
 import { createTheme } from "@mui/material/styles";
 import { fontDisplay, fontFamily, pageAtmosphere, utep } from "./tokens";
 
+export type TextScale = 1 | 1.25 | 1.5;
+
 export interface DisplayPrefs {
-  textScale: 1 | 1.15 | 1.3;
+  textScale: TextScale;
   highContrast: boolean;
   navCollapsed: boolean;
 }
 
-export function createAppTheme({ textScale, highContrast }: DisplayPrefs) {
-  const line = highContrast ? "#5B6577" : utep.lineSoft;
-  const ink2 = highContrast ? utep.ink : utep.ink2;
+export function createAppTheme({ highContrast }: DisplayPrefs) {
+  const line = highContrast ? "#243044" : utep.lineSoft;
+  const ink2 = highContrast ? "#0B0E14" : utep.ink2;
   const pageBg = highContrast ? "#FFFFFF" : utep.page;
 
   return createTheme({
@@ -27,7 +29,7 @@ export function createAppTheme({ textScale, highContrast }: DisplayPrefs) {
     shape: { borderRadius: 4 },
     typography: {
       fontFamily,
-      fontSize: 14 * textScale,
+      fontSize: 14,
       h1: { fontFamily: fontDisplay, fontWeight: 700, letterSpacing: "-0.03em" },
       h2: { fontFamily: fontDisplay, fontWeight: 700, letterSpacing: "-0.025em" },
       h3: { fontFamily: fontDisplay, fontWeight: 700, letterSpacing: "-0.02em" },
@@ -37,7 +39,7 @@ export function createAppTheme({ textScale, highContrast }: DisplayPrefs) {
       subtitle1: { fontWeight: 600 },
       subtitle2: { fontWeight: 650 },
       button: { textTransform: "none", fontWeight: 600, fontFamily },
-      overline: { textTransform: "none", letterSpacing: "0.04em", fontWeight: 600, fontSize: 11 * textScale },
+      overline: { textTransform: "none", letterSpacing: "0.04em", fontWeight: 600, fontSize: 11 },
     },
     components: {
       MuiCssBaseline: {
@@ -96,7 +98,7 @@ export function createAppTheme({ textScale, highContrast }: DisplayPrefs) {
             color: utep.ink,
             backgroundColor: highContrast ? "#F0F2F5" : "rgba(14, 34, 80, 0.04)",
             borderBottom: `2px solid ${utep.navy}`,
-            fontSize: 12.5 * textScale,
+            fontSize: 12.5,
           },
           root: { borderColor: line },
         },

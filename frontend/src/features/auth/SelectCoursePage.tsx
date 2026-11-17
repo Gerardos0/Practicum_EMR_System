@@ -106,10 +106,8 @@ export default function SelectCoursePage() {
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 3, maxWidth: "42ch" }}>
           {activeRole === "admin"
-            ? "Administration is separate from teaching."
-            : "Choose the course you're working in today."}
-          {activeRole === "student" && " You'll see the patients and cases assigned to that class."}
-          {(activeRole === "instructor" || activeRole === "course_coordinator") && " You'll review notes and teach that class."}
+            ? "Set up classes, rosters, and reports."
+            : "Choose the course for this session."}
         </Typography>
 
         {roles.length > 1 && (

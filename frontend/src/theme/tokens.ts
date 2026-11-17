@@ -12,7 +12,23 @@ export const utep = {
   paper: "#FFFFFF",
   alert: "#B42318",
   alertSoft: "#FEF3F2",
-} as const;
+};
+
+const paletteBase = {
+  ink: utep.ink,
+  ink2: utep.ink2,
+  line: utep.line,
+  lineSoft: utep.lineSoft,
+  page: utep.page,
+};
+
+/** High contrast darkens body text and rules. Called before each themed render. */
+export function applyContrast(high: boolean) {
+  const next = high
+    ? { ink: "#0B0E14", ink2: "#1A2230", line: "#243044", lineSoft: "#3C4A60", page: "#FFFFFF" }
+    : paletteBase;
+  Object.assign(utep, next);
+}
 
 /** Body / UI text — Source Sans 3 (clinical, not Inter/Roboto). */
 export const fontFamily = [

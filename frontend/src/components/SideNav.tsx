@@ -111,17 +111,24 @@ function DisplayPrefsButton() {
 
   return (
     <>
-      <Button startIcon={<TextFieldsOutlined fontSize="small" />} sx={itemSx} onClick={(e) => setAnchor(e.currentTarget)}>
-        Text size & contrast
+      <Button startIcon={<TextFieldsOutlined fontSize="small" />} sx={{ ...itemSx, alignItems: "flex-start" }} onClick={(e) => setAnchor(e.currentTarget)}>
+        <Box sx={{ textAlign: "left", lineHeight: 1.25 }}>
+          Text size & contrast
+          {(prefs.textScale !== 1 || prefs.highContrast) && (
+            <Box component="span" sx={{ display: "block", fontSize: 12, fontWeight: 600, opacity: 0.8 }}>
+              {Math.round(prefs.textScale * 100)}%{prefs.highContrast ? " · high contrast" : ""}
+            </Box>
+          )}
+        </Box>
       </Button>
       <Menu
         anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         transformOrigin={{ vertical: "bottom", horizontal: "left" }}
       >
-        <MenuItem selected={prefs.textScale === 1} onClick={() => setPrefs({ textScale: 1 })}>Default text</MenuItem>
-        <MenuItem selected={prefs.textScale === 1.15} onClick={() => setPrefs({ textScale: 1.15 })}>Larger text</MenuItem>
-        <MenuItem selected={prefs.textScale === 1.3} onClick={() => setPrefs({ textScale: 1.3 })}>Largest text</MenuItem>
+        <MenuItem selected={prefs.textScale === 1} onClick={() => setPrefs({ textScale: 1 })}>Default · 100%</MenuItem>
+        <MenuItem selected={prefs.textScale === 1.25} onClick={() => setPrefs({ textScale: 1.25 })}>Large · 125%</MenuItem>
+        <MenuItem selected={prefs.textScale === 1.5} onClick={() => setPrefs({ textScale: 1.5 })}>Largest · 150%</MenuItem>
         <MenuItem onClick={() => setPrefs({ highContrast: !prefs.highContrast })}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
             High contrast

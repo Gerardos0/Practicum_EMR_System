@@ -163,27 +163,33 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
             </Select>
           )}
 
-          <Tooltip title="Text size and contrast">
+          <Tooltip title={`Text size ${Math.round(prefs.textScale * 100)}%${prefs.highContrast ? ", high contrast" : ""}`}>
             <IconButton aria-label="Display settings" sx={{ color: utep.navy }} onClick={(e) => setAnchor(e.currentTarget)}>
               <TextIncreaseOutlined />
             </IconButton>
           </Tooltip>
           <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
-            <Box sx={{ px: 2, py: 1.5, width: 260 }}>
-              <Typography variant="subtitle2" id="text-size" sx={{ mb: 1 }}>Text size</Typography>
+            <Box sx={{ px: 2, py: 1.5, width: 280 }}>
+              <Typography variant="subtitle2" id="text-size" sx={{ mb: 0.25 }}>Text size</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Large is 125%. Largest is 150%.
+              </Typography>
               <ToggleButtonGroup
                 exclusive fullWidth size="small" value={prefs.textScale} aria-labelledby="text-size"
                 onChange={(_, v) => v && setPrefs({ textScale: v })}
               >
-                <ToggleButton value={1}>Default</ToggleButton>
-                <ToggleButton value={1.15}>Large</ToggleButton>
-                <ToggleButton value={1.3}>Largest</ToggleButton>
+                <ToggleButton value={1}>100%</ToggleButton>
+                <ToggleButton value={1.25}>125%</ToggleButton>
+                <ToggleButton value={1.5}>150%</ToggleButton>
               </ToggleButtonGroup>
               <Divider sx={{ my: 1.5 }} />
               <FormControlLabel
                 control={<Switch checked={prefs.highContrast} onChange={(e) => setPrefs({ highContrast: e.target.checked })} />}
                 label="High contrast"
               />
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                Darker text and borders on a white page.
+              </Typography>
             </Box>
           </Menu>
 

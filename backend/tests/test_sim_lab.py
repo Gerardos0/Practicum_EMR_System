@@ -24,6 +24,9 @@ async def test_instructor_assigns_student_sees_mine_and_clear(client):
     catalog = rooms.json()
     assert any(r["number"] == "109" for r in catalog)
     assert any(r["number"] == "126" and r["bedCount"] == 10 for r in catalog)
+    room_127 = next(r for r in catalog if r["number"] == "127")
+    assert room_127["bedCount"] == 5
+    assert room_127["bedOptions"] == ["A", "B", "C", "D", "E"]
     room_109 = next(r for r in catalog if r["number"] == "109")
     assert room_109["bedOptions"] == ["A", "B", "C", "D", "E"]
     assert room_109["softCapacity"] == 25
