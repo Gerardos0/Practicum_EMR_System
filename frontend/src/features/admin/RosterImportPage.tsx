@@ -56,7 +56,7 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
         : parsed.map((row) => ({ ...row, problem: row.problem === "ID must be a 9-digit 800 number" ? undefined : row.problem }));
       setRows(ready);
       setFileName(file.name);
-      if (ready.length === 0) setMessage({ kind: "error", text: "No rows found. The first sheet needs a name and a UTEP email." });
+      if (ready.length === 0) setMessage({ kind: "error", text: "No rows found. The first sheet needs a name and an email." });
     } catch {
       setMessage({ kind: "error", text: "That file couldn't be read. Upload an .xlsx, .xls, or .csv file." });
     }
@@ -161,7 +161,7 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Or upload a spreadsheet</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Upload Excel or CSV. Students need a name, UTEP email, and 800 number. Instructors need a name and UTEP email. Existing accounts are enrolled. <Link href={templateHref} download="roster-template.csv">Download a template</Link>.
+              Upload Excel or CSV. Students need a name, email, and 800 number. Instructors need a name and email. Existing accounts are enrolled. <Link href={templateHref} download="roster-template.csv">Download a template</Link>.
             </Typography>
           <input ref={fileInput} type="file" hidden accept=".xlsx,.xls,.csv" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
           <Button variant="outlined" startIcon={<UploadFileOutlined />} onClick={() => fileInput.current?.click()}>
