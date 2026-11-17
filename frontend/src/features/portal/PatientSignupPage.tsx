@@ -6,7 +6,7 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { patientSignupByEmail } from "../../api/portalAccounts";
 import BrandLogo from "../../components/BrandLogo";
-import { brandAccentBar, brandAtmosphere, utep } from "../../theme/tokens";
+import { brandAtmosphere, utep } from "../../theme/tokens";
 import { useAuth } from "../auth/useSession";
 
 export default function PatientSignupPage() {
@@ -63,7 +63,7 @@ export default function PatientSignupPage() {
         px: { xs: 2, sm: 4 },
       }}
     >
-      <Box aria-hidden sx={{ height: 5, background: brandAccentBar, mx: { xs: -2, sm: -4 } }} />
+      <Box aria-hidden sx={{ height: 5, bgcolor: utep.orange, mx: { xs: -2, sm: -4 } }} />
       <Box
         component="header"
         sx={{ width: "100%", maxWidth: 1080, mx: "auto", py: { xs: 2.5, sm: 3.5 } }}
