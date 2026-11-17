@@ -27,8 +27,8 @@ interface StatProps {
 export function StatCard({ label, value, icon, tone, iconColor, to }: StatProps) {
   const t = TONES[tone];
   const sx = {
-    display: "flex", flexDirection: "column", gap: 1, p: 2.25, borderRadius: 1,
-    bgcolor: t.bg, color: t.ink, textDecoration: "none", minHeight: 128,
+    display: "flex", alignItems: "center", gap: 1.25, px: 1.5, py: 1.15, borderRadius: 1,
+    bgcolor: t.bg, color: t.ink, textDecoration: "none", minHeight: 64,
     transition: "transform 160ms ease",
     "&:hover": { transform: "translateY(-1px)" },
     "@media (prefers-reduced-motion: reduce)": { transition: "none", "&:hover": { transform: "none" } },
@@ -39,14 +39,16 @@ export function StatCard({ label, value, icon, tone, iconColor, to }: StatProps)
       <Box
         aria-hidden
         sx={{
-          width: 36, height: 36, borderRadius: 1, display: "grid", placeItems: "center",
+          width: 32, height: 32, borderRadius: 1, display: "grid", placeItems: "center", flexShrink: 0,
           bgcolor: iconColor ?? t.iconBg, color: iconColor ? "#fff" : t.iconInk,
         }}
       >
         {icon}
       </Box>
-      <Typography sx={{ fontSize: 14, fontWeight: 600, opacity: 0.92 }}>{label}</Typography>
-      <Typography sx={{ fontSize: 28, fontWeight: 750, lineHeight: 1, letterSpacing: "-0.02em" }}>{value}</Typography>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontSize: 22, fontWeight: 750, lineHeight: 1, letterSpacing: "-0.02em" }}>{value}</Typography>
+        <Typography noWrap sx={{ fontSize: 13, fontWeight: 600, opacity: 0.92, mt: 0.35 }}>{label}</Typography>
+      </Box>
     </>
   );
   return to ? <Box component={RouterLink} to={to} sx={sx}>{body}</Box> : <Box sx={sx}>{body}</Box>;
@@ -54,9 +56,9 @@ export function StatCard({ label, value, icon, tone, iconColor, to }: StatProps)
 
 export function StatGrid({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Box component="section" aria-label={title} sx={{ py: 0.5 }}>
-      <Typography component="h2" variant="h6" sx={{ color: utep.navy, mb: 1.75 }}>{title}</Typography>
-      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+    <Box component="section" aria-label={title}>
+      <Typography component="h2" variant="h6" sx={{ color: utep.navy, mb: 1, fontSize: 16 }}>{title}</Typography>
+      <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
         {children}
       </Box>
     </Box>
@@ -69,10 +71,12 @@ interface PanelProps {
   action?: { label: string; to: string };
   accent?: boolean;
   flush?: boolean;
+  /** Stretch to the row and scroll the body instead of the page. */
+  fill?: boolean;
   children: ReactNode;
 }
 
-export function Panel({ title, subtitle, action, accent, flush, children }: PanelProps) {
+export function Panel({ title, subtitle, action, accent, flush, fill, children }: PanelProps) {
   return (
     <Paper
       component="section" aria-label={title}
@@ -80,14 +84,20 @@ export function Panel({ title, subtitle, action, accent, flush, children }: Pane
         borderRadius: "16px",
         boxShadow: "none",
         overflow: "hidden",
-        px: flush ? 0 : 2.75,
-        pt: flush ? 2.25 : 2.75,
-        pb: flush ? 0 : 2.75,
-        ...(accent && { borderTop: `5px solid ${utep.orange}` }),
+        px: flush ? 0 : 2,
+        pt: flush ? 1.5 : 2,
+        pb: flush ? 0 : 2,
+        ...(accent && { borderTop: `4px solid ${utep.orange}` }),
+        ...(fill && {
+          height: { md: "100%" },
+          minHeight: { md: 0 },
+          display: "flex",
+          flexDirection: "column",
+        }),
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "baseline", gap: 2, mb: subtitle ? 0.5 : flush ? 1.25 : 1.5, px: flush ? 2.75 : 0 }}>
-        <Typography component="h2" variant="h6" sx={{ flex: 1, color: utep.navy, fontSize: 18 }}>{title}</Typography>
+      <Box sx={{ display: "flex", alignItems: "baseline", gap: 2, flexShrink: 0, mb: subtitle ? 0.25 : 1, px: flush ? 2 : 0 }}>
+        <Typography component="h2" variant="h6" sx={{ flex: 1, color: utep.navy, fontSize: 16 }}>{title}</Typography>
         {action && (
           <Link component={RouterLink} to={action.to} underline="hover" sx={{ fontWeight: 600, fontSize: 14, color: utep.navy, whiteSpace: "nowrap" }}>
             {action.label}
@@ -95,11 +105,13 @@ export function Panel({ title, subtitle, action, accent, flush, children }: Pane
         )}
       </Box>
       {subtitle && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, px: flush ? 2.75 : 0 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1, flexShrink: 0, px: flush ? 2 : 0 }}>
           {subtitle}
         </Typography>
       )}
-      {children}
+      <Box sx={fill ? { flex: 1, minHeight: { md: 0 }, overflow: { md: "auto" } } : undefined}>
+        {children}
+      </Box>
     </Paper>
   );
 }

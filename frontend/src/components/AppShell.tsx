@@ -12,7 +12,7 @@ export default function AppShell() {
 
   return (
     <PageHeadingProvider>
-      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+      <Box sx={{ display: "flex", height: "100dvh", overflow: "hidden", bgcolor: "background.default" }}>
         <Box
           component="a" href="#main"
           sx={{
@@ -25,9 +25,9 @@ export default function AppShell() {
 
         <SideNav mobileOpen={navOpen} onClose={() => setNavOpen(false)} />
 
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <AppHeader onOpenNav={() => setNavOpen(true)} />
-          <Box component="main" id="main" tabIndex={-1} sx={{ flex: 1, p: { xs: 2, md: 3 }, outline: "none" }}>
+          <Box component="main" id="main" tabIndex={-1} sx={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", p: { xs: 1.5, md: 2 }, outline: "none" }}>
             <LabAssignmentStrip />
             <Outlet />
           </Box>
