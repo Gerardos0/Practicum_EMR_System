@@ -1,14 +1,15 @@
 import { useState, type FormEvent } from "react";
 import {
-  Alert, Box, Breadcrumbs, Button, Checkbox, FormControlLabel, LinearProgress, Link, MenuItem, Paper, Stack, TextField, Typography,
+  Alert, Box, Button, Checkbox, FormControlLabel, LinearProgress, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { createCase, getCase, updateCase, type CaseInput } from "../../api/cases";
 import { savePatientPhoto } from "../../api/patients";
 import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
+import BackLink from "../../components/BackLink";
 import AnswerKeyEditor from "./AnswerKeyEditor";
 import CaseRubricPanel from "./CaseRubricPanel";
 import CaseTriggersEditor from "./CaseTriggersEditor";
@@ -298,13 +299,13 @@ export default function CaseEditorPage() {
 
   return (
     <Stack component="form" spacing={2.5} onSubmit={save}>
-      <Breadcrumbs aria-label="Breadcrumb">
-        <Link component={RouterLink} to="/cases" underline="hover">Cases</Link>
-        <Typography color="text.primary">{isNew ? "New case" : `${draft.lastName}, ${draft.firstName}`}</Typography>
-      </Breadcrumbs>
-      <Typography variant="body2" color="text.secondary">
-        {isNew ? "Students cannot see this master." : `${existing.data?.mrn}. Saving changes the master only. Assigned copies stay as they were.`}
-      </Typography>
+      <BackLink to="/cases" label="Return to cases" />
+      <Box>
+        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>{isNew ? "New case" : `${draft.lastName}, ${draft.firstName}`}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {isNew ? "Students cannot see this master." : `${existing.data?.mrn}. Saving changes the master only. Assigned copies stay as they were.`}
+        </Typography>
+      </Box>
       {error && <Alert severity="error">{error}</Alert>}
       {photoMessage && <Alert severity="success">{photoMessage}</Alert>}
       {!isNew && (

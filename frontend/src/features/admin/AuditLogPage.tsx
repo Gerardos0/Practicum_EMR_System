@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Box, FormControlLabel, LinearProgress, MenuItem, Paper, Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography,
+  Box, FormControlLabel, LinearProgress, MenuItem, Paper, Switch, TextField, Typography,
 } from "@mui/material";
 import { listAudit } from "../../api/audit";
 import { listCoursesForUser } from "../../api/courses";
@@ -10,6 +10,7 @@ import { useSession } from "../auth/useSession";
 import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
 import { actionLabel } from "./auditLabels";
+import CensusRow, { nameInitials } from "../../components/CensusRow";
 
 export default function AuditLogPage() {
   const { user, courseId: sessionCourseId, activeRole } = useSession();
@@ -61,31 +62,27 @@ export default function AuditLogPage() {
         <TextField size="small" placeholder="Filter by person, action, or record" value={q} onChange={(e) => setQ(e.target.value)} slotProps={{ htmlInput: { "aria-label": "Filter activity" } }} sx={{ width: { xs: "100%", sm: 300 } }} />
         <FormControlLabel control={<Switch checked={deniedOnly} onChange={(e) => setDeniedOnly(e.target.checked)} />} label="Denied only" />
       </Box>
-      <Paper>
+      <Paper sx={{ overflow: "hidden", borderRadius: "16px" }}>
         {loading && <LinearProgress />}
-        <Box sx={{ overflowX: "auto" }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow><TableCell>When</TableCell><TableCell>Who</TableCell><TableCell>Action</TableCell><TableCell>Record</TableCell><TableCell>Result</TableCell></TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((a) => (
-                <TableRow key={a.id} sx={a.result === "denied" ? { bgcolor: "#FEF3F2" } : undefined}>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateTime(a.timestamp)}</TableCell>
-                  <TableCell>{a.actorName}</TableCell>
-                  <TableCell>{actionLabel(a.action, a.detail)}</TableCell>
-                  <TableCell>{a.entity}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: a.result === "denied" ? "error.main" : "success.main" }}>
-                      {a.result === "denied" ? "Denied" : "Allowed"}
-                    </Typography>
-                    {a.detail && <Typography variant="caption" color="text.secondary">{a.detail}</Typography>}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Box>
+        {rows.length === 0 && !loading ? (
+          <Typography variant="body2" color="text.secondary" sx={{ p: 2.5 }}>No activity matches that filter.</Typography>
+        ) : (
+          <Box component="ul" aria-label="Activity" sx={{ listStyle: "none", m: 0, p: 0, containerType: "inline-size" }}>
+            {rows.map((event) => (
+              <CensusRow
+                key={event.id}
+                initials={nameInitials(event.actorName)}
+                title={event.actorName}
+                meta={actionLabel(event.action, event.detail)}
+                primary={event.entity}
+                secondary={[formatDateTime(event.timestamp), event.result === "denied" ? "Denied" : "Allowed", event.detail].filter(Boolean).join(" · ")}
+                ariaLabel={`${event.actorName} ${event.action}`}
+                highlight={event.result === "denied"}
+                wrap
+              />
+            ))}
+          </Box>
+        )}
       </Paper>
     </Box>
   );

@@ -281,3 +281,26 @@ async def test_admin_activity_log_is_available_without_a_course(client):
     instructor, _ = await login(client, "joe.mota@utep.edu")
     missing_course = await client.get("/api/v1/audit", headers=instructor, params={"role": "instructor"})
     assert missing_course.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_admin_chart_activity_stays_on_that_chart(client):
+    admin, _ = await login(client, "clarissa.dominguez@utep.edu")
+    course = await course_id(client, admin, "PHAR 5320")
+    patient = await patient_by_mrn(client, admin, course, "admin", "TR-X-CRUZ")
+    other = await patient_by_mrn(client, admin, course, "admin", "TR-M-STARK")
+    opened = await client.get(f"/api/v1/patients/{patient['id']}", headers=admin, params={"role": "admin"})
+    assert opened.status_code == 200, opened.text
+
+    log = await client.get("/api/v1/audit", headers=admin, params={"role": "admin", "patient_id": patient["id"]})
+    assert log.status_code == 200, log.text
+    rows = log.json()
+    assert any(row["action"] == "chart.view" and row["entity"] == f"patient/{patient['id']}" for row in rows)
+    assert all(not row["entity"].startswith("patient/") or row["entity"] == f"patient/{patient['id']}" for row in rows)
+    assert all(f"patient/{other['id']}" not in row["entity"] for row in rows)
+
+    student, _ = await login(client, "daniel.reyes@miners.utep.edu")
+    hidden = await client.get(
+        "/api/v1/audit", headers=student, params={"role": "student", "patient_id": patient["id"], "course_id": course},
+    )
+    assert hidden.status_code == 403

@@ -8,7 +8,7 @@ import VitalsChart from "./VitalsChart";
 import PatientReportedCard from "./PatientReportedCard";
 import { useSession } from "../../auth/useSession";
 import { can } from "../../../utils/permissions";
-import { canEditSection } from "../../chart/access";
+import { canChartPatient, canEditSection } from "../../chart/access";
 import { formatDate, formatDateTime } from "../../../utils/format";
 import { useAsync } from "../../../utils/useAsync";
 import { utep } from "../../../theme/tokens";
@@ -44,7 +44,8 @@ const CATEGORIES: { id: AllergyCategory; label: string }[] = [
 export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: Props) {
   const navigate = useNavigate();
   const { user, activeRole } = useSession();
-  const isAuthor = can(activeRole, "note:author");
+  const chartable = canChartPatient(activeRole, p, user.id);
+  const isAuthor = can(activeRole, "note:author") && chartable;
   const appts = useAsync(() => listAppointments(p.id, activeRole), [p.id, activeRole]);
   const [allergy, setAllergy] = useState({ substance: "", category: "medication" as AllergyCategory, reaction: "" });
   const [vital, setVital] = useState({ label: "", value: "" });
@@ -169,7 +170,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
               {formatDate(p.encounter.date)} · visit {p.status.encounter.toLowerCase()} · {p.status.careSetting.toLowerCase()}
             </Typography>
           </Box>
-          {next && can(activeRole, "encounter:advance") && (
+          {next && chartable && can(activeRole, "encounter:advance") && (
             <Button variant="outlined" disabled={needsCosign} onClick={() => onAdvance(next)}>
               {ADVANCE_LABEL[next]}
             </Button>
@@ -239,7 +240,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
                     ? rows.map((item) => item.reaction ? `${item.substance} (${item.reaction})` : item.substance).join(", ")
                     : "None documented"}
                 </Typography>
-                {canEditSection(activeRole, p, "allergies") && rows.map((item) => item.id && (
+                {canEditSection(activeRole, p, "allergies", user.id) && rows.map((item) => item.id && (
                   <Button key={item.id} size="small" color="error" onClick={async () => {
                     try { onChange(await removeAllergy(activeRole, p.id, item.id!)); } catch (e) { setError((e as Error).message); }
                   }}>Remove {item.substance}</Button>
@@ -247,7 +248,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
               </Box>
             );
           })}
-          {canEditSection(activeRole, p, "allergies") && (
+          {canEditSection(activeRole, p, "allergies", user.id) && (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <TextField size="small" label="Substance" value={allergy.substance} onChange={(e) => setAllergy({ ...allergy, substance: e.target.value })} />
               <TextField size="small" label="Reaction" value={allergy.reaction} onChange={(e) => setAllergy({ ...allergy, reaction: e.target.value })} />
@@ -271,13 +272,13 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           </Box>
           <VitalsHistory
             patient={p}
-            canMark={canEditSection(activeRole, p, "vitals")}
+            canMark={canEditSection(activeRole, p, "vitals", user.id)}
             onMark={async (id) => {
               try { onChange(await markVitalEnteredInError(activeRole, p.id, id)); }
               catch (e) { setError((e as Error).message); }
             }}
           />
-          {canEditSection(activeRole, p, "vitals") && (
+          {canEditSection(activeRole, p, "vitals", user.id) && (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
               <Autocomplete
                 freeSolo

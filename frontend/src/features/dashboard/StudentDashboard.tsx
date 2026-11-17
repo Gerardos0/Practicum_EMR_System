@@ -1,35 +1,32 @@
 import { useState } from "react";
-import { Box, LinearProgress, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
+import { Box, LinearProgress } from "@mui/material";
 import AssignmentOutlined from "@mui/icons-material/AssignmentOutlined";
 import PeopleAltOutlined from "@mui/icons-material/PeopleAltOutlined";
 import ReplayOutlined from "@mui/icons-material/ReplayOutlined";
 import ScienceOutlined from "@mui/icons-material/ScienceOutlined";
-import { Link as RouterLink } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { listPatients, type PatientRow } from "../../api/patients";
 import { caseloadHref, matchesCaseload } from "../patients/caseload";
+import TrackerRow from "../patients/TrackerRow";
 import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
-import NoteStatusChip from "../../components/NoteStatusChip";
 import { Panel, StatCard, StatGrid } from "./components/DashboardParts";
-import { DAY_MS, patientName, since } from "./dashboardFormat";
-import { utep } from "../../theme/tokens";
-
-function continueTo(row: PatientRow) {
-  return `/patients/${row.patient.id}`;
-}
+import { DAY_MS, since } from "./dashboardFormat";
+const listSx = { listStyle: "none", m: 0, p: 0, containerType: "inline-size" } as const;
 
 export default function StudentDashboard() {
-  const { activeRole, courseId } = useSession();
+  const navigate = useNavigate();
+  const { user, activeRole, courseId } = useSession();
   const patients = useAsync(() => listPatients(activeRole, courseId), [activeRole, courseId]);
   const [now] = useState(() => Date.now());
 
   if (patients.loading && !patients.data) return <LinearProgress />;
 
   const rows = patients.data ?? [];
-  const assessment = rows.filter((r) => matchesCaseload(r, "assigned"));
-  const practice = rows.filter((r) => matchesCaseload(r, "practice"));
-  const inProgress = rows.filter((r) => matchesCaseload(r, "in-clinic"));
+  const assessment = rows.filter((r) => matchesCaseload(r, "assigned", user.id));
+  const practice = rows.filter((r) => matchesCaseload(r, "practice", user.id));
+  const inProgress = rows.filter((r) => matchesCaseload(r, "in-clinic", user.id));
   const returned = rows.filter((r) => matchesCaseload(r, "returned"));
   const pending = rows.filter((r) => matchesCaseload(r, "awaiting"));
   const flagged = rows.filter((r) => r.patient.labs.some((l) => l.flag));
@@ -43,6 +40,9 @@ export default function StudentDashboard() {
     if (!note || note.status === "cosigned") return false;
     return now - new Date(note.updatedAt).getTime() >= DAY_MS;
   });
+  const continueRows = (stale.length ? stale : assessment).slice(0, 8);
+
+  const open = (row: PatientRow) => navigate(`/patients/${row.patient.id}`);
 
   return (
     <Box sx={{ display: "grid", gap: 2.5 }}>
@@ -92,96 +92,62 @@ export default function StudentDashboard() {
       </StatGrid>
 
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1.45fr 1fr" } }}>
-        <Panel title="Continue where you left off" accent>
-          {stale.length === 0 && assessment.length === 0 ? (
+        <Panel title="Continue where you left off" accent flush={continueRows.length > 0}>
+          {continueRows.length === 0 ? (
             <EmptyState title="No assigned patients yet">Your instructor will add assessment cases here.</EmptyState>
           ) : (
-            <Table size="small" aria-label="Patients to continue">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Patient</TableCell>
-                  <TableCell>Visit</TableCell>
-                  <TableCell>Note</TableCell>
-                  <TableCell>Updated</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {(stale.length ? stale : assessment).slice(0, 8).map((r) => (
-                  <TableRow
-                    key={r.patient.id}
-                    hover
-                    component={RouterLink}
-                    to={continueTo(r)}
-                    sx={{ textDecoration: "none", "&:hover td": { color: utep.navy } }}
-                  >
-                    <TableCell sx={{ fontWeight: 600 }}>{patientName(r.patient)}</TableCell>
-                    <TableCell>{r.patient.status.encounter}</TableCell>
-                    <TableCell><NoteStatusChip status={r.latestNote?.status} /></TableCell>
-                    <TableCell>{r.latestNote ? since(r.latestNote.updatedAt, now) : "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <Box component="ul" aria-label="Patients to continue" sx={listSx}>
+              {continueRows.map((row) => (
+                <TrackerRow
+                  key={row.patient.id}
+                  row={row}
+                  isStudent
+                  userId={user.id}
+                  onOpen={() => open(row)}
+                  noteCaption={row.latestNote ? since(row.latestNote.updatedAt, now) : undefined}
+                />
+              ))}
+            </Box>
           )}
         </Panel>
 
-        <Panel title="Recent notes" action={{ label: "All patients", to: "/patients" }}>
+        <Panel title="Recent notes" action={{ label: "All patients", to: "/patients" }} flush={recentNotes.length > 0}>
           {recentNotes.length === 0 ? (
             <EmptyState title="No notes yet">Open a chart to start a note.</EmptyState>
           ) : (
-            <Table size="small" aria-label="Recent notes">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Patient</TableCell>
-                  <TableCell>Status</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {recentNotes.map((r) => (
-                  <TableRow
-                    key={r.patient.id}
-                    hover
-                    component={RouterLink}
-                    to={continueTo(r)}
-                    sx={{ textDecoration: "none" }}
-                  >
-                    <TableCell sx={{ fontWeight: 600 }}>{patientName(r.patient)}</TableCell>
-                    <TableCell><NoteStatusChip status={r.latestNote?.status} /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <Box component="ul" aria-label="Recent notes" sx={listSx}>
+              {recentNotes.map((row) => (
+                <TrackerRow
+                  key={row.patient.id}
+                  row={row}
+                  isStudent
+                  userId={user.id}
+                  onOpen={() => open(row)}
+                />
+              ))}
+            </Box>
           )}
         </Panel>
       </Box>
 
       {flagged.length > 0 && (
-        <Panel title="Charts with flagged labs">
-          <Table size="small" aria-label="Flagged labs">
-            <TableHead>
-              <TableRow>
-                <TableCell>Patient</TableCell>
-                <TableCell>Finding</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {flagged.slice(0, 6).map((r) => {
-                const lab = r.patient.labs.find((l) => l.flag);
-                return (
-                  <TableRow
-                    key={r.patient.id}
-                    hover
-                    component={RouterLink}
-                    to={`/patients/${r.patient.id}`}
-                    sx={{ textDecoration: "none" }}
-                  >
-                    <TableCell sx={{ fontWeight: 600 }}>{patientName(r.patient)}</TableCell>
-                    <TableCell>{lab ? `${lab.name} ${lab.value} ${lab.unit} (${lab.flag})` : "—"}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <Panel title="Charts with flagged labs" flush>
+          <Box component="ul" aria-label="Flagged labs" sx={listSx}>
+            {flagged.slice(0, 6).map((row) => {
+              const lab = row.patient.labs.find((item) => item.flag);
+              return (
+                <TrackerRow
+                  key={row.patient.id}
+                  row={row}
+                  isStudent
+                  userId={user.id}
+                  onOpen={() => open(row)}
+                  primary={lab ? `${lab.name} ${lab.value} ${lab.unit}` : row.patient.status.encounter}
+                  secondary={lab?.flag ? `Flagged ${lab.flag}` : undefined}
+                />
+              );
+            })}
+          </Box>
         </Panel>
       )}
     </Box>

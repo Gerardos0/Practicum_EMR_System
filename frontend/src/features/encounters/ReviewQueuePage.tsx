@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, LinearProgress, Paper, Tab, Table, TableBody, TableCell, TableHead, TableRow, Tabs, Typography,
+  Alert, Box, Button, LinearProgress, Paper, Typography,
 } from "@mui/material";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listReviewQueue } from "../../api/notes";
@@ -11,6 +11,8 @@ import NoteStatusChip from "../../components/NoteStatusChip";
 import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
 import { usePageHeading } from "../../components/usePageHeading";
+import CountTabs from "../../components/CountTabs";
+import CensusRow, { nameInitials } from "../../components/CensusRow";
 import { templateName } from "./noteTemplates";
 import type { NoteStatus } from "../../types";
 
@@ -66,21 +68,18 @@ export default function ReviewQueuePage() {
         <Alert severity="success" onClose={() => setFlash("")} sx={{ mb: 2 }}>{flash}</Alert>
       )}
 
-      <Paper>
-        <Tabs
+      <Paper sx={{ overflow: "hidden", borderRadius: "16px" }}>
+        <CountTabs
+          ariaLabel="Review status"
+          idPrefix="review-tab"
+          panelId="review-panel"
           value={filter}
-          onChange={(_, v) => setParams({ status: v }, { replace: true })}
-          sx={{ px: 1, borderBottom: 1, borderColor: "divider" }}
-          aria-label="Filter by status"
-        >
-          {FILTERS.map((f) => (
-            <Tab key={f.id} value={f.id} label={f.id === "all" ? `${f.label} (${count("all")})` : `${f.label} (${count(f.id)})`} />
-          ))}
-        </Tabs>
-        {queue.loading && <LinearProgress aria-label="Loading review queue" />}
-        <Box sx={{ overflowX: "auto", p: 1 }}>
-          {queue.loading ? null : items.length === 0 ? (
-            <Box sx={{ p: 2 }}>
+          onChange={(id) => setParams({ status: id }, { replace: true })}
+          tabs={FILTERS.map((item) => ({ id: item.id, label: item.label, count: count(item.id) }))}
+        />
+        <Box role="tabpanel" id="review-panel" aria-labelledby={`review-tab-${filter}`} sx={{ bgcolor: "#fff" }}>
+          {queue.loading && !queue.data ? <LinearProgress aria-label="Loading review queue" /> : items.length === 0 ? (
+            <Box sx={{ px: 2, py: 2.5 }}>
               <EmptyState title={filter === "pending_review" ? "You're caught up" : "Nothing here"}>
                 {filter === "pending_review"
                   ? "New submissions appear here as students sign their notes."
@@ -88,55 +87,37 @@ export default function ReviewQueuePage() {
               </EmptyState>
             </Box>
           ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Student</TableCell>
-                  <TableCell>Patient</TableCell>
-                  <TableCell>Note</TableCell>
-                  <TableCell>Submitted</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right"><Box component="span" sx={visuallyHidden}>Actions</Box></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {items.map(({ note, patient }) => {
-                  const open = () => navigate(`/review/${note.id}`);
-                  return (
-                    <TableRow
-                      key={note.id}
-                      hover
-                      onClick={open}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
-                      tabIndex={0}
-                      sx={{ cursor: "pointer" }}
-                      aria-label={`Review note by ${note.authorName}`}
-                    >
-                      <TableCell sx={{ fontWeight: 600 }}>{note.authorName}</TableCell>
-                      <TableCell>
-                        {patient.lastName}, {patient.firstName}
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>MRN {patient.mrn}</Typography>
-                      </TableCell>
-                      <TableCell>{templateName(note.templateId)}</TableCell>
-                      <TableCell>{note.signedAt ? formatDateTime(note.signedAt) : "—"}</TableCell>
-                      <TableCell><NoteStatusChip status={note.status} /></TableCell>
-                      <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                        <Button size="small" variant={note.status === "pending_review" ? "contained" : "outlined"} onClick={open}>
-                          {note.status === "pending_review" ? "Review" : "Open"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <Box component="ul" aria-label="Notes" sx={{ listStyle: "none", m: 0, p: 0, containerType: "inline-size" }}>
+              {items.map(({ note, patient }) => {
+                const open = () => navigate(`/review/${note.id}`);
+                return (
+                  <CensusRow
+                    key={note.id}
+                    initials={nameInitials(note.authorName)}
+                    title={note.authorName}
+                    meta={`${patient.lastName}, ${patient.firstName}`}
+                    primary={templateName(note.templateId)}
+                    secondary={note.signedAt ? formatDateTime(note.signedAt) : "Not signed"}
+                    onOpen={open}
+                    ariaLabel={`Review note by ${note.authorName}`}
+                    note={<NoteStatusChip status={note.status} />}
+                    actions={(
+                      <Button
+                        size="small"
+                        variant={note.status === "pending_review" ? "contained" : "outlined"}
+                        color={note.status === "pending_review" ? "secondary" : "primary"}
+                        onClick={open}
+                      >
+                        {note.status === "pending_review" ? "Review" : "Open"}
+                      </Button>
+                    )}
+                  />
+                );
+              })}
+            </Box>
           )}
         </Box>
       </Paper>
     </Box>
   );
 }
-
-const visuallyHidden = {
-  position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
-} as const;

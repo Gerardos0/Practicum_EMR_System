@@ -1,40 +1,109 @@
-import { Box, Button, LinearProgress, Paper, Stack, Typography } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Box, Button, LinearProgress, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { listCoursesForUser } from "../../api/courses";
+import { listPatients, type PatientRow } from "../../api/patients";
 import { useSession } from "../auth/useSession";
 import { useAsync } from "../../utils/useAsync";
 import { usePageHeading } from "../../components/usePageHeading";
+import { utep } from "../../theme/tokens";
+import CensusRow from "../../components/CensusRow";
+import EmptyState from "../../components/EmptyState";
+import { Panel } from "../dashboard/components/DashboardParts";
+import { byPatientName } from "../patients/tracker";
+import type { Course, Patient } from "../../types";
+
+const listSx = { listStyle: "none", m: 0, p: 0, containerType: "inline-size" } as const;
+
+function assignmentLabel(patient: Patient, ownerName?: string) {
+  if (ownerName) return ownerName;
+  if (patient.mode === "practice") return patient.practiceLabel || "Practice";
+  if (!patient.ownerId) return "Unassigned";
+  return "Assigned";
+}
+
+function sexLetter(patient: Patient) {
+  if (patient.sexAtBirth === "Male") return "M";
+  if (patient.sexAtBirth === "Female") return "F";
+  return patient.sexAtBirth;
+}
 
 export default function AdminHomePage() {
   usePageHeading("Administration");
   const { user } = useSession();
-  const courses = useAsync(() => listCoursesForUser(), [user.id]);
-  const count = courses.data?.length;
+  const board = useAsync(async () => {
+    const courses = await listCoursesForUser();
+    const batches = await Promise.all(courses.map(async (course) => {
+      const rows = await listPatients("admin", course.id);
+      return rows
+        .filter((row) => row.patient.status.encounter === "Checked in")
+        .map((row) => ({ row, course }));
+    }));
+    const checkedIn = batches.flat().sort((a, b) => {
+      const course = a.course.code.localeCompare(b.course.code);
+      return course || byPatientName(a.row, b.row);
+    });
+    return { courses, checkedIn };
+  }, [user.id]);
+
+  if (board.loading && !board.data) return <LinearProgress aria-label="Loading administration" />;
+
+  const courses = board.data?.courses ?? [];
+  const checkedIn = board.data?.checkedIn ?? [];
 
   return (
-    <Stack spacing={2.5}>
-      <Box>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: "62ch" }}>
-          Classes and accounts. Instructors build cases and grade notes in their own screens.
-        </Typography>
-      </Box>
-      {courses.loading && <LinearProgress aria-label="Loading classes" />}
-      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
-        <Paper sx={{ p: 2.5 }}>
-          <Typography component="h2" variant="h6">Classes</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-            {count === undefined ? " " : `${count} ${count === 1 ? "class" : "classes"} on file. Create one and set whether it is planned, active, ended, or archived.`}
+    <Box sx={{ display: "grid", gap: 2.5 }}>
+      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
+        <Panel title="Classes" accent action={{ label: "Manage classes", to: "/admin/courses" }}>
+          <Typography sx={{ fontSize: 40, fontWeight: 800, color: utep.navy, lineHeight: 1 }}>
+            {courses.length}
           </Typography>
-          <Button component={RouterLink} to="/admin/courses" variant="contained">Manage classes</Button>
-        </Paper>
-        <Paper sx={{ p: 2.5 }}>
-          <Typography component="h2" variant="h6">People</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-            Enroll students, add instructors, and add course coordinators. Student accounts stay with the administrator for the whole program.
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Planned, active, ended, and archived classes.
           </Typography>
-          <Button component={RouterLink} to="/admin/people" variant="contained">Manage people</Button>
-        </Paper>
+        </Panel>
+        <Panel title="People" action={{ label: "Manage people", to: "/admin/people" }}>
+          <Typography sx={{ color: utep.ink, maxWidth: "42ch" }}>
+            Enroll students, add instructors, and add course coordinators for a class.
+          </Typography>
+        </Panel>
       </Box>
-    </Stack>
+
+      <Panel title="Checked in" flush={checkedIn.length > 0}>
+        {board.error ? (
+          <Typography color="error">The checked-in list could not be loaded.</Typography>
+        ) : checkedIn.length === 0 ? (
+          <EmptyState title="No one is checked in">Patients show here when their visit status is Checked in.</EmptyState>
+        ) : (
+          <Box component="ul" aria-label="Patients checked in" sx={listSx}>
+            {checkedIn.map(({ row, course }) => (
+              <CheckedInRow key={row.patient.id} row={row} course={course} />
+            ))}
+          </Box>
+        )}
+      </Panel>
+    </Box>
+  );
+}
+
+function CheckedInRow({ row, course }: { row: PatientRow; course: Course }) {
+  const navigate = useNavigate();
+  const patient = row.patient;
+  const initials = `${patient.firstName[0] ?? ""}${patient.lastName[0] ?? ""}`.toUpperCase();
+  const open = () => navigate(`/patients/${patient.id}`);
+  return (
+    <CensusRow
+      initials={initials}
+      title={`${patient.lastName}, ${patient.firstName}`}
+      meta={`${patient.ageYears}y ${sexLetter(patient)} · ${assignmentLabel(patient, row.ownerName)}`}
+      primary={course.code}
+      secondary={patient.chiefComplaint || "No chief complaint"}
+      onOpen={open}
+      ariaLabel={`Open chart for ${patient.lastName}, ${patient.firstName}`}
+      actions={(
+        <Button size="small" variant="contained" color="secondary" onClick={open}>
+          Open
+        </Button>
+      )}
+    />
   );
 }

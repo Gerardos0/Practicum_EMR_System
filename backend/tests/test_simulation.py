@@ -56,7 +56,7 @@ async def _start(client):
 
 
 @pytest.mark.asyncio
-async def test_simulation_handoff_closes_note_and_keeps_assessment_private(client):
+async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private(client):
     sim = await _start(client)
     chart_id = sim["chart"]["id"]
 
@@ -65,8 +65,11 @@ async def test_simulation_handoff_closes_note_and_keeps_assessment_private(clien
 
     course = sim["course"]
     sam = await patient_by_mrn(client, sim["instructor"], course, "instructor", "TR-10057-ST")
-    still_private = await client.get(f"/api/v1/patients/{sam['id']}", headers=sim["nurse"], params={"role": "student"})
-    assert still_private.status_code == 403
+    review_only = await client.get(f"/api/v1/patients/{sam['id']}", headers=sim["nurse"], params={"role": "student"})
+    assert review_only.status_code == 200, review_only.text
+    other_notes = await client.get(f"/api/v1/patients/{sam['id']}/notes", headers=sim["nurse"], params={"role": "student"})
+    assert other_notes.status_code == 200, other_notes.text
+    assert other_notes.json() == []
 
     blocked = await client.post(
         f"/api/v1/patients/{chart_id}/vitals",
