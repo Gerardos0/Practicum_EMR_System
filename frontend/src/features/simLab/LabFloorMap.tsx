@@ -40,6 +40,13 @@ function placeName(spot: LabBedSpot, room: SimLabRoom) {
   return oneBedRoom(spot, room) ? `Room ${spot.room}` : `Room ${spot.room}, bed ${spot.bed}`;
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return `${first}${last}`.toUpperCase();
+}
+
 export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: Props) {
   const byNumber = new Map(rooms.map((room) => [room.number, room]));
 
@@ -70,7 +77,9 @@ export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: P
         const title = reserved
           ? `${place}, reserved for ${people.map((row) => row.studentName).join(", ")}`
           : place;
-        const showLetter = !reserved && !oneBedRoom(spot, room);
+        const mark = reserved
+          ? (spot.w >= 18 ? initials(people[0]?.studentName ?? "") : "")
+          : oneBedRoom(spot, room) ? "" : spot.bed;
         return (
           <Box
             key={`${spot.room}-${spot.bed}`}
@@ -94,7 +103,7 @@ export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: P
               borderRadius: "1px",
               border: reserved ? `1.5px solid ${utep.navy}` : `1.5px solid ${utep.orange}`,
               bgcolor: reserved ? "rgba(14, 34, 80, 0.78)" : "rgba(238, 139, 60, 0.22)",
-              color: utep.navy,
+              color: reserved ? "#fff" : utep.navy,
               fontSize: 9,
               fontWeight: 700,
               lineHeight: 1,
@@ -105,7 +114,7 @@ export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: P
               "&:disabled": { opacity: 1 },
             }}
           >
-            {showLetter ? spot.bed : ""}
+            {mark}
           </Box>
         );
       })}

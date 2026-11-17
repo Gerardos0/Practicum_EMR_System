@@ -122,7 +122,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
       return {
         severity: "success" as const,
         title: "Note submitted — waiting for co-signature",
-        body: "The signed wording stays. If it is returned, correct it with an addendum.",
+        body: "Waiting on your instructor. If they send it back, add an addendum.",
         action: null,
       };
     }
@@ -130,17 +130,17 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
       return {
         severity: "success" as const,
         title: "Note co-signed",
-        body: "This documentation is final. You can still add an addendum if something new comes up.",
+        body: "Signed. Add an addendum if something new comes up.",
         action: null,
       };
     }
     if (!submitted) {
       return {
         severity: "info" as const,
-        title: p.mode === "assessment" ? "Next: document this visit" : "Practice documenting on this patient",
+        title: p.mode === "assessment" ? "Write the note" : "Practice note",
         body: p.mode === "assessment"
-          ? "Review the summary below, then start a note. You'll pick an instructor when you submit."
-          : "Practice notes aren't graded. Reset happens when an instructor restores the chart.",
+          ? "Read the summary, then start a note. You choose an instructor when you submit."
+          : "This one isn't graded.",
         action: noteButton,
       };
     }
@@ -163,10 +163,10 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         </Alert>
       )}
       {p.status.encounter === "Scheduled" && chartable && (
-        <Alert severity="info">Check-in starts this visit. Sign the note when you finish. After that, the original stays and a correction is an addendum. Notes from earlier visits stay locked.</Alert>
+        <Alert severity="info">Check the patient in, then write and sign the note. After it's signed, correct it with an addendum.</Alert>
       )}
       {(p.status.encounter === "Checked in" || p.status.encounter === "Roomed" || p.status.encounter === "In progress") && chartable && (
-        <Alert severity="info">This visit is checked in. Document it and sign the note. A signed note is not edited. Add an addendum if something else needs to be recorded.</Alert>
+        <Alert severity="info">This visit is checked in. Write the note and sign it. Add an addendum later if you need to.</Alert>
       )}
       {needsCosign && isAuthor && (
         <Alert severity="info">Discharge waits until your instructor co-signs the note. The signed note stays as written.</Alert>

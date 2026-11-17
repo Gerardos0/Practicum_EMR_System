@@ -76,7 +76,7 @@ export default function StudentDashboard() {
           icon={<AssignmentOutlined fontSize="small" />}
         />
         <StatCard
-          label="Items to check"
+          label="Dose flags"
           value={doseFlags.length}
           tone="orange"
           to={caseloadHref("flags")}
@@ -92,9 +92,9 @@ export default function StudentDashboard() {
       </StatGrid>
 
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1.45fr 1fr" } }}>
-        <Panel title="Continue where you left off" accent flush={continueRows.length > 0}>
+        <Panel title="Assigned patients" accent flush={continueRows.length > 0}>
           {continueRows.length === 0 ? (
-            <EmptyState title="No assigned patients yet">Your instructor will add assessment cases here.</EmptyState>
+            <EmptyState title="No assigned patients yet">Assessment cases from your instructor show up here.</EmptyState>
           ) : (
             <Box component="ul" aria-label="Patients to continue" sx={listSx}>
               {continueRows.map((row) => (
@@ -113,7 +113,7 @@ export default function StudentDashboard() {
 
         <Panel title="Recent notes" action={{ label: "All patients", to: "/patients" }} flush={recentNotes.length > 0}>
           {recentNotes.length === 0 ? (
-            <EmptyState title="No notes yet">Open a chart to start a note.</EmptyState>
+            <EmptyState title="No notes yet">Open a chart and start one.</EmptyState>
           ) : (
             <Box component="ul" aria-label="Recent notes" sx={listSx}>
               {recentNotes.map((row) => (

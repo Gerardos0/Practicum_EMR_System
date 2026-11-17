@@ -87,7 +87,7 @@ export default function InstructorDashboard() {
       <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1.4fr 1fr" } }}>
         <Panel title="Review queue" action={{ label: "Open queue", to: "/review?status=pending_review" }} accent flush={pending.length > 0}>
           {queue.loading && !queue.data ? <LinearProgress /> : pending.length === 0 ? (
-            <EmptyState title="Nothing waiting">Students' assessment notes will land here after they submit for signature.</EmptyState>
+            <EmptyState title="Nothing waiting">Submitted notes show up here.</EmptyState>
           ) : (
             <Box component="ul" aria-label="Notes awaiting review" sx={listSx}>
               {pending.slice(0, 8).map((q) => (
@@ -113,7 +113,7 @@ export default function InstructorDashboard() {
 
         <Panel title="Recent activity" action={{ label: "Full log", to: "/audit" }} flush={recent.length > 0}>
           {audit.loading && !audit.data ? <LinearProgress /> : recent.length === 0 ? (
-            <EmptyState title="No events yet">Chart views and note actions will show here.</EmptyState>
+            <EmptyState title="No events yet">Chart opens and note changes show up here.</EmptyState>
           ) : (
             <Box component="ul" aria-label="Recent activity" sx={listSx}>
               {recent.map((event) => (
@@ -143,7 +143,7 @@ export default function InstructorDashboard() {
         flush={riskStudents.length > 0}
       >
         {risk.loading && !risk.data ? <LinearProgress /> : riskStudents.length === 0 ? (
-          <EmptyState title="No one is flagged">Students show up here after a week without opening a chart, or when an assigned chart has no submitted note.</EmptyState>
+          <EmptyState title="No one right now">Quiet charts and missing notes show up here.</EmptyState>
         ) : (
           <Box component="ul" aria-label="Students to check in with" sx={listSx}>
             {riskStudents.map((student) => (
@@ -162,7 +162,7 @@ export default function InstructorDashboard() {
 
       <Panel title="Patients with flagged labs" subtitle="High or low results on the current chart" action={{ label: "All patients", to: "/patients" }} flush={flaggedRows.length > 0}>
         {flaggedRows.length === 0 ? (
-          <EmptyState title="No flagged labs">Out-of-range results will appear here.</EmptyState>
+          <EmptyState title="No flagged labs">High and low results show up here.</EmptyState>
         ) : (
           <Box component="ul" aria-label="Flagged labs" sx={listSx}>
             {flaggedRows.map((row) => {

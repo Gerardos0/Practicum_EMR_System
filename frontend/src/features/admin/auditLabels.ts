@@ -11,7 +11,9 @@ export function actionLabel(action: string, detail?: string): string {
     "note.view_sensitive": "Opened a protected note",
     "note.view_psychiatry": "Opened a psychiatry note",
     "portal.view": "Opened the patient portal",
-    "ai.suggest": "Requested a suggestion",
+    "ai.suggest": "Asked for a suggestion",
+    "sim_lab.assign": "Checked a student into lab",
+    "sim_lab.clear": "Cleared a lab bed",
   };
   return labels[action] ?? action.replace(/[._]/g, " ");
 }

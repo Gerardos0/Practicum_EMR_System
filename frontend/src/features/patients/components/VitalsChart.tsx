@@ -1,19 +1,7 @@
 import { useMemo, useState } from "react";
-import { Box, IconButton, Typography } from "@mui/material";
-import AddRounded from "@mui/icons-material/AddRounded";
-import RemoveRounded from "@mui/icons-material/RemoveRounded";
+import { Box, Typography } from "@mui/material";
 import type { Patient, Vital } from "../../../types";
 import { utep } from "../../../theme/tokens";
-
-type Range = "year" | "month" | "week" | "day" | "hour";
-
-const RANGES: { id: Range; label: string; windowMs: number }[] = [
-  { id: "year", label: "Year", windowMs: 365 * 24 * 60 * 60 * 1000 },
-  { id: "month", label: "Month", windowMs: 31 * 24 * 60 * 60 * 1000 },
-  { id: "week", label: "Week", windowMs: 7 * 24 * 60 * 60 * 1000 },
-  { id: "day", label: "Day", windowMs: 24 * 60 * 60 * 1000 },
-  { id: "hour", label: "Hour", windowMs: 60 * 60 * 1000 },
-];
 
 interface Point {
   at: number | null;
@@ -26,7 +14,7 @@ interface Series {
   label: string;
   unit: string;
   valueLabel: string;
-  high?: boolean;
+  note?: string;
   points: Point[];
 }
 
@@ -66,7 +54,7 @@ function seriesFrom(patient: Patient): Series[] {
     const current = pulse[pulse.length - 1].value;
     series.push({
       id: "hr", label: "Heart rate", unit: "bpm", valueLabel: String(Math.round(current)),
-      high: current > 100, points: pulse,
+      note: current > 100 ? "High" : current < 50 ? "Low" : undefined, points: pulse,
     });
   }
   const bp = readings(vitals, (vital) => /^bp$/i.test(vital.label) || /blood pressure/i.test(vital.label), (vital) => {
@@ -80,13 +68,13 @@ function seriesFrom(patient: Patient): Series[] {
   if (bp.length) {
     series.push({
       id: "sys", label: "BP systolic", unit: "mmHg", valueLabel: String(bp[bp.length - 1].value),
-      high: bp[bp.length - 1].value >= 140, points: bp,
+      note: bp[bp.length - 1].value >= 140 ? "High" : undefined, points: bp,
     });
   }
   if (dia.length) {
     series.push({
       id: "dia", label: "BP diastolic", unit: "mmHg", valueLabel: String(dia[dia.length - 1].value),
-      high: dia[dia.length - 1].value >= 90, points: dia,
+      note: dia[dia.length - 1].value >= 90 ? "High" : undefined, points: dia,
     });
   }
   const seen = new Set<string>();
@@ -98,47 +86,65 @@ function seriesFrom(patient: Patient): Series[] {
     const points = readings(vitals, (item) => item.label.toLowerCase() === id, (item) => firstNumber(item.value));
     if (!points.length) continue;
     const current = points[points.length - 1].value;
-    const high = /pain/i.test(vital.label) ? current >= 7
-      : /temp/i.test(vital.label) ? current >= 100.4
-      : /rr|respir/i.test(vital.label) ? current > 20
-      : /spo/i.test(vital.label) ? current < 92
+    const note = /pain/i.test(vital.label) ? (current >= 7 ? "High" : undefined)
+      : /temp/i.test(vital.label) ? (current >= 100.4 ? "High" : undefined)
+      : /rr|respir/i.test(vital.label) ? (current > 20 ? "High" : current < 10 ? "Low" : undefined)
+      : /spo/i.test(vital.label) ? (current < 92 ? "Low" : undefined)
       : undefined;
-    series.push({ id, label: vital.label, unit: "", valueLabel: String(current), high, points });
+    series.push({ id, label: vital.label, unit: "", valueLabel: String(current), note, points });
   }
   return series;
 }
 
-function inWindow(points: Point[], windowMs: number): Point[] {
-  const newest = Math.max(...points.map((point) => point.at ?? 0));
-  if (!newest) return points;
-  const filtered = points.filter((point) => point.at == null || newest - point.at <= windowMs);
-  return filtered.length ? filtered : points;
+function scaleFor(series: Series, values: number[]) {
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const label = series.label;
+  let min = lo;
+  let max = hi;
+  if (series.id === "hr") { min = Math.min(50, lo); max = Math.max(120, hi); }
+  else if (series.id === "sys") { min = Math.min(80, lo); max = Math.max(180, hi); }
+  else if (series.id === "dia") { min = Math.min(40, lo); max = Math.max(110, hi); }
+  else if (/spo/i.test(label)) { min = Math.min(88, lo); max = 100; }
+  else if (/respir|^rr\b/i.test(label)) { min = Math.min(8, lo); max = Math.max(36, hi); }
+  else if (/temp/i.test(label)) { min = Math.min(96, lo); max = Math.max(104, hi); }
+  else if (/pain/i.test(label)) { min = 0; max = 10; }
+  else {
+    const pad = Math.max((hi - lo) * 0.35, Math.abs(hi) * 0.08, 1);
+    min = lo - pad;
+    max = hi + pad;
+  }
+  if (max <= min) max = min + 1;
+  return { min, max };
+}
+
+function tickText(n: number) {
+  const rounded = Math.abs(n) >= 10 ? Math.round(n) : Math.round(n * 10) / 10;
+  return String(rounded);
+}
+
+function axisLabels(points: Point[]) {
+  const days = new Set(points.map((point) => (point.at == null ? "" : new Date(point.at).toDateString())));
+  return points.map((point) => {
+    if (point.at == null) return "On file";
+    const date = new Date(point.at);
+    if (days.size <= 1) return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  });
 }
 
 export default function VitalsChart({ patient }: { patient: Patient }) {
   const series = useMemo(() => seriesFrom(patient), [patient]);
   const [selected, setSelected] = useState(series[0]?.id ?? "");
-  const [range, setRange] = useState<Range>("year");
   const active = series.find((item) => item.id === selected) ?? series[0];
-  const rangeIdx = RANGES.findIndex((item) => item.id === range);
-  const shown = useMemo(() => {
-    if (!active) return [];
-    const spec = RANGES.find((item) => item.id === range)!;
-    return inWindow(active.points, spec.windowMs);
-  }, [active, range]);
 
   if (!active) {
-    return <Typography variant="body2" color="text.secondary">No numeric vitals to trend yet.</Typography>;
+    return <Typography variant="body2" color="text.secondary">No numeric vitals yet.</Typography>;
   }
-
-  const shiftRange = (dir: 1 | -1) => {
-    const next = Math.min(RANGES.length - 1, Math.max(0, rangeIdx + dir));
-    setRange(RANGES[next].id);
-  };
 
   return (
     <Box>
-      <Box role="tablist" aria-label="Vital signs" sx={{ display: "flex", gap: 0.75, flexWrap: "nowrap", overflowX: "auto", mb: 2, pb: 0.5 }}>
+      <Box role="tablist" aria-label="Vital signs" sx={{ display: "flex", gap: 0.75, flexWrap: "nowrap", overflowX: "auto", pb: 0.5 }}>
         {series.map((item) => {
           const on = item.id === active.id;
           return (
@@ -153,84 +159,67 @@ export default function VitalsChart({ patient }: { patient: Patient }) {
               }}
             >
               <Typography sx={{ fontSize: 12, fontWeight: 600, opacity: 0.85, lineHeight: 1.2 }}>{item.label}</Typography>
-              <Typography sx={{ fontSize: 16, fontWeight: 800, lineHeight: 1.3, color: on ? utep.orange : item.high ? utep.alert : utep.navy }}>
-                {item.high ? "▲ " : "● "}{item.valueLabel}
+              <Typography sx={{ fontSize: 16, fontWeight: 800, lineHeight: 1.3, color: on ? "#fff" : item.note ? utep.alert : utep.navy }}>
+                {item.valueLabel}
                 {item.unit && <Box component="span" sx={{ fontSize: 12, fontWeight: 600, ml: 0.5, opacity: 0.8 }}>{item.unit}</Box>}
               </Typography>
+              {item.note && (
+                <Typography sx={{ fontSize: 11, fontWeight: 700, lineHeight: 1.2, color: on ? utep.orange : utep.alert }}>{item.note}</Typography>
+              )}
             </Box>
           );
         })}
       </Box>
 
-      <TrendSvg points={shown.map((point) => point.value)} labels={shown.map((point) => point.caption)} />
-
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.25, flexWrap: "wrap" }}>
-        <IconButton aria-label="Narrower time range" size="small" onClick={() => shiftRange(1)} disabled={rangeIdx === RANGES.length - 1}>
-          <AddRounded fontSize="small" />
-        </IconButton>
-        <IconButton aria-label="Wider time range" size="small" onClick={() => shiftRange(-1)} disabled={rangeIdx === 0}>
-          <RemoveRounded fontSize="small" />
-        </IconButton>
-        {RANGES.map((item) => {
-          const on = item.id === range;
-          return (
-            <Box
-              key={item.id} component="button" type="button" onClick={() => setRange(item.id)}
-              sx={{
-                appearance: "none", border: "none", background: "none", cursor: "pointer",
-                px: 1, py: 0.5, fontWeight: on ? 800 : 600, fontSize: 13,
-                color: on ? utep.navy : utep.ink2,
-                borderBottom: on ? `2px solid ${utep.orange}` : "2px solid transparent",
-                "&:focus-visible": { outline: `3px solid ${utep.navy}`, outlineOffset: 2 },
-              }}
-            >
-              {item.label}
-            </Box>
-          );
-        })}
-      </Box>
+      {active.points.length > 1 && (
+        <TrendSvg series={active} />
+      )}
     </Box>
   );
 }
 
-function TrendSvg({ points, labels }: { points: number[]; labels: string[] }) {
-  if (points.length === 0) return null;
-  const w = 720;
-  const h = 220;
-  const pad = { l: 40, r: 8, t: 12, b: 28 };
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = max - min || 1;
-  const niceMin = min - span * 0.15;
-  const niceMax = max + span * 0.15;
-  const niceSpan = niceMax - niceMin;
+function TrendSvg({ series }: { series: Series }) {
+  const points = series.points.map((point) => point.value);
+  const labels = axisLabels(series.points);
+  const w = 640;
+  const h = 148;
+  const pad = { l: 36, r: 12, t: 16, b: 26 };
+  const { min, max } = scaleFor(series, points);
+  const span = max - min;
   const x = (i: number) => pad.l + (i / Math.max(points.length - 1, 1)) * (w - pad.l - pad.r);
-  const y = (v: number) => pad.t + (1 - (v - niceMin) / niceSpan) * (h - pad.t - pad.b);
+  const y = (v: number) => pad.t + (1 - (v - min) / span) * (h - pad.t - pad.b);
   const line = points.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const area = `${line} L${x(points.length - 1).toFixed(1)},${h - pad.b} L${pad.l},${h - pad.b} Z`;
-  const ticks = 5;
-  const yTicks = Array.from({ length: ticks }, (_, i) => niceMin + (niceSpan * i) / (ticks - 1));
-  const labelEvery = Math.ceil(labels.length / 6);
+  const seen = new Set<string>();
+  const yTicks = [0, 1, 2, 3]
+    .map((i) => min + (span * i) / 3)
+    .filter((tick) => {
+      const text = tickText(tick);
+      if (seen.has(text)) return false;
+      seen.add(text);
+      return true;
+    });
+  const labelEvery = Math.ceil(labels.length / 5);
 
   return (
-    <Box sx={{ width: "100%", overflow: "hidden" }}>
-      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Vital sign trend from recorded values" style={{ width: "100%", height: "auto", display: "block" }}>
+    <Box sx={{ width: "100%", mt: 1.5 }}>
+      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`${series.label} over time`} style={{ width: "100%", height: "auto", display: "block" }}>
         {yTicks.map((tick) => (
-          <g key={tick}>
-            <line x1={pad.l} x2={w - pad.r} y1={y(tick)} y2={y(tick)} stroke={utep.line} strokeDasharray="4 6" />
-            <text x={pad.l - 8} y={y(tick) + 4} textAnchor="end" fill={utep.ink2} fontSize="11" fontFamily="Source Sans 3, sans-serif">
-              {Math.round(tick)}
+          <g key={tickText(tick)}>
+            <line x1={pad.l} x2={w - pad.r} y1={y(tick)} y2={y(tick)} stroke={utep.line} />
+            <text x={pad.l - 6} y={y(tick) + 4} textAnchor="end" fill={utep.ink2} fontSize="11" fontFamily="Source Sans 3, sans-serif">
+              {tickText(tick)}
             </text>
           </g>
         ))}
-        <path d={area} fill={utep.orange} fillOpacity="0.12" />
-        <path d={line} fill="none" stroke={utep.navy} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={line} fill="none" stroke={utep.navy} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {points.map((value, i) => (
-          <circle key={i} cx={x(i)} cy={y(value)} r={i === points.length - 1 ? 5 : 3.5} fill={i === points.length - 1 ? utep.orange : utep.navy} stroke="#fff" strokeWidth="1.5" />
+          <circle key={i} cx={x(i)} cy={y(value)} r={i === points.length - 1 ? 4.5 : 3} fill={i === points.length - 1 ? utep.orange : utep.navy}>
+            <title>{`${series.label} ${value} · ${series.points[i].caption}`}</title>
+          </circle>
         ))}
         {labels.map((label, i) =>
-          i % labelEvery === 0 ? (
-            <text key={`${label}-${i}`} x={x(i)} y={h - 8} textAnchor="middle" fill={utep.ink2} fontSize="11" fontFamily="Source Sans 3, sans-serif">
+          i % labelEvery === 0 || i === labels.length - 1 ? (
+            <text key={`${label}-${i}`} x={x(i)} y={h - 6} textAnchor="middle" fill={utep.ink2} fontSize="11" fontFamily="Source Sans 3, sans-serif">
               {label}
             </text>
           ) : null,

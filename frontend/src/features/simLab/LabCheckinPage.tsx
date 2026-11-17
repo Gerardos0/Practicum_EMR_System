@@ -92,7 +92,7 @@ export default function LabCheckinPage() {
     setError("");
     setMessage("");
     if (!userId || !rid) {
-      setError("Pick a student and a bed.");
+      setError("Choose a student and a bed.");
       return;
     }
     if (room && room.bedCount > 1 && !chosenBed) {
@@ -111,10 +111,10 @@ export default function LabCheckinPage() {
       });
       setRoomId(rid);
       setBed(chosenBed);
-      setMessage(`Checked in ${row.studentName} — ${assignmentSummary(row)}`);
+      setMessage(`${row.studentName} is in ${assignmentSummary(row)}.`);
       setTick((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save assignment.");
+      setError(err instanceof Error ? err.message : "Couldn't check them in.");
     } finally {
       setBusy(false);
     }
@@ -126,7 +126,7 @@ export default function LabCheckinPage() {
     const room = rooms.data?.find((item) => item.id === nextRoomId);
     if (room?.timing !== "hour") setTimeBlock("");
     if (!userId) {
-      setError("Pick a student to reserve this bed.");
+      setError("Choose a student first.");
       setMessage("");
       return;
     }
@@ -138,10 +138,10 @@ export default function LabCheckinPage() {
     setError("");
     try {
       await clearSimLabAssignment(courseId, activeRole, id);
-      setMessage("Cleared assignment.");
+      setMessage("Cleared.");
       setTick((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not clear.");
+      setError(err instanceof Error ? err.message : "Couldn't remove that.");
     } finally {
       setBusy(false);
     }
@@ -157,8 +157,7 @@ export default function LabCheckinPage() {
   return (
     <Box sx={{ display: "grid", gap: 2, maxWidth: 1100, mx: "auto" }}>
       <Typography sx={{ color: utep.ink2, textAlign: "center", maxWidth: 640, mx: "auto", lineHeight: 1.5 }}>
-        Pick a student, then click an open bed. A reserved bed stays locked.
-        Testing and exam rooms can reuse a bed at a different time.
+        Choose a student, then click a bed. Testing and exam rooms can be booked again for a later hour.
       </Typography>
 
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
