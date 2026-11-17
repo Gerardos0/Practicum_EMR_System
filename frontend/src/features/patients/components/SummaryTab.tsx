@@ -199,7 +199,11 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         <Typography variant="body2">{p.chiefComplaint || "Not documented"}</Typography>
       </Paper>
 
-      <VisitRecord patient={p} onChange={onChange} />
+      <VisitRecord
+        key={`${p.id}|${p.pastMedicalHistory}|${p.surgicalHistory}|${p.unit ?? ""}|${p.room ?? ""}|${p.bed ?? ""}`}
+        patient={p}
+        onChange={onChange}
+      />
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 

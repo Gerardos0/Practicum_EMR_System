@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
 import type { Patient } from "../../../types";
 import { updateHistory, updatePlacement } from "../../../api/chart";
@@ -20,13 +20,6 @@ export default function VisitRecord({ patient: p, onChange }: { patient: Patient
   const [unit, setUnit] = useState(p.unit ?? "");
   const [room, setRoom] = useState(p.room ?? "");
   const [bed, setBed] = useState(p.bed ?? "");
-  useEffect(() => {
-    setMedical(p.pastMedicalHistory);
-    setSurgical(p.surgicalHistory);
-    setUnit(p.unit ?? "");
-    setRoom(p.room ?? "");
-    setBed(p.bed ?? "");
-  }, [p.id, p.pastMedicalHistory, p.surgicalHistory, p.unit, p.room, p.bed]);
   const canMove = can(activeRole, "patient:update_status") || can(activeRole, "case:author");
   const editMedical = canEditSection(activeRole, p, "medical_history", user.id);
   const editSurgical = canEditSection(activeRole, p, "surgical_history", user.id);
