@@ -106,7 +106,7 @@ export default function PatientSignupPage() {
                   Create your account
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Use the email registered on your patient chart to get started.
+                  Create an account with your email. If you already have a patient chart, use the email registered on it.
                 </Typography>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                 <Box component="form" noValidate onSubmit={submit}>

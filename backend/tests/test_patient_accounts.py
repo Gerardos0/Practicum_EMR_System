@@ -94,7 +94,6 @@ async def test_invite_signup_creates_patient_and_returns_portal_token(client, db
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_email_signup_links_chart_or_creates_login_without_chart(client, db_session):
     admin, patient_out = await _admin_chart(client)
     patient = await db_session.get(Patient, uuid.UUID(patient_out["id"]))

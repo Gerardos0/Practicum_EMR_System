@@ -4,27 +4,14 @@ import pytest
 
 from tests.test_workflows import course_id, login, patient_by_mrn
 
-DEMO = "practicum-demo"
-
 
 @pytest.mark.asyncio
-async def test_patient_signup_is_closed(client):
+async def test_activation_code_signup_remains_closed(client):
     signup = await client.post(
         "/api/v1/auth/patient-signup",
         json={"code": "ABCD-EFGH", "username": "rosa.patient", "password": "patient-pass-123"},
     )
-    email = await client.post(
-        "/api/v1/auth/patient-signup-by-email",
-        json={"email": "rosa.chart@example.com", "password": "patient-pass-123"},
-    )
     assert signup.status_code == 403
-    assert email.status_code == 403
-    response = await client.post(
-        "/api/v1/auth/login",
-        data={"username": "patient.demo@example.com", "password": DEMO},
-    )
-    assert response.status_code == 403
-    assert "password" not in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

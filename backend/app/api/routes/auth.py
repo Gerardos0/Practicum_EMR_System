@@ -232,7 +232,6 @@ async def patient_signup(body: PatientSignupIn, request: Request, db: DbSession)
 
 @router.post("/patient-signup-by-email", response_model=Token)
 async def patient_signup_by_email(body: PatientEmailSignupIn, request: Request, db: DbSession):
-    raise HTTPException(status.HTTP_403_FORBIDDEN, "Patient portal accounts are not used.")
     ip = _client_ip(request)
     now = datetime.now(timezone.utc)
     attempts = await db.scalar(
