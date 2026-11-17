@@ -45,9 +45,10 @@ export default function SelectCoursePage() {
   return (
     <Box
       sx={{
-        minHeight: "100dvh",
+        height: "100dvh",
+        overflow: "hidden",
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "minmax(0, 0.9fr) minmax(340px, 520px)" },
+        gridTemplateColumns: { xs: "1fr", md: "minmax(0, 0.85fr) minmax(320px, 480px)" },
         bgcolor: utep.navyDark,
       }}
     >
@@ -55,28 +56,29 @@ export default function SelectCoursePage() {
         sx={{
           display: { xs: "none", md: "flex" },
           flexDirection: "column",
-          justifyContent: "flex-end",
-          px: 7,
-          py: 7,
+          justifyContent: "center",
+          px: { md: 5, lg: 7 },
+          py: 4,
           backgroundImage: brandAtmosphere,
           color: "#fff",
           position: "relative",
+          overflow: "hidden",
           "&::after": {
             content: '""',
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(180deg, transparent 40%, rgba(8,22,54,0.5) 100%)",
+            background: "linear-gradient(180deg, transparent 40%, rgba(8,22,54,0.45) 100%)",
             pointerEvents: "none",
           },
         }}
       >
-        <Box sx={{ position: "relative", zIndex: 1 }}>
-          <BrandLogo variant="hero" titleSize={48} />
-          <Box sx={{ width: 64, height: 3, bgcolor: utep.orange, my: 2 }} />
+        <Box sx={{ position: "relative", zIndex: 1, maxWidth: 420 }}>
+          <BrandLogo variant="hero" titleSize={{ md: 40, lg: 48 }} />
+          <Box sx={{ width: 56, height: 3, bgcolor: utep.orange, my: 1.5 }} />
           <Typography sx={{ opacity: 0.85, maxWidth: "28ch" }}>
             Pick the role and course for this session.
           </Typography>
-          <Box sx={{ mt: 4, maxWidth: 240, opacity: 0.9 }}>
+          <Box sx={{ mt: 3, maxWidth: 200, opacity: 0.9, "@media (max-height: 720px)": { display: "none" } }}>
             <BrandLogo variant="wordmark" />
           </Box>
         </Box>
@@ -87,13 +89,14 @@ export default function SelectCoursePage() {
         sx={{
           bgcolor: utep.paper,
           px: { xs: 3, sm: 4 },
-          py: { xs: 4, md: 6 },
+          py: 2.5,
           display: "flex",
           flexDirection: "column",
-          minHeight: "100dvh",
+          minHeight: 0,
+          overflow: "auto",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
           <Typography sx={{ fontFamily: fontDisplay, fontWeight: 800, fontSize: 20, color: utep.navy, display: { md: "none" } }}>
             UTEP EMR
           </Typography>
@@ -101,17 +104,17 @@ export default function SelectCoursePage() {
           <Button onClick={signOut} size="small">Sign out</Button>
         </Box>
 
-        <Typography component="h1" variant="h5" sx={{ mb: 0.75 }}>
+        <Typography component="h1" variant="h5" sx={{ mb: 0.5 }}>
           Welcome, {user.fullName.split(" ")[0]}
         </Typography>
-        <Typography color="text.secondary" sx={{ mb: 3, maxWidth: "42ch" }}>
+        <Typography color="text.secondary" sx={{ mb: 2, maxWidth: "42ch" }}>
           {activeRole === "admin"
             ? "Set up classes, rosters, and reports."
             : "Choose the course for this session."}
         </Typography>
 
         {roles.length > 1 && (
-          <Box sx={{ mb: 3 }}>
+          <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle2" id="role-label" sx={{ mb: 1 }}>Sign in as</Typography>
             <ToggleButtonGroup
               exclusive value={activeRole} aria-labelledby="role-label" size="small"
@@ -153,7 +156,7 @@ export default function SelectCoursePage() {
                       textAlign: "left",
                       cursor: "pointer",
                       px: 2,
-                      py: 1.75,
+                      py: 1.25,
                       borderRadius: 1,
                       border: "none",
                       bgcolor: selected ? "rgba(14,34,80,0.06)" : "transparent",

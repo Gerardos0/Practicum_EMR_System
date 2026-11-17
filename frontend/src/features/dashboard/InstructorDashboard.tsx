@@ -45,7 +45,16 @@ export default function InstructorDashboard() {
   const riskStudents = risk.data?.students.slice(0, 12) ?? [];
 
   return (
-    <Box sx={{ display: "grid", gap: 2.5 }}>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 1.5,
+        flex: { lg: "1 1 auto" },
+        minHeight: { lg: 0 },
+        overflow: { lg: "hidden" },
+        gridTemplateRows: { lg: "auto minmax(0, 1.15fr) minmax(0, 0.85fr)" },
+      }}
+    >
       <StatGrid title="Today">
         <StatCard
           label="Notes to review"
@@ -84,8 +93,8 @@ export default function InstructorDashboard() {
         />
       </StatGrid>
 
-      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", lg: "1.4fr 1fr" } }}>
-        <Panel title="Review queue" action={{ label: "Open queue", to: "/review?status=pending_review" }} accent flush={pending.length > 0}>
+      <Box sx={{ display: "grid", gap: 1.5, minHeight: 0, gridTemplateColumns: { xs: "1fr", lg: "1.35fr 1fr" } }}>
+        <Panel fill title="Review queue" action={{ label: "Open queue", to: "/review?status=pending_review" }} accent flush={pending.length > 0}>
           {queue.loading && !queue.data ? <LinearProgress /> : pending.length === 0 ? (
             <EmptyState title="Nothing waiting">Submitted notes show up here.</EmptyState>
           ) : (
@@ -111,7 +120,7 @@ export default function InstructorDashboard() {
           )}
         </Panel>
 
-        <Panel title="Recent activity" action={{ label: "Full log", to: "/audit" }} flush={recent.length > 0}>
+        <Panel fill title="Recent activity" action={{ label: "Full log", to: "/audit" }} flush={recent.length > 0}>
           {audit.loading && !audit.data ? <LinearProgress /> : recent.length === 0 ? (
             <EmptyState title="No events yet">Chart opens and note changes show up here.</EmptyState>
           ) : (
@@ -132,7 +141,9 @@ export default function InstructorDashboard() {
         </Panel>
       </Box>
 
+      <Box sx={{ display: "grid", gap: 1.5, minHeight: 0, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" } }}>
       <Panel
+        fill
         title="Students to check in with"
         subtitle={
           risk.data
@@ -160,7 +171,7 @@ export default function InstructorDashboard() {
         )}
       </Panel>
 
-      <Panel title="Patients with flagged labs" subtitle="High or low results on the current chart" action={{ label: "All patients", to: "/patients" }} flush={flaggedRows.length > 0}>
+      <Panel fill title="Patients with flagged labs" subtitle="High or low results on the current chart" action={{ label: "All patients", to: "/patients" }} flush={flaggedRows.length > 0}>
         {flaggedRows.length === 0 ? (
           <EmptyState title="No flagged labs">High and low results show up here.</EmptyState>
         ) : (
@@ -182,6 +193,7 @@ export default function InstructorDashboard() {
           </Box>
         )}
       </Panel>
+      </Box>
     </Box>
   );
 }
