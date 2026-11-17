@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clinical_sections import LUNG_SOUND_FINDINGS, LUNG_SOUND_LOCATIONS, locks_or_default, prefill_or_default
-from app.models.clinical import CaseAnswerKey, Course, Encounter, Patient
+from app.models.clinical import CaseAnswerKey, Course, Encounter, Patient, current_encounter, make_encounter
 from app.models.user import User
 from app.schemas.clinical import CaseIn
 from app.services.audit import log_event
@@ -96,13 +96,22 @@ async def create_case(
         unit=(body.unit or "").strip() or None,
         room=(body.room or "").strip() or None,
         bed=(body.bed or "").strip() or None,
-        encounter=Encounter(type=body.encounter_type.strip() or "Office visit", date=date.today()),
+        encounters=[make_encounter(
+            visit_type=body.encounter_type.strip() or "Office visit",
+            when=date.today(),
+            status=body.encounter_status,
+            care_setting=body.care_setting,
+            chief_complaint=body.chief_complaint.strip(),
+            unit=(body.unit or "").strip() or None,
+            room=(body.room or "").strip() or None,
+            bed=(body.bed or "").strip() or None,
+        )],
     )
     db.add(patient)
     await db.flush()
     await db.refresh(
         patient,
-        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"],
     )
     await _replace_children(db, patient, _children(body))
     patient.updated_at = utcnow()
@@ -131,7 +140,7 @@ async def update_case(
     _validate(body)
     await db.refresh(
         patient,
-        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"],
     )
     patient.first_name = body.first_name.strip()
     patient.last_name = body.last_name.strip()
@@ -165,10 +174,27 @@ async def update_case(
     patient.encounter_status = body.encounter_status
     patient.care_setting = body.care_setting
     patient.program = (body.program or "").strip() or None
-    if patient.encounter is None:
-        patient.encounter = Encounter(type=body.encounter_type.strip() or "Office visit", date=date.today())
+    visit = current_encounter(patient)
+    if visit is None:
+        patient.encounters.append(make_encounter(
+            visit_type=body.encounter_type.strip() or "Office visit",
+            when=date.today(),
+            status=body.encounter_status,
+            care_setting=body.care_setting,
+            chief_complaint=body.chief_complaint.strip(),
+            unit=(body.unit or "").strip() or None,
+            room=(body.room or "").strip() or None,
+            bed=(body.bed or "").strip() or None,
+        ))
     else:
-        patient.encounter.type = body.encounter_type.strip() or "Office visit"
+        visit.type = body.encounter_type.strip() or "Office visit"
+        visit.status = body.encounter_status
+        visit.care_setting = body.care_setting
+        visit.chief_complaint = body.chief_complaint.strip()
+        visit.unit = (body.unit or "").strip() or None
+        visit.room = (body.room or "").strip() or None
+        visit.bed = (body.bed or "").strip() or None
+        visit.closed_at = None if body.encounter_status not in {"Checked out", "Closed"} else visit.closed_at
     if body.section_locks is not None:
         patient.section_locks = locks_or_default(body.section_locks)
     if body.prefill_sections is not None:
@@ -435,7 +461,7 @@ async def copy_case(
     await ensure_destination_open(db, destination_id)
     await db.refresh(
         patient,
-        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"],
     )
     clone = Patient(
         mrn=await _unique_case_mrn(db),
@@ -471,10 +497,16 @@ async def copy_case(
         bed=patient.bed,
         photo=patient.photo,
         photo_content_type=patient.photo_content_type,
-        encounter=Encounter(
-            type=patient.encounter.type if patient.encounter else "Office visit",
-            date=date.today(),
-        ),
+        encounters=[make_encounter(
+            visit_type=patient.encounter.type if patient.encounter else "Office visit",
+            when=date.today(),
+            status=patient.encounter_status,
+            care_setting=patient.care_setting,
+            chief_complaint=patient.chief_complaint,
+            unit=patient.unit,
+            room=patient.room,
+            bed=patient.bed,
+        )],
     )
     db.add(clone)
     await db.flush()
@@ -564,7 +596,7 @@ async def _reload(db: AsyncSession, patient: Patient) -> Patient:
     await db.refresh(
         patient,
         attribute_names=[
-            "owner", "created_by", "allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter",
+            "owner", "created_by", "allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters",
         ],
     )
     return patient

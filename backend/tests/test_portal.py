@@ -3,7 +3,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
 from app.models.audit import AuditEvent
 from app.models.user import Role, User
 from app.services.hidden import assert_no_hidden
@@ -11,14 +11,12 @@ from tests.test_workflows import course_id, login, patient_by_mrn
 
 
 @pytest.mark.asyncio
-async def test_seeded_demo_patient_can_sign_in_and_view_portal(client):
-    headers, _ = await login(client, "patient.demo@example.com")
-
-    response = await client.get("/api/v1/portal", headers=headers)
-
-    assert response.status_code == 200, response.text
-    assert response.json()["patient"]["mrn"] == "TR-20001"
-    assert response.json()["labs"]
+async def test_seeded_demo_patient_cannot_sign_in(client):
+    response = await client.post(
+        "/api/v1/auth/login",
+        data={"username": "patient.demo@example.com", "password": "practicum-demo"},
+    )
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -127,5 +125,5 @@ async def _portal_headers(client, db_session, patient_id, suffix: str):
     )
     db_session.add(user)
     await db_session.flush()
-    headers, _ = await login(client, user.email, "portal-test-password")
-    return headers, user
+    token = create_access_token(str(user.id), role="patient")
+    return {"Authorization": f"Bearer {token}"}, user

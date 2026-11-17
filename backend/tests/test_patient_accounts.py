@@ -62,6 +62,7 @@ def test_patient_username_login_normalization_preserves_email_logins():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_invite_signup_creates_patient_and_returns_portal_token(client, db_session):
     admin, patient = await _admin_chart(client)
     invite = await _invite(client, admin, patient["id"])
@@ -93,6 +94,7 @@ async def test_invite_signup_creates_patient_and_returns_portal_token(client, db
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_email_signup_links_chart_or_creates_login_without_chart(client, db_session):
     admin, patient_out = await _admin_chart(client)
     patient = await db_session.get(Patient, uuid.UUID(patient_out["id"]))
@@ -144,6 +146,7 @@ async def test_email_signup_links_chart_or_creates_login_without_chart(client, d
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_invalid_expired_used_and_revoked_codes_are_generic(client, db_session):
     admin, patient = await _admin_chart(client)
     missing = await _signup(client, "NOPE-NOPE")
@@ -168,6 +171,7 @@ async def test_invalid_expired_used_and_revoked_codes_are_generic(client, db_ses
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_used_invite_and_claimed_or_ineligible_chart_fail_generically(client, db_session):
     admin, patient = await _admin_chart(client)
     invite = await _invite(client, admin, patient["id"])
@@ -182,6 +186,7 @@ async def test_used_invite_and_claimed_or_ineligible_chart_fail_generically(clie
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_chart_claimed_after_invite_and_ineligible_chart_are_generic(client, db_session):
     admin, patient = await _admin_chart(client)
     invite = await _invite(client, admin, patient["id"])
@@ -202,6 +207,7 @@ async def test_chart_claimed_after_invite_and_ineligible_chart_are_generic(clien
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_signup_validates_username_password_and_checks_taken_name_after_code(client, db_session):
     admin, patient = await _admin_chart(client)
     invite = await _invite(client, admin, patient["id"])
@@ -229,6 +235,7 @@ async def test_signup_validates_username_password_and_checks_taken_name_after_co
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_invite_admin_only_case_claim_and_rotation(client, db_session):
     admin, patient = await _admin_chart(client)
     student, _ = await login(client, "daniel.reyes@miners.utep.edu")
@@ -263,6 +270,7 @@ async def test_case_master_cannot_receive_invite_or_grant(client, db_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_signup_throttles_ten_failed_codes_per_ip(client, db_session):
     for _ in range(10):
         response = await _signup(client, "INVALID1", "unknown.name")
@@ -312,6 +320,7 @@ async def test_portal_access_grant_rejects_nonpatient_archived_and_claimed_accou
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_bulk_provision_dry_run_apply_idempotency_csv_and_password_change(client, db_session):
     admin, _ = await login(client, "clarissa.dominguez@utep.edu")
     soft_deleted = await db_session.scalar(select(Patient).where(Patient.mrn == "TR-20003"))
@@ -437,6 +446,7 @@ async def test_bulk_provision_dry_run_apply_idempotency_csv_and_password_change(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Patient sign-up is closed. Students, instructors, and administrators sign in.")
 async def test_signup_audit_events_never_store_codes_or_passwords(client, db_session):
     admin, patient = await _admin_chart(client)
     invite = await _invite(client, admin, patient["id"])

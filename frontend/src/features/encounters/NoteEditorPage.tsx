@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Autocomplete, Box, Button, Checkbox, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  FormControlLabel, Divider, LinearProgress, MenuItem, Paper, Stack, TextField, Typography,
+  FormControlLabel,
+  Divider, LinearProgress, MenuItem, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ClinicalNote, CptSelection, IcdCode, Patient, User } from "../../types";
@@ -11,6 +12,7 @@ import { getCourse, listInstructors } from "../../api/courses";
 import { listNoteTemplates } from "../../api/templates";
 import { getChartGradingGuide } from "../../api/cases";
 import { useSession } from "../auth/useSession";
+import { canChartPatient } from "../chart/access";
 import { formatDate, formatTime } from "../../utils/format";
 import { listCpt } from "../../api/reference";
 import { useAsync } from "../../utils/useAsync";
@@ -27,7 +29,6 @@ import CourseRubricPanel from "./components/CourseRubricPanel";
 import AnswerKeyPanel from "./components/AnswerKeyPanel";
 import { defaultTemplateFor, diagnosesFromPatient, prefillFromPatient, templateName, templatesFor, TEMPLATES, type NoteTemplate } from "./noteTemplates";
 import { suggestionsFor } from "./suggestionPacks";
-import { canChartPatient } from "../chart/access";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -132,7 +133,7 @@ export default function NoteEditorPage() {
   const savedSeq = useRef(0);
   const saving = useRef(false);
 
-  const clinician = patient?.mode === "simulation" && (patient.viewerStation === "pharmacist" || patient.viewerStation === "provider");
+  const clinician = patient?.mode === "simulation" && patient.viewerStation === "nurse";
   const editable = Boolean(
     note && !note.bodyLocked && (note.status === "draft" || note.status === "returned")
     && (note.authorId === user.id || (clinician && (note.kind ?? "visit") === "visit")),
@@ -524,9 +525,14 @@ export default function NoteEditorPage() {
                 Signing closes this note. A later clarification is a separate note and does not reopen it.
               </Typography>
             )}
-            {isAssessment && (
+            {!isSimulation && !editable && (
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
-                You sign as the author. The note isn't final until an instructor co-signs. Prescribing is simulated.
+                This note is signed. The original stays as written. Add an addendum to correct it.
+              </Typography>
+            )}
+            {isAssessment && editable && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+                You sign as the author. After you sign, the wording stays. A later correction is an addendum.
               </Typography>
             )}
           </Paper>
@@ -545,7 +551,7 @@ export default function NoteEditorPage() {
             {isSimulation
               ? "The visit note locks. Anyone on the team can open a new clarification note afterward."
               : isAssessment
-              ? `It goes to ${reviewer?.fullName ?? "your instructor"} for review. You won't be able to edit it unless it's returned.`
+              ? `It goes to ${reviewer?.fullName ?? "your instructor"} for review. The note locks. A later correction is an addendum.`
               : "Signed notes are locked. You can still add an addendum."}
           </DialogContentText>
         </DialogContent>

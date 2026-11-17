@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func, text
@@ -108,9 +108,15 @@ class Patient(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     labs: Mapped[list["LabResult"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     vitals: Mapped[list["Vital"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
     lung_sounds: Mapped[list["LungSound"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
-    encounter: Mapped["Encounter | None"] = relationship(
-        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    encounters: Mapped[list["Encounter"]] = relationship(
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Encounter.opened_at",
     )
+
+    @property
+    def encounter(self) -> "Encounter | None":
+        return current_encounter(self)
 
 
 class PatientIntake(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -202,6 +208,7 @@ class LabResult(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "lab_results"
 
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    encounter_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("encounters.id", ondelete="SET NULL"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     value: Mapped[str] = mapped_column(String(40))
     unit: Mapped[str] = mapped_column(String(40))
@@ -214,6 +221,7 @@ class Vital(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "vitals"
 
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    encounter_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("encounters.id", ondelete="SET NULL"), index=True)
     label: Mapped[str] = mapped_column(String(40))
     value: Mapped[str] = mapped_column(String(40))
     recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -225,6 +233,7 @@ class LungSound(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "lung_sounds"
 
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
+    encounter_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("encounters.id", ondelete="SET NULL"), index=True)
     location: Mapped[str] = mapped_column(String(20))
     finding: Mapped[str] = mapped_column(String(40))
     notes: Mapped[str | None] = mapped_column(Text)
@@ -236,9 +245,58 @@ class LungSound(UUIDPrimaryKeyMixin, Base):
 class Encounter(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "encounters"
 
-    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), unique=True)
+    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("patients.id", ondelete="CASCADE"), index=True)
     type: Mapped[str] = mapped_column(String(80))
     date: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(40), default="Scheduled", server_default="Scheduled")
+    care_setting: Mapped[str] = mapped_column(String(40), default="Outpatient", server_default="Outpatient")
+    unit: Mapped[str | None] = mapped_column(String(80))
+    room: Mapped[str | None] = mapped_column(String(40))
+    bed: Mapped[str | None] = mapped_column(String(40))
+    chief_complaint: Mapped[str] = mapped_column(Text, default="", server_default="")
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_in_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    checked_in_by_name: Mapped[str | None] = mapped_column(String(120))
+
+
+FINISHED_VISITS = {"Checked out", "Closed"}
+VISIT_FLOW = ["Scheduled", "Checked in", "Roomed", "In progress", "Checked out", "Closed"]
+
+
+def current_encounter(patient: "Patient") -> Encounter | None:
+    visits = list(patient.encounters or [])
+    if not visits:
+        return None
+    open_rows = [row for row in visits if row.closed_at is None and row.status not in FINISHED_VISITS]
+    pool = open_rows or visits
+    return max(pool, key=lambda row: row.opened_at or datetime.min.replace(tzinfo=timezone.utc))
+
+
+def make_encounter(
+    *,
+    visit_type: str,
+    when: date,
+    status: str = "Scheduled",
+    care_setting: str = "Outpatient",
+    chief_complaint: str = "",
+    unit: str | None = None,
+    room: str | None = None,
+    bed: str | None = None,
+) -> Encounter:
+    return Encounter(
+        type=visit_type or "Office visit",
+        date=when,
+        status=status,
+        care_setting=care_setting or "Outpatient",
+        chief_complaint=chief_complaint or "",
+        unit=unit,
+        room=room,
+        bed=bed,
+        opened_at=datetime.now(timezone.utc),
+        closed_at=datetime.now(timezone.utc) if status in FINISHED_VISITS else None,
+    )
 
 
 class ClinicalNote(UUIDPrimaryKeyMixin, TimestampMixin, Base):

@@ -56,7 +56,7 @@ async def _start(client):
 
 
 @pytest.mark.asyncio
-async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private(client):
+async def test_simulation_handoff_closes_note_and_keeps_assessment_private(client):
     sim = await _start(client)
     chart_id = sim["chart"]["id"]
 
@@ -65,11 +65,15 @@ async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private
 
     course = sim["course"]
     sam = await patient_by_mrn(client, sim["instructor"], course, "instructor", "TR-10057-ST")
-    review_only = await client.get(f"/api/v1/patients/{sam['id']}", headers=sim["nurse"], params={"role": "student"})
-    assert review_only.status_code == 200, review_only.text
-    other_notes = await client.get(f"/api/v1/patients/{sam['id']}/notes", headers=sim["nurse"], params={"role": "student"})
-    assert other_notes.status_code == 200, other_notes.text
-    assert other_notes.json() == []
+    still_private = await client.get(f"/api/v1/patients/{sam['id']}", headers=sim["nurse"], params={"role": "student"})
+    assert still_private.status_code == 200
+    blocked_note = await client.post(
+        f"/api/v1/patients/{sam['id']}/notes",
+        headers=sim["nurse"],
+        params={"role": "student"},
+        json={"templateId": "pharmacy_mtm", "discipline": "pharmacy"},
+    )
+    assert blocked_note.status_code == 403
 
     blocked = await client.post(
         f"/api/v1/patients/{chart_id}/vitals",
@@ -81,9 +85,9 @@ async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private
 
     early = await client.post(
         f"/api/v1/patients/{chart_id}/notes",
-        headers=sim["pharmacist"],
+        headers=sim["nurse"],
         params={"role": "student"},
-        json={"templateId": "pharmacy_mtm", "discipline": "pharmacy", "kind": "clarification"},
+        json={"templateId": "pharmacy_mtm", "discipline": "pharmacy"},
     )
     assert early.status_code == 409
 
@@ -96,17 +100,9 @@ async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private
     assert recorded.status_code == 200, recorded.text
     assert recorded.json()["simulationPhase"] == "ready"
 
-    nurse_note = await client.post(
-        f"/api/v1/patients/{chart_id}/notes",
-        headers=sim["nurse"],
-        params={"role": "student"},
-        json={"templateId": "pharmacy_mtm", "discipline": "pharmacy"},
-    )
-    assert nurse_note.status_code == 403
-
     created = await client.post(
         f"/api/v1/patients/{chart_id}/notes",
-        headers=sim["pharmacist"],
+        headers=sim["nurse"],
         params={"role": "student"},
         json={"templateId": "pharmacy_mtm", "discipline": "pharmacy"},
     )
@@ -115,14 +111,14 @@ async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private
     assert created.json()["kind"] == "visit"
 
     shared = await client.get(
-        f"/api/v1/patients/{chart_id}/notes", headers=sim["provider"], params={"role": "student"},
+        f"/api/v1/patients/{chart_id}/notes", headers=sim["nurse"], params={"role": "student"},
     )
     assert shared.status_code == 200
     assert any(row["id"] == note_id for row in shared.json())
 
     edited = await client.patch(
         f"/api/v1/notes/{note_id}",
-        headers=sim["provider"],
+        headers=sim["nurse"],
         params={"role": "student"},
         json={"expectedVersion": created.json()["version"], "content": {"reason": "Blood pressure follow-up"}},
     )
@@ -130,28 +126,40 @@ async def test_simulation_handoff_closes_note_and_keeps_assessment_notes_private
 
     signed = await client.post(
         f"/api/v1/notes/{note_id}/sign",
-        headers=sim["provider"],
+        headers=sim["nurse"],
         params={"role": "student"},
         json={"expectedVersion": edited.json()["version"]},
     )
     assert signed.status_code == 200, signed.text
-    assert signed.json()["status"] == "signed"
+    assert signed.json()["status"] == "pending_review"
     assert signed.json()["bodyLocked"] is True
 
-    chart = await client.get(f"/api/v1/patients/{chart_id}", headers=sim["nurse"], params={"role": "student"})
-    assert chart.json()["simulationPhase"] == "closed"
+    waiting = await client.get(f"/api/v1/patients/{chart_id}", headers=sim["nurse"], params={"role": "student"})
+    assert waiting.json()["simulationPhase"] == "ready"
 
     queue = await client.get(
         "/api/v1/review-queue", headers=sim["instructor"], params={"course_id": course, "role": "instructor"},
     )
     assert queue.status_code == 200
-    assert all(row["note"]["id"] != note_id for row in queue.json())
+    assert any(row["note"]["id"] == note_id for row in queue.json())
+
+    cosigned = await client.post(
+        f"/api/v1/notes/{note_id}/cosign",
+        headers=sim["instructor"],
+        params={"role": "instructor"},
+        json={},
+    )
+    assert cosigned.status_code == 200, cosigned.text
+    assert cosigned.json()["status"] == "cosigned"
+
+    chart = await client.get(f"/api/v1/patients/{chart_id}", headers=sim["nurse"], params={"role": "student"})
+    assert chart.json()["simulationPhase"] == "closed"
 
     locked = await client.patch(
         f"/api/v1/notes/{note_id}",
-        headers=sim["provider"],
+        headers=sim["nurse"],
         params={"role": "student"},
-        json={"expectedVersion": signed.json()["version"], "content": {"reason": "too late"}},
+        json={"expectedVersion": cosigned.json()["version"], "content": {"reason": "too late"}},
     )
     assert locked.status_code == 409
 

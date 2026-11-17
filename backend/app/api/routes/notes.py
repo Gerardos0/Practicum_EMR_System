@@ -2,7 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession
@@ -350,8 +350,17 @@ async def review_queue(
             select(ClinicalNote)
             .join(Patient, Patient.id == ClinicalNote.patient_id)
             .where(
-                ClinicalNote.mode == "assessment",
-                ClinicalNote.status.in_(("pending_review", "returned", "cosigned")),
+                or_(
+                    and_(
+                        ClinicalNote.mode == "assessment",
+                        ClinicalNote.status.in_(("pending_review", "returned", "cosigned")),
+                    ),
+                    and_(
+                        ClinicalNote.mode == "simulation",
+                        ClinicalNote.kind == "visit",
+                        ClinicalNote.status.in_(("pending_review", "returned", "cosigned")),
+                    ),
+                ),
                 ClinicalNote.archived.is_(False),
                 Patient.course_id == course_id,
                 Patient.deleted_at.is_(None),

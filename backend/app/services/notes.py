@@ -4,12 +4,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.clinical import ClinicalNote, NoteAddendum, NoteComment, Patient
+from app.models.clinical import ClinicalNote, Encounter, NoteAddendum, NoteComment, Patient
 from app.models.user import Discipline, User
 from app.services.access import can, require
 from app.services.audit import log_event
 from app.services.note_prefill import diagnoses_from_patient, prefill_from_patient
-from app.services.charts import ensure_student_may_chart, utcnow
+from app.services.charts import utcnow
 from app.services.note_crypto import seal_note, seal_text
 from app.services.note_templates import allowed_section_ids, assert_usable, template_sensitivity
 from app.services.simulation import may_edit_simulation_note, prepare_note, sign_simulation
@@ -55,6 +55,8 @@ async def create_draft(
 ) -> ClinicalNote:
     require(role, "note:author", "Your role can't write notes.")
     if patient.mode != "simulation":
+        from app.services.charts import ensure_student_may_chart
+
         ensure_student_may_chart(patient, author, role)
     kind = await prepare_note(db, patient, author, role, kind)
     if patient.mode == "case":
@@ -98,6 +100,13 @@ async def create_draft(
 
 
 async def save_draft(db, note: ClinicalNote, author: User, expected_version: int, patch: dict) -> ClinicalNote:
+    if note.encounter_id is not None:
+        visit = await db.get(Encounter, note.encounter_id)
+        if visit is not None and visit.status in {"Checked out", "Closed"}:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "This visit is discharged. Add an addendum instead of changing the note.",
+            )
     closed = note.status not in EDITABLE or note.body_locked
     shared = await may_edit_simulation_note(db, note, author)
     if note.author_id != author.id and not shared:
@@ -163,6 +172,7 @@ async def sign_note(db, note: ClinicalNote, author: User, expected_version: int,
     if note.mode == "assessment" and note.routed_to_id is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose an instructor to review this note.")
     note.status = "pending_review" if note.mode == "assessment" else "signed"
+    note.body_locked = True
     note.signed_at = utcnow()
     note.updated_at = note.signed_at
     note.version += 1
@@ -200,6 +210,10 @@ async def cosign_note(db, note: ClinicalNote, reviewer: User, role: str, comment
     note.cosigned_at = utcnow()
     note.cosigned_by_id = reviewer.id
     note.updated_at = note.cosigned_at
+    if note.mode == "simulation" and (note.kind or "visit") == "visit":
+        patient = await db.get(Patient, note.patient_id)
+        if patient is not None:
+            patient.simulation_phase = "closed"
     note.version += 1
     if comment and comment.strip():
         body, cipher = seal_text(note, comment.strip())
@@ -305,29 +319,23 @@ async def add_section_comment(
     )
 
 
-async def instructor_edit_note(db, note: ClinicalNote, reviewer: User, role: str, patch: dict, ip: str | None, course_id) -> None:
+async def instructor_edit_note(db, note: ClinicalNote, reviewer: User, role: str, _patch: dict, ip: str | None, course_id) -> None:
     require(role, "note:cosign", "Your role can't edit a student note.")
-    if note.body_locked:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This note is already signed. Return it or review the addendum.")
-    if note.status != "pending_review":
-        raise HTTPException(status.HTTP_409_CONFLICT, "Edit a note while it is pending review, or return it to the student.")
-    if patch.get("content") is not None:
-        note.content = _bounded_content(patch["content"])
-    seal_note(note)
-    if patch.get("diagnoses") is not None:
-        note.diagnoses = patch["diagnoses"]
-    if patch.get("cpt_codes") is not None:
-        note.cpt_codes = patch["cpt_codes"]
-    note.version += 1
-    note.updated_at = utcnow()
     await log_event(
         db,
         action="note.instructor_edit",
         entity_type="note",
         entity_id=str(note.id),
         actor_user_id=reviewer.id,
+        result="denied",
         course_id=course_id,
         ip_address=ip,
+        detail="Signed notes stay as written. Corrections are addenda.",
+    )
+    await db.commit()
+    raise HTTPException(
+        status.HTTP_409_CONFLICT,
+        "This note is signed. Add an addendum instead of changing it.",
     )
 
 

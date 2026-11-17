@@ -9,7 +9,7 @@ import { utep } from "../../theme/tokens";
 import CensusRow from "../../components/CensusRow";
 import EmptyState from "../../components/EmptyState";
 import { Panel } from "../dashboard/components/DashboardParts";
-import { byPatientName } from "../patients/tracker";
+import { byPatientName, hasAbnormalResults, placeLabel } from "../patients/tracker";
 import type { Course, Patient } from "../../types";
 
 const listSx = { listStyle: "none", m: 0, p: 0, containerType: "inline-size" } as const;
@@ -17,6 +17,7 @@ const listSx = { listStyle: "none", m: 0, p: 0, containerType: "inline-size" } a
 function assignmentLabel(patient: Patient, ownerName?: string) {
   if (ownerName) return ownerName;
   if (patient.mode === "practice") return patient.practiceLabel || "Practice";
+  if (patient.mode === "simulation") return "Simulation";
   if (!patient.ownerId) return "Unassigned";
   return "Assigned";
 }
@@ -35,7 +36,7 @@ export default function AdminHomePage() {
     const batches = await Promise.all(courses.map(async (course) => {
       const rows = await listPatients("admin", course.id);
       return rows
-        .filter((row) => row.patient.status.encounter === "Checked in")
+        .filter((row) => row.patient.status.encounter === "Checked in" && row.patient.mode !== "case")
         .map((row) => ({ row, course }));
     }));
     const checkedIn = batches.flat().sort((a, b) => {
@@ -89,16 +90,19 @@ function CheckedInRow({ row, course }: { row: PatientRow; course: Course }) {
   const navigate = useNavigate();
   const patient = row.patient;
   const initials = `${patient.firstName[0] ?? ""}${patient.lastName[0] ?? ""}`.toUpperCase();
+  const abnormal = hasAbnormalResults(patient);
+  const location = placeLabel(patient);
   const open = () => navigate(`/patients/${patient.id}`);
   return (
     <CensusRow
       initials={initials}
       title={`${patient.lastName}, ${patient.firstName}`}
-      meta={`${patient.ageYears}y ${sexLetter(patient)} · ${assignmentLabel(patient, row.ownerName)}`}
+      meta={`${patient.ageYears}y ${sexLetter(patient)} · ${assignmentLabel(patient, row.ownerName)}${location ? ` · ${location}` : ""}${abnormal ? " · Abnormal results" : ""}`}
       primary={course.code}
       secondary={patient.chiefComplaint || "No chief complaint"}
+      highlight={abnormal}
       onOpen={open}
-      ariaLabel={`Open chart for ${patient.lastName}, ${patient.firstName}`}
+      ariaLabel={`Open chart for ${patient.lastName}, ${patient.firstName}${abnormal ? ", abnormal results" : ""}`}
       actions={(
         <Button size="small" variant="contained" color="secondary" onClick={open}>
           Open

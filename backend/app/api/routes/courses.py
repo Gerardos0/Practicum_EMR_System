@@ -51,11 +51,11 @@ def _require_admin(user: User, rows, role: str = "admin") -> None:
 def _require_roster_role(staff_role: str, target_role: str) -> None:
     if target_role == "student":
         require(staff_role, "roster:import", "Your role can't edit the roster.")
-    elif target_role == "course_coordinator":
-        require(staff_role, "course:manage_access", "Only an administrator can add a course coordinator.")
     elif target_role == "instructor":
         if not (can(staff_role, "instructor:manage") or can(staff_role, "course:manage_access")):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only a course coordinator or administrator can add instructors.")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an administrator can add instructors.")
+    elif target_role in {"course_coordinator", "front_desk", "patient"}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That account type isn't used. Add a student, instructor, or administrator.")
     else:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't edit the roster.")
 

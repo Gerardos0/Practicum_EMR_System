@@ -17,24 +17,18 @@ export default function StartSimulationDialog({ item, onClose, onStarted }: Prop
   const roster = useAsync(() => listRoster(courseId), [courseId]);
   const students = (roster.data ?? []).filter((student) => student.rosterStatus !== "inactive");
   const [nurseId, setNurseId] = useState("");
-  const [pharmacistId, setPharmacistId] = useState("");
-  const [providerId, setProviderId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!nurseId || (!pharmacistId && !providerId)) {
-      setError("Choose a nurse and at least one of pharmacist or provider.");
+    if (!nurseId) {
+      setError("Choose the student who will be the nurse.");
       return;
     }
     setBusy(true);
     setError("");
     try {
-      const chart = await startSimulation(activeRole, courseId, item.id, {
-        nurseId,
-        pharmacistId: pharmacistId || undefined,
-        providerId: providerId || undefined,
-      });
+      const chart = await startSimulation(activeRole, courseId, item.id, { nurseId });
       onStarted(chart);
     } catch (e) {
       setError((e as Error).message);
@@ -61,8 +55,6 @@ export default function StartSimulationDialog({ item, onClose, onStarted }: Prop
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}
           {field("Nurse", nurseId, setNurseId, true)}
-          {field("Pharmacist", pharmacistId, setPharmacistId)}
-          {field("Provider", providerId, setProviderId)}
         </Stack>
       </DialogContent>
       <DialogActions>
