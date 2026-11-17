@@ -24,8 +24,20 @@ function isReserved(spot: LabBedSpot, room: SimLabRoom | undefined, rows: SimLab
   return people.some((row) => !row.timeBlock || row.timeBlock === timeBlock);
 }
 
+function drawnCounts() {
+  const counts = new Map<string, number>();
+  for (const spot of LAB_BEDS) counts.set(spot.room, (counts.get(spot.room) ?? 0) + 1);
+  return counts;
+}
+
+const DRAWN_BEDS = drawnCounts();
+
+function oneBedRoom(spot: LabBedSpot, room: SimLabRoom) {
+  return (DRAWN_BEDS.get(spot.room) ?? 1) <= 1 || room.bedCount <= 1;
+}
+
 function placeName(spot: LabBedSpot, room: SimLabRoom) {
-  return room.bedCount <= 1 ? `Room ${spot.room}` : `Room ${spot.room}, bed ${spot.bed}`;
+  return oneBedRoom(spot, room) ? `Room ${spot.room}` : `Room ${spot.room}, bed ${spot.bed}`;
 }
 
 export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: Props) {
@@ -58,7 +70,7 @@ export default function LabFloorMap({ rooms, assignments, timeBlock, onPick }: P
         const title = reserved
           ? `${place}, reserved for ${people.map((row) => row.studentName).join(", ")}`
           : place;
-        const showLetter = !reserved && room.bedCount > 1;
+        const showLetter = !reserved && !oneBedRoom(spot, room);
         return (
           <Box
             key={`${spot.room}-${spot.bed}`}
