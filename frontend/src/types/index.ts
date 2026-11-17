@@ -177,6 +177,23 @@ export interface Encounter {
   date: string;
 }
 
+export interface Visit {
+  id: string;
+  type: string;
+  date: string;
+  status: string;
+  careSetting: string;
+  unit?: string | null;
+  room?: string | null;
+  bed?: string | null;
+  chiefComplaint: string;
+  openedAt?: string | null;
+  closedAt?: string | null;
+  checkedInAt?: string | null;
+  checkedInByName?: string | null;
+  current: boolean;
+}
+
 export interface Insurance {
   payer?: string | null;
   memberId?: string | null;
@@ -224,6 +241,7 @@ export interface Patient {
   surgicalHistory: string;
   socialHistory: string;
   encounter: Encounter;
+  visits?: Visit[];
   insurance?: Insurance;
   emergencyContact?: EmergencyContact;
   codeStatus?: CodeStatus | string | null;

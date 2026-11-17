@@ -28,7 +28,7 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
   const [fileName, setFileName] = useState("");
   const [discipline, setDiscipline] = useState<Discipline>("pharmacy");
   const manageStudents = can(activeRole, "roster:import");
-  const [importRole, setImportRole] = useState<"student" | "instructor" | "course_coordinator">(manageStudents ? "student" : "instructor");
+  const [importRole, setImportRole] = useState<"student" | "instructor">(manageStudents ? "student" : "instructor");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string }>();
   const [passwords, setPasswords] = useState<TempPassword[]>([]);
   const [removing, setRemoving] = useState<{ person: User; role: "student" | "instructor" | "course_coordinator" }>();
@@ -124,10 +124,9 @@ export default function RosterImportPage({ courseId: courseIdProp }: { courseId?
         <Typography component="h2" variant="h6">Add people</Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" }, mt: 2 }}>
           {manageStudents && (
-            <TextField select size="small" label="Add as" value={importRole} onChange={(e) => setImportRole(e.target.value as "student" | "instructor" | "course_coordinator")} sx={{ minWidth: 200 }}>
+            <TextField select size="small" label="Add as" value={importRole} onChange={(e) => setImportRole(e.target.value as "student" | "instructor")} sx={{ minWidth: 200 }}>
               <MenuItem value="student">Student</MenuItem>
               <MenuItem value="instructor">Instructor</MenuItem>
-              <MenuItem value="course_coordinator">Course coordinator</MenuItem>
             </TextField>
           )}
           <TextField select size="small" label="Discipline" value={discipline} onChange={(e) => setDiscipline(e.target.value as Discipline)} sx={{ minWidth: 240 }}>

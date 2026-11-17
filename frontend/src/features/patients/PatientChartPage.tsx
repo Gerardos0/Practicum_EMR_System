@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, LinearProgress, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, LinearProgress, Tab, Tabs, Typography } from "@mui/material";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getPatient, updatePatientStatus } from "../../api/patients";
-import { grantPortalAccess } from "../../api/users";
-import { recordPresence, updatePlacement } from "../../api/chart";
+import { recordPresence } from "../../api/chart";
 import { listNotesForPatient } from "../../api/notes";
 import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
@@ -22,9 +21,11 @@ import LabsTab from "../labs/LabsTab";
 import SchedulingTab from "../scheduling/SchedulingTab";
 import { simulationNoteAction } from "./simulation";
 import ChartActivity from "./components/ChartActivity";
+import VisitsTab from "./components/VisitsTab";
 
 const TABS = [
   { id: "summary", label: "Overview" },
+  { id: "visits", label: "Visits" },
   { id: "labs", label: "Labs" },
   { id: "medications", label: "Medications" },
   { id: "notes", label: "Notes" },
@@ -42,16 +43,6 @@ export default function PatientChartPage() {
   const visibleTabs = TABS.filter((item) => item.id !== "activity" || activeRole === "admin");
   const tab = (visibleTabs.find((item) => item.id === params.get("tab"))?.id ?? "summary") as TabId;
   const [statusOpen, setStatusOpen] = useState(false);
-  const [placement, setPlacement] = useState({ unit: "", room: "", bed: "" });
-  const [portalAccessOpen, setPortalAccessOpen] = useState(false);
-  const [portalEmail, setPortalEmail] = useState("");
-  const [portalFullName, setPortalFullName] = useState("");
-  const [portalBusy, setPortalBusy] = useState(false);
-  const [portalError, setPortalError] = useState("");
-  const [portalGranted, setPortalGranted] = useState(false);
-  const [temporaryPassword, setTemporaryPassword] = useState("");
-  const [portalInvite, setPortalInvite] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [portalInviteCopied, setPortalInviteCopied] = useState(false);
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
   const notes = useAsync(() => listNotesForPatient(activeRole, patientId), [patientId, activeRole]);
@@ -117,78 +108,28 @@ export default function PatientChartPage() {
         onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
       />
 
-      {can(activeRole, "user:manage_access") && (
-        <Box sx={{ px: 0, py: 1.5, my: 1.5, display: "flex", justifyContent: "flex-end", alignItems: "center", borderBottom: `1px solid ${utep.lineSoft}` }}>
-          <Button size="small" onClick={() => {
-            setPortalEmail("");
-            setPortalFullName(`${p.firstName} ${p.lastName}`);
-            setPortalError("");
-            setPortalGranted(false);
-            setTemporaryPassword("");
-            setPortalInvite(null);
-            setPortalInviteCopied(false);
-            setPortalAccessOpen(true);
-          }}>Portal access</Button>
-        </Box>
-      )}
-
-      {!chartable && (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          View only. You can review this chart. Only the assigned student can change it or write the note.
-        </Alert>
-      )}
-
-      {can(activeRole, "patient:update_status") && (
-        <Paper sx={{ p: 2, my: 2, display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-          <Typography variant="subtitle2" sx={{ mr: 1 }}>Bed assignment</Typography>
-          <input aria-label="Unit" placeholder={p.unit || "Unit"} value={placement.unit} onChange={(e) => setPlacement({ ...placement, unit: e.target.value })} />
-          <input aria-label="Room" placeholder={p.room || "Room"} value={placement.room} onChange={(e) => setPlacement({ ...placement, room: e.target.value })} />
-          <input aria-label="Bed" placeholder={p.bed || "Bed"} value={placement.bed} onChange={(e) => setPlacement({ ...placement, bed: e.target.value })} />
-          <Button size="small" onClick={async () => patient.setData(await updatePlacement(activeRole, p.id, placement))}>Save placement</Button>
-        </Paper>
-      )}
-
-      <Box sx={{ display: "grid", gap: 2, mt: 2, gridTemplateColumns: { xs: "1fr", md: "180px minmax(0, 1fr)" }, alignItems: "start" }}>
-      <Box role="tablist"
+      <Tabs
+        value={tab}
+        onChange={(_, next: TabId) => setParams({ tab: next }, { replace: true })}
+        variant="scrollable"
+        scrollButtons="auto"
         aria-label="Chart sections"
         sx={{
+          mt: 2,
           mb: 2,
           minHeight: 44,
           borderBottom: `1px solid ${utep.lineSoft}`,
           "& .MuiTab-root": { minHeight: 44, px: 1.75 },
         }}
       >
-        {visibleTabs.map((t) => {
-          const selected = tab === t.id;
-          const label = t.id === "notes" && notes.data ? `${t.label} (${notes.data.length})` : t.label;
-          return (
-            <Box
-              key={t.id}
-              component="button"
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => setParams({ tab: t.id }, { replace: true })}
-              sx={{
-                border: "none",
-                cursor: "pointer",
-                px: 1.75,
-                py: 1,
-                borderRadius: "999px",
-                fontWeight: 700,
-                fontSize: 14,
-                fontFamily: "inherit",
-                bgcolor: selected ? utep.navy : "#fff",
-                color: selected ? "#fff" : utep.navy,
-                boxShadow: selected ? "none" : `inset 0 0 0 1px ${utep.line}`,
-                "&:focus-visible": { outline: `3px solid ${utep.orange}`, outlineOffset: 2 },
-              }}
-            >
-              {label}
-            </Box>
-          );
-        })}
-      </Box>
+        {visibleTabs.map((t) => (
+          <Tab
+            key={t.id}
+            value={t.id}
+            label={t.id === "notes" && notes.data ? `${t.label} (${notes.data.length})` : t.label}
+          />
+        ))}
+      </Tabs>
 
       <Box role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label}>
         {tab === "summary" && (
@@ -200,6 +141,9 @@ export default function PatientChartPage() {
               patient.setData(await updatePatientStatus(activeRole, p.id, { encounter: next }));
             }}
           />
+        )}
+        {tab === "visits" && (
+          <VisitsTab patient={p} notes={notes.data ?? []} onChange={patient.setData} />
         )}
         {tab === "notes" && (
           <Box sx={{ py: 0.5 }}>
@@ -222,7 +166,6 @@ export default function PatientChartPage() {
         {tab === "referrals" && <SchedulingTab patient={p} section="referrals" />}
         {tab === "activity" && activeRole === "admin" && <ChartActivity patientId={p.id} />}
       </Box>
-      </Box>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
         Opening this chart was recorded in the activity log.
@@ -234,84 +177,6 @@ export default function PatientChartPage() {
           onSave={async (status) => patient.setData(await updatePatientStatus(activeRole, p.id, status))}
         />
       )}
-
-      <Dialog open={portalAccessOpen} onClose={() => !portalBusy && setPortalAccessOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Grant portal access</DialogTitle>
-        <DialogContent>
-          {portalError && <Alert severity="error" sx={{ mb: 2 }}>{portalError}</Alert>}
-          {portalInvite && (
-            <Stack spacing={1.5} sx={{ mb: 2 }}>
-              <Alert severity="info">
-                Share this code with the patient. It works once and expires on {new Date(portalInvite.expiresAt).toLocaleDateString()}.
-              </Alert>
-              <Paper variant="outlined" sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography component="code" sx={{ flex: 1, fontFamily: "monospace", fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>
-                  {portalInvite.code}
-                </Typography>
-                <Button size="small" onClick={() => {
-                  navigator.clipboard.writeText(portalInvite.code)
-                    .then(() => setPortalInviteCopied(true))
-                    .catch(() => setPortalError("Copy failed. Select and copy the code manually."));
-                }}>
-                  {portalInviteCopied ? "Copied" : "Copy"}
-                </Button>
-              </Paper>
-            </Stack>
-          )}
-          {portalGranted ? (
-            temporaryPassword ? (
-              <Alert severity="success">
-                Portal access granted. Copy this temporary password now: <strong>{temporaryPassword}</strong>
-              </Alert>
-            ) : (
-              <Alert severity="success">Portal access granted. The existing account was linked; no temporary password was generated.</Alert>
-            )
-          ) : (
-            <Box sx={{ display: "grid", gap: 2, pt: 1 }}>
-              <TextField
-                label="Email" type="email" required autoFocus fullWidth
-                value={portalEmail} onChange={(event) => setPortalEmail(event.target.value)}
-              />
-              <TextField
-                label="Full name" required fullWidth
-                value={portalFullName} onChange={(event) => setPortalFullName(event.target.value)}
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {portalGranted ? (
-            <Button onClick={() => setPortalAccessOpen(false)}>Close</Button>
-          ) : (
-            <>
-              <Button onClick={() => setPortalAccessOpen(false)} disabled={portalBusy}>Cancel</Button>
-              <Button
-                variant="contained"
-                disabled={portalBusy || !portalEmail.trim() || !portalFullName.trim()}
-                onClick={async () => {
-                  setPortalBusy(true);
-                  setPortalError("");
-                  try {
-                    const result = await grantPortalAccess({
-                      email: portalEmail.trim(),
-                      fullName: portalFullName.trim(),
-                      patientId: p.id,
-                    });
-                    setTemporaryPassword(result.temporaryPassword ?? "");
-                    setPortalGranted(true);
-                  } catch (error) {
-                    setPortalError((error as Error).message);
-                  } finally {
-                    setPortalBusy(false);
-                  }
-                }}
-              >
-                {portalBusy ? "Granting…" : "Grant access"}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

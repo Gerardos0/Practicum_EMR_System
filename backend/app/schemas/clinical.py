@@ -149,6 +149,23 @@ class EncounterOut(APIModel):
     date: date
 
 
+class VisitOut(APIModel):
+    id: str
+    type: str
+    date: date
+    status: str
+    care_setting: str
+    unit: str | None = None
+    room: str | None = None
+    bed: str | None = None
+    chief_complaint: str = ""
+    opened_at: datetime | None = None
+    closed_at: datetime | None = None
+    checked_in_at: datetime | None = None
+    checked_in_by_name: str | None = None
+    current: bool = False
+
+
 class StatusOut(APIModel):
     lifecycle: str
     encounter: str
@@ -202,6 +219,7 @@ class PatientOut(APIModel):
     surgical_history: str
     social_history: str
     encounter: EncounterOut
+    visits: list[VisitOut] = []
     insurance: InsuranceOut
     emergency_contact: EmergencyContactOut
     code_status: str | None = None

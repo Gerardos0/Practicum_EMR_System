@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Divider, LinearProgress, Paper, Stack, TextField, Typography,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import { commentOnNote, cosignNote, getNote, instructorEditNote, returnNote } from "../../api/notes";
+import { commentOnNote, cosignNote, getNote, returnNote } from "../../api/notes";
 import { getPatient } from "../../api/patients";
 import { getChartGradingGuide, releaseChartAnswerKey } from "../../api/cases";
 import { useSession } from "../auth/useSession";
@@ -25,7 +25,6 @@ import AnswerKeyPanel from "./components/AnswerKeyPanel";
 import { templateName } from "./noteTemplates";
 import ScoreForm from "./components/ScoreForm";
 import TriggersPanel from "./components/TriggersPanel";
-import type { IcdCode } from "../../types";
 
 export default function NoteReviewPage() {
   const { noteId = "" } = useParams();
@@ -34,9 +33,6 @@ export default function NoteReviewPage() {
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [draftContent, setDraftContent] = useState<Record<string, string>>({});
-  const [draftDiagnoses, setDraftDiagnoses] = useState<IcdCode[]>([]);
   const [releaseBusy, setReleaseBusy] = useState(false);
   const [releaseNote, setReleaseNote] = useState("");
 
@@ -109,49 +105,18 @@ export default function NoteReviewPage() {
               </Typography>
             </Box>
             <NoteStatusChip status={note.status} />
-            {canReview && pending && !note.bodyLocked && (
-              <Button size="small" variant="outlined" onClick={() => {
-                if (editing) {
-                  setEditing(false);
-                  return;
-                }
-                setDraftContent(note.content);
-                setDraftDiagnoses(note.diagnoses);
-                setEditing(true);
-              }}>{editing ? "Cancel edit" : "Edit note"}</Button>
-            )}
           </Box>
           <NoteFields
             templateId={note.templateId} patient={patient}
-            content={editing ? draftContent : note.content}
-            diagnoses={editing ? draftDiagnoses : note.diagnoses}
-            readOnly={!editing}
+            content={note.content}
+            diagnoses={note.diagnoses}
+            readOnly
             comments={note.feedback}
-            onField={editing ? (id, next) => setDraftContent((current) => ({
-              ...current,
-              [id]: typeof next === "function" ? next(current[id] ?? "") : next,
-            })) : undefined}
-            onDiagnoses={editing ? setDraftDiagnoses : undefined}
-            onComment={canReview && pending && !editing ? async (sectionId, body) => {
+            onComment={canReview && pending ? async (sectionId, body) => {
               const updated = await commentOnNote(activeRole, note.id, { sectionId, body });
               load.setData({ note: updated, patient });
             } : undefined}
           />
-          {editing && (
-            <Button sx={{ mt: 2 }} variant="contained" disabled={busy} onClick={async () => {
-              setBusy(true);
-              setError("");
-              try {
-                const updated = await instructorEditNote(activeRole, note.id, { content: draftContent, diagnoses: draftDiagnoses });
-                load.setData({ note: updated, patient });
-                setEditing(false);
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}>Save instructor edit</Button>
-          )}
           {note.addenda.length > 0 && (<><Divider sx={{ my: 3 }} /><Addenda items={note.addenda} /></>)}
         </Paper>
 
@@ -205,7 +170,7 @@ export default function NoteReviewPage() {
                 <TextField
                   id="review-comment" label="Feedback to the student" multiline minRows={4} value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  helperText="Required to return the note. Optional when co-signing. You leave comments — the student's wording stays theirs."
+                  helperText="Required to return the note. Optional when co-signing. The signed wording stays. A correction is an addendum."
                 />
                 <Button variant="contained" size="large" disabled={busy} onClick={() => act("cosign")}>
                   Co-sign and accept
@@ -214,7 +179,7 @@ export default function NoteReviewPage() {
                   Return for revision
                 </Button>
                 <Typography variant="caption" color="text.secondary">
-                  Return is the usual path and reopens the note. Co-sign locks the wording. Later corrections are addenda.
+                  The signed note stays as written. Return asks the student for an addendum. Co-sign accepts it.
                 </Typography>
               </Stack>
             )}

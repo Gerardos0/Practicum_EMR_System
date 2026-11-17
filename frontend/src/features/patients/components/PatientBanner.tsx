@@ -9,6 +9,7 @@ import { formatDate } from "../../../utils/format";
 import { utep } from "../../../theme/tokens";
 import { useSession } from "../../auth/useSession";
 import { phaseChip } from "../simulation";
+import { placeLabel } from "../tracker";
 
 interface Props {
   patient: Patient;
@@ -20,7 +21,6 @@ const card = { borderRadius: 1, overflow: "hidden", border: "none", boxShadow: `
 
 export default function PatientBanner({ patient: p, onEditStatus, compact }: Props) {
   const { activeRole } = useSession();
-  const ownerName = p.ownerName;
   const opened = useAsync(
     () => (p.mode === "simulation" ? listOpened(activeRole, p.id) : Promise.resolve([])),
     [activeRole, p.id, p.mode],
@@ -40,25 +40,19 @@ export default function PatientBanner({ patient: p, onEditStatus, compact }: Pro
   const openedLine = (opened.data ?? []).length
     ? `Opened by ${opened.data!.map((person) => person.station ? `${person.name} (${person.station})` : person.name).join(", ")}`
     : "";
-  const statusLabel = p.mode === "case"
-    ? "Case master"
-    : p.mode === "assessment"
-      ? (ownerName ? `Assessment · ${ownerName}` : "Assessment · your copy")
-      : p.mode === "simulation"
-        ? phase.label
-        : `${p.practiceLabel ?? "Practice"} · not graded`;
+  const statusLabel = p.mode === "case" ? "Case master" : p.mode === "simulation" ? phase.label : "";
   const statusChip = p.mode === "simulation"
     ? { bgcolor: phase.bgcolor, color: phase.color }
-    : p.mode === "practice"
-      ? { bgcolor: "transparent", color: utep.navy, border: `1px solid ${utep.line}` }
-      : { bgcolor: utep.navy, color: "#fff" };
+    : { bgcolor: utep.navy, color: "#fff" };
   const emergency = [p.emergencyContact?.name, p.emergencyContact?.relationship && `(${p.emergencyContact.relationship})`]
     .filter(Boolean)
     .join(" ");
   const emergencyLine = [emergency, p.emergencyContact?.phone].filter(Boolean).join(" · ");
   const codeAlert = p.codeStatus === "DNR" || p.codeStatus === "DNI";
+  const location = placeLabel(p);
   const statusItems: [string, string][] = [
     ["Visit", p.status.encounter],
+    ...(location ? ([["Location", location]] as [string, string][]) : []),
     ["Setting", p.status.careSetting],
     ["Record", p.status.lifecycle],
     ...(p.status.program ? ([["Program", p.status.program]] as [string, string][]) : []),
@@ -106,14 +100,15 @@ export default function PatientBanner({ patient: p, onEditStatus, compact }: Pro
             {p.ageYears} y, {p.sexAtBirth}{p.pronouns ? ` (${p.pronouns})` : ""}, DOB {formatDate(p.dob)}, MRN {p.mrn}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
-            <Chip size="small" label={statusLabel} sx={statusChip} />
+            {statusLabel && <Chip size="small" label={statusLabel} sx={statusChip} />}
             {p.codeStatus && (
-              <Chip size="small" label={p.codeStatus} sx={codeAlert
-                ? { bgcolor: utep.alertSoft, color: utep.alert, fontWeight: 700 }
-                : { bgcolor: "action.hover", color: utep.ink2 }} />
-            )}
-            {p.mode === "case" && (
-              <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
+              <Chip
+                size="small"
+                label={p.codeStatus}
+                sx={codeAlert
+                  ? { bgcolor: utep.alertSoft, color: utep.alert, fontWeight: 700 }
+                  : { bgcolor: "action.hover", color: utep.ink2 }}
+              />
             )}
             {p.hipaaOnFile && (
               <Chip size="small" label="HIPAA on file" sx={{ bgcolor: "action.hover", color: utep.ink2 }} />

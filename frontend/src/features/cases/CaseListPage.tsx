@@ -140,10 +140,7 @@ export default function CaseListPage() {
 function CopyCaseDialog({ item, onClose, onCopied }: { item: AuthoredCase; onClose: () => void; onCopied: (courseName: string) => void }) {
   const { user, activeRole, courseId } = useSession();
   const courses = useAsync(() => listCoursesForUser(), [user.id]);
-  const teaching = new Set([
-    ...courseIdsForRole(user, "instructor"),
-    ...courseIdsForRole(user, "course_coordinator"),
-  ]);
+  const teaching = new Set(courseIdsForRole(user, "instructor"));
   const destinations = (courses.data ?? []).filter((course) => course.id !== courseId && teaching.has(course.id));
   const [destinationId, setDestinationId] = useState(destinations[0]?.id ?? "");
   const [error, setError] = useState("");

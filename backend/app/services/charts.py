@@ -17,6 +17,9 @@ from app.models.clinical import (
     Patient,
     Problem,
     Vital,
+    VISIT_FLOW,
+    current_encounter,
+    make_encounter,
 )
 from app.models.user import Role, User
 from app.services.access import can, ensure_student_may_enter, full_name, require, require_course
@@ -85,7 +88,7 @@ async def ensure_visible(db: AsyncSession, patient: Patient, user: User, role: s
                 status.HTTP_403_FORBIDDEN,
                 "You are not assigned to this simulation. Graded charts stay private, and this live chart is only for its team.",
             )
-    if role not in {"student", "instructor", "course_coordinator", "admin", "front_desk"}:
+    if role not in {"student", "instructor", "admin"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't open charts.")
 
 
@@ -109,6 +112,21 @@ def ensure_student_may_chart(patient: Patient, user: User, role: str) -> None:
         status.HTTP_403_FORBIDDEN,
         "You can review this chart, but only the assigned student can change it.",
     )
+
+
+def mirror_visit(patient: Patient, visit: Encounter) -> None:
+    patient.encounter_status = visit.status
+    patient.care_setting = visit.care_setting or patient.care_setting
+    patient.unit = visit.unit
+    patient.room = visit.room
+    patient.bed = visit.bed
+    if visit.chief_complaint:
+        patient.chief_complaint = visit.chief_complaint
+
+
+def _location_text(visit: Encounter) -> str:
+    parts = [visit.unit, f"Room {visit.room}" if visit.room else "", f"Bed {visit.bed}" if visit.bed else ""]
+    return ", ".join(part for part in parts if part)
 
 
 async def apply_status(db, patient: Patient, user: User, role: str, patch: dict, ip: str | None) -> None:
@@ -151,14 +169,47 @@ async def apply_status(db, patient: Patient, user: User, role: str, patch: dict,
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown encounter status.")
     if "care_setting" in provided and provided["care_setting"] not in CARE_SETTING:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown care setting.")
+    visit = current_encounter(patient)
+    if visit is None:
+        visit = make_encounter(
+            visit_type=patient.encounter.type if patient.encounter else "Office visit",
+            when=date.today(),
+            status=patient.encounter_status or "Scheduled",
+            care_setting=patient.care_setting,
+            chief_complaint=patient.chief_complaint,
+            unit=patient.unit,
+            room=patient.room,
+            bed=patient.bed,
+        )
+        patient.encounters.append(visit)
+    old = visit.status
+    new = provided.get("encounter", old)
+    if "encounter" in provided and new != old:
+        if role == "student":
+            if old not in VISIT_FLOW or new not in VISIT_FLOW or VISIT_FLOW.index(new) != VISIT_FLOW.index(old) + 1:
+                raise HTTPException(status.HTTP_409_CONFLICT, "Move the visit one step at a time.")
+        if new == "Checked in":
+            visit.checked_in_at = utcnow()
+            visit.checked_in_by_id = user.id
+            visit.checked_in_by_name = full_name(user)
+            await _lock_other_visit_notes(db, patient.id, visit.id)
+        elif new == "Scheduled":
+            visit.checked_in_at = None
+            visit.checked_in_by_id = None
+            visit.checked_in_by_name = None
+        if new in {"Checked out", "Closed"}:
+            await _discharge_visit_notes(db, patient, visit)
+        visit.status = new
+        visit.closed_at = utcnow() if new in {"Checked out", "Closed"} else None
+    if "care_setting" in provided:
+        visit.care_setting = provided["care_setting"]
     if "lifecycle" in provided:
         patient.lifecycle = provided["lifecycle"]
-    if "encounter" in provided:
-        patient.encounter_status = provided["encounter"]
-    if "care_setting" in provided:
-        patient.care_setting = provided["care_setting"]
     if "program" in provided:
         patient.program = provided["program"]
+    mirror_visit(patient, visit)
+    place = _location_text(visit)
+    detail = f"{old} → {visit.status}" + (f" · {place}" if place else "")
     await log_event(
         db,
         action="patient.update_status",
@@ -167,8 +218,79 @@ async def apply_status(db, patient: Patient, user: User, role: str, patch: dict,
         actor_user_id=user.id,
         course_id=patient.course_id,
         ip_address=ip,
-        detail=str(provided),
+        detail=detail,
     )
+
+
+async def start_visit(db, patient: Patient, user: User, role: str, ip: str | None) -> None:
+    if role == "student":
+        ensure_student_may_chart(patient, user, role)
+    elif not (can(role, "patient:update_status") or can(role, "case:author")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your role can't start another visit.")
+    current = current_encounter(patient)
+    if current is not None and current.status not in {"Checked out", "Closed"}:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Finish the current visit before starting another.")
+    opened = make_encounter(
+        visit_type=current.type if current else "Office visit",
+        when=date.today(),
+        status="Scheduled",
+        care_setting=patient.care_setting,
+        chief_complaint=patient.chief_complaint,
+    )
+    patient.encounters.append(opened)
+    mirror_visit(patient, opened)
+    await log_event(
+        db,
+        action="encounter.start",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        actor_user_id=user.id,
+        course_id=patient.course_id,
+        ip_address=ip,
+        detail=f"Scheduled → {opened.type}",
+    )
+
+
+async def _lock_other_visit_notes(db, patient_id, current_visit_id) -> None:
+    """Checking in starts a new visit. Notes from earlier visits stay as signed."""
+    notes = (
+        await db.scalars(
+            select(ClinicalNote).where(
+                ClinicalNote.patient_id == patient_id,
+                ClinicalNote.archived.is_(False),
+                ClinicalNote.body_locked.is_(False),
+            )
+        )
+    ).all()
+    for note in notes:
+        if note.encounter_id == current_visit_id and note.status == "draft":
+            continue
+        note.body_locked = True
+
+
+async def _discharge_visit_notes(db, patient: Patient, visit) -> None:
+    """Discharge locks this visit's notes. A signed note is corrected with an addendum."""
+    notes = (
+        await db.scalars(
+            select(ClinicalNote).where(
+                ClinicalNote.patient_id == patient.id,
+                ClinicalNote.encounter_id == visit.id,
+                ClinicalNote.archived.is_(False),
+            )
+        )
+    ).all()
+    if patient.mode == "assessment" and not any(note.status == "cosigned" for note in notes):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Discharge the patient after an instructor co-signs the note.",
+        )
+    if any(note.status == "draft" for note in notes):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Sign the visit note before discharge. After it is signed, corrections are an addendum.",
+        )
+    for note in notes:
+        note.body_locked = True
 
 
 def can_status(role: str, only_encounter: bool) -> bool:
@@ -210,6 +332,14 @@ async def reset_practice(db: AsyncSession, patient: Patient, user: User, role: s
     if patient.encounter and snap.get("encounter"):
         patient.encounter.type = snap["encounter"]["type"]
         patient.encounter.date = date.fromisoformat(snap["encounter"]["date"])
+        patient.encounter.status = snap["encounter_status"]
+        patient.encounter.care_setting = snap["care_setting"]
+        patient.encounter.chief_complaint = snap["chief_complaint"]
+        patient.encounter.closed_at = None if snap["encounter_status"] not in {"Checked out", "Closed"} else patient.encounter.closed_at
+        if snap["encounter_status"] == "Scheduled":
+            patient.encounter.checked_in_at = None
+            patient.encounter.checked_in_by_id = None
+            patient.encounter.checked_in_by_name = None
     archived = await db.scalars(
         update(ClinicalNote)
         .where(ClinicalNote.patient_id == patient.id, ClinicalNote.archived.is_(False))
@@ -217,7 +347,7 @@ async def reset_practice(db: AsyncSession, patient: Patient, user: User, role: s
         .returning(ClinicalNote.id)
     )
     count = len(list(archived.all()))
-    db.expire(patient, ["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"])
+    db.expire(patient, ["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"])
     await log_event(
         db,
         action="patient.reset_practice",
@@ -460,10 +590,16 @@ async def assign_case(
         bed=source.bed,
         photo=source.photo,
         photo_content_type=source.photo_content_type,
-        encounter=Encounter(
-            type=source.encounter.type if source.encounter else "Office visit",
-            date=date.today(),
-        ),
+        encounters=[make_encounter(
+            visit_type=source.encounter.type if source.encounter else "Office visit",
+            when=date.today(),
+            status=source.encounter_status,
+            care_setting=source.care_setting,
+            chief_complaint=source.chief_complaint,
+            unit=source.unit,
+            room=source.room,
+            bed=source.bed,
+        )],
     )
     for item in source.allergies:
         clone.allergies.append(
@@ -532,7 +668,7 @@ async def assign_case(
     )
     await db.refresh(
         clone,
-        attribute_names=["owner", "allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+        attribute_names=["owner", "allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"],
     )
     return clone
 

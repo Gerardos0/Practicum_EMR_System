@@ -355,7 +355,7 @@ async def test_ended_course_rejects_writes(client):
     student_headers, _ = await login(client, "daniel.reyes@miners.utep.edu")
     rosa = await patient_by_mrn(client, student_headers, course, "student", "TR-20001")
 
-    payload = {"encounter": "In progress"}
+    payload = {"encounter": "Roomed"}
     allowed = await client.patch(
         f"/api/v1/patients/{rosa['id']}/status",
         headers=student_headers,
@@ -514,10 +514,10 @@ async def test_student_advances_encounter_but_cannot_reset(client):
         f"/api/v1/patients/{rosa['id']}/status",
         headers=headers,
         params={"role": "student"},
-        json={"encounter": "In progress"},
+        json={"encounter": "Roomed"},
     )
     assert moved.status_code == 200
-    assert moved.json()["status"]["encounter"] == "In progress"
+    assert moved.json()["status"]["encounter"] == "Roomed"
     reset = await client.post(f"/api/v1/patients/{rosa['id']}/reset", headers=headers, params={"role": "student"})
     assert reset.status_code == 403
 

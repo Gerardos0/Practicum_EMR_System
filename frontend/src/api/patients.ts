@@ -37,6 +37,10 @@ export async function updatePatientStatus(role: Role, id: string, patch: Partial
   return request<Patient>(`/patients/${id}/status`, { method: "PATCH", query: { role }, json: patch });
 }
 
+export async function startVisit(role: Role, id: string): Promise<Patient> {
+  return request<Patient>(`/patients/${id}/encounters`, { method: "POST", query: { role } });
+}
+
 export async function resetPracticePatient(role: Role, id: string): Promise<void> {
   await request<void>(`/patients/${id}/reset`, { method: "POST", query: { role } });
 }

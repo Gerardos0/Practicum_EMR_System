@@ -17,7 +17,7 @@ from app.models.user import User
 
 from app.schemas.auth import ActingRoleRequest, ChangePasswordRequest, RefreshRequest, Token
 from app.schemas.clinical import PublicUser
-from app.services.access import CLINICAL_ROLES, holds_role, memberships_for
+from app.services.access import holds_role, memberships_for
 from app.schemas.portal_accounts import PatientEmailSignupIn, PatientSignupIn
 from app.services.audit import log_event
 from app.services.auth import authenticate_user, get_user_by_email, get_user_by_id, is_usable
@@ -72,14 +72,14 @@ def _rate_limit_login(ip: str | None) -> None:
         bucket.append(now)
 
 
+ACCOUNT_ROLES = ("instructor", "student", "admin")
+
+
 async def _default_acting_role(db: DbSession, user: User) -> str | None:
     rows = await memberships_for(db, user.id)
-    # Prefer course-bound teaching roles; admin is available via explicit role switch (ADM-05).
-    for code in ("instructor", "course_coordinator", "student", "front_desk", "patient", "admin"):
+    for code in ACCOUNT_ROLES:
         if holds_role(user, code, rows):
             return code
-    if user.roles:
-        return user.roles[0].code
     return None
 
 
@@ -145,6 +145,11 @@ async def login(
     user.last_login_at = now
     user.last_activity_at = now
     user.acting_role = await _default_acting_role(db, user)
+    if user.acting_role is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "This account can't sign in. Use a student, instructor, or administrator account.",
+        )
     await log_event(
         db,
         action="auth.login",
@@ -160,6 +165,7 @@ async def login(
 
 @router.post("/patient-signup", response_model=Token)
 async def patient_signup(body: PatientSignupIn, request: Request, db: DbSession):
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Patient portal accounts are not used.")
     ip = _client_ip(request)
     now = datetime.now(timezone.utc)
     attempts = await db.scalar(
@@ -226,6 +232,7 @@ async def patient_signup(body: PatientSignupIn, request: Request, db: DbSession)
 
 @router.post("/patient-signup-by-email", response_model=Token)
 async def patient_signup_by_email(body: PatientEmailSignupIn, request: Request, db: DbSession):
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Patient portal accounts are not used.")
     ip = _client_ip(request)
     now = datetime.now(timezone.utc)
     attempts = await db.scalar(
@@ -334,8 +341,8 @@ async def refresh(body: RefreshRequest, db: DbSession):
 @router.post("/acting-role", response_model=Token)
 async def set_acting_role(body: ActingRoleRequest, db: DbSession, user: CurrentUser, request: Request):
     role = body.role.strip()
-    if role not in CLINICAL_ROLES:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown role.")
+    if role not in ACCOUNT_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "That account type isn't used.")
     rows = await memberships_for(db, user.id)
     if not holds_role(user, role, rows):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You don't have that role.")

@@ -4,7 +4,8 @@ import type { Patient } from "../../types";
 import { canChartPatient } from "../chart/access";
 import NoteStatusChip from "../../components/NoteStatusChip";
 import CensusRow from "../../components/CensusRow";
-import { isAssignedTo, isInRoom, placeLabel } from "./tracker";
+import { hasAbnormalResults, visitLine } from "./tracker";
+import { phaseChip } from "./simulation";
 
 const WIDE = "@container (min-width: 720px)";
 
@@ -28,20 +29,21 @@ export default function TrackerRow({
   const p = row.patient;
   const chartable = canChartPatient(isStudent ? "student" : "instructor", p, userId);
   const viewOnly = isStudent && !chartable;
-  const mine = isAssignedTo(p, userId);
+  const abnormal = hasAbnormalResults(p);
   const initials = `${p.firstName[0] ?? ""}${p.lastName[0] ?? ""}`.toUpperCase();
   const sex = p.sexAtBirth === "Male" ? "M" : p.sexAtBirth === "Female" ? "F" : p.sexAtBirth;
+  const phase = p.mode === "simulation" ? phaseChip(p.simulationPhase).label : "";
 
   return (
     <CensusRow
       initials={initials}
       title={`${p.lastName}, ${p.firstName}`}
-      meta={`${p.ageYears}y ${sex} · ${assignmentLabel(p, row.ownerName)}`}
-      primary={primary ?? (isInRoom(p) ? placeLabel(p) : p.status.encounter)}
+      meta={`${p.ageYears}y ${sex} · ${assignmentLabel(p, row.ownerName)}${phase ? ` · ${phase}` : ""}${abnormal ? " · Abnormal results" : ""}`}
+      primary={primary ?? visitLine(p)}
       secondary={secondary ?? (p.chiefComplaint || "No chief complaint")}
-      highlight={mine}
+      highlight={abnormal}
       onOpen={onOpen}
-      ariaLabel={`Open chart for ${p.lastName}, ${p.firstName}`}
+      ariaLabel={`Open chart for ${p.lastName}, ${p.firstName}${abnormal ? ", abnormal results" : ""}`}
       note={(
         <Box>
           <NoteStatusChip status={row.latestNote?.status} />
@@ -62,6 +64,11 @@ export default function TrackerRow({
           {p.mode === "assessment" && canAssign && row.patient.ownerId && onUnassign && (
             <Button size="small" color="inherit" onClick={onUnassign} sx={{ display: "none", [WIDE]: { display: "inline-flex" } }}>
               Remove
+            </Button>
+          )}
+          {p.mode === "simulation" && canAssign && onUnassign && (
+            <Button size="small" color="inherit" onClick={onUnassign} sx={{ display: "none", [WIDE]: { display: "inline-flex" } }}>
+              End
             </Button>
           )}
           <Button

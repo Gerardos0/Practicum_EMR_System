@@ -258,13 +258,7 @@ async def test_admin_can_edit_an_account_and_coordinators_stay_with_the_admin(cl
         headers=admin,
         json={"userId": joe["id"], "role": "course_coordinator", "discipline": "pharmacy"},
     )
-    assert seated.status_code == 200, seated.text
-    removed = await client.delete(
-        f"/api/v1/courses/{course}/roster/{joe['id']}",
-        headers=instructor,
-        params={"role": "course_coordinator"},
-    )
-    assert removed.status_code == 403
+    assert seated.status_code == 403
 
 
 @pytest.mark.asyncio

@@ -162,6 +162,30 @@ def patient_out(patient: Patient, *, owner_name: str | None, viewer_role: str | 
         }
         if encounter
         else None,
+        "visits": [
+            {
+                "id": str(row.id),
+                "type": row.type,
+                "date": row.date,
+                "status": row.status,
+                "care_setting": row.care_setting,
+                "unit": row.unit,
+                "room": row.room,
+                "bed": row.bed,
+                "chief_complaint": row.chief_complaint or "",
+                "opened_at": row.opened_at,
+                "closed_at": row.closed_at,
+                "checked_in_at": row.checked_in_at,
+                "checked_in_by_name": row.checked_in_by_name,
+                "current": bool(
+                    encounter is not None
+                    and row.id == encounter.id
+                    and row.closed_at is None
+                    and row.status not in {"Checked out", "Closed"}
+                ),
+            }
+            for row in patient.encounters
+        ],
         "insurance": {
             "payer": patient.insurance_payer,
             "member_id": patient.insurance_member_id,

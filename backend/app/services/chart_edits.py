@@ -19,6 +19,7 @@ from app.models.clinical import (
     Patient,
     Problem,
     Vital,
+    current_encounter,
 )
 from app.models.user import User
 from app.services.access import can, full_name
@@ -45,9 +46,7 @@ def _deny(section: str) -> None:
 
 
 def _require_section(role: str, patient: Patient, actor: User, section: str) -> None:
-    # Simulation access is team/station based; chart ownership is checked by its simulation workflow.
-    if patient.mode != "simulation":
-        ensure_student_may_chart(patient, actor, role)
+    ensure_student_may_chart(patient, actor, role)
     if not _can_edit_section(role, patient, section):
         _deny(section)
 
@@ -223,12 +222,13 @@ async def _simulation_nurse(db, patient: Patient, actor: User) -> None:
 async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip: str | None) -> None:
     if patient.mode == "simulation":
         await _simulation_nurse(db, patient, actor)
-    else:
-        _require_section(role, patient, actor, "vitals")
+    elif not _can_edit_section(role, patient, "vitals"):
+        _deny("vitals")
     label = (body.get("label") or "").strip()
     value = (body.get("value") or "").strip()
     if not label or not value:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A vital needs a label and a value.")
+    visit = current_encounter(patient)
     patient.vitals.append(
         Vital(
             label=label,
@@ -236,6 +236,7 @@ async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip
             recorded_at=utcnow(),
             recorded_by_name=full_name(actor),
             status="recorded",
+            encounter_id=visit.id if visit else None,
         )
     )
     if patient.mode == "simulation" and patient.simulation_phase == "waiting_vitals":
@@ -246,8 +247,8 @@ async def add_vital(db, patient: Patient, actor: User, role: str, body: dict, ip
 async def mark_vital_entered_in_error(db, patient: Patient, actor: User, role: str, vital_id: uuid.UUID, ip: str | None) -> None:
     if patient.mode == "simulation":
         await _simulation_nurse(db, patient, actor)
-    else:
-        _require_section(role, patient, actor, "vitals")
+    elif not _can_edit_section(role, patient, "vitals"):
+        _deny("vitals")
     row = _find(patient.vitals, vital_id, "Vital")
     if row.status == "entered_in_error":
         raise HTTPException(status.HTTP_409_CONFLICT, "That vital was already marked entered in error.")
@@ -266,6 +267,7 @@ async def add_lung_sound(db, patient: Patient, actor: User, role: str, body: dic
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Use a lung location like RUL, RML, RLL, LUL, or LLL.")
     if finding not in LUNG_SOUND_FINDINGS:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Use a lung finding like clear, crackles, wheeze, diminished, rhonchi, or other.")
+    visit = current_encounter(patient)
     patient.lung_sounds.append(
         LungSound(
             location=location,
@@ -274,6 +276,7 @@ async def add_lung_sound(db, patient: Patient, actor: User, role: str, body: dic
             recorded_at=utcnow(),
             recorded_by_name=full_name(actor),
             status="recorded",
+            encounter_id=visit.id if visit else None,
         )
     )
     if patient.mode == "simulation" and patient.simulation_phase == "waiting_vitals":
@@ -303,6 +306,7 @@ async def add_lab(db, patient: Patient, actor: User, role: str, body: dict, ip: 
     collected = body.get("collected_at")
     if not collected:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A lab needs the date it was collected.")
+    visit = current_encounter(patient)
     patient.labs.append(
         LabResult(
             name=name,
@@ -311,6 +315,7 @@ async def add_lab(db, patient: Patient, actor: User, role: str, body: dict, ip: 
             reference_range=(body.get("reference_range") or "").strip(),
             flag=(body.get("flag") or "").strip() or None,
             collected_at=collected,
+            encounter_id=visit.id if visit else None,
         )
     )
     await _touch(db, patient, actor, ip, "lab.add", name)
@@ -342,6 +347,9 @@ async def set_history(db, patient: Patient, actor: User, role: str, section: str
         patient.surgical_history = text
     else:
         patient.chief_complaint = text
+        visit = current_encounter(patient)
+        if visit is not None:
+            visit.chief_complaint = text
     await _touch(db, patient, actor, ip, f"{section}.update", "")
 
 
@@ -351,6 +359,11 @@ async def set_placement(db, patient: Patient, actor: User, role: str, body: dict
     patient.unit = (body.get("unit") or "").strip() or None
     patient.room = (body.get("room") or "").strip() or None
     patient.bed = (body.get("bed") or "").strip() or None
+    visit = current_encounter(patient)
+    if visit is not None:
+        visit.unit = patient.unit
+        visit.room = patient.room
+        visit.bed = patient.bed
     await _touch(db, patient, actor, ip, "placement.update", " ".join(part for part in (patient.unit, patient.room, patient.bed) if part))
 
 

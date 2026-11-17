@@ -66,7 +66,7 @@ from app.services.access import can, ensure_course_open, ensure_student_may_ente
 from app.services.answer_keys import deny_answer_key, read_answer_key
 from app.services.cases import deny_triggers, grading_guide_for, triggers_for
 from app.services.audit import log_event
-from app.services.charts import apply_status, assign_case, ensure_student_may_chart, ensure_visible, load_patient, owner_name_for, reset_practice, unassign_case
+from app.services.charts import apply_status, assign_case, ensure_student_may_chart, ensure_visible, load_patient, owner_name_for, reset_practice, start_visit, unassign_case
 from app.services.intake import get_intake
 from app.services.simulation import assigned_patient_ids, end_simulation, presence_rows, station_for
 from app.services.portal_accounts import chart_is_claimed, create_invite, ensure_chart_eligible
@@ -144,7 +144,7 @@ async def list_patients(
         if role == "student" and patient.mode == "simulation":
             if patient.id not in sim_ids:
                 continue
-        if role not in {"student", "instructor", "course_coordinator", "admin", "front_desk"}:
+        if role not in {"student", "instructor", "admin"}:
             continue
         note_query = select(ClinicalNote).where(ClinicalNote.patient_id == patient.id, ClinicalNote.archived.is_(False))
         if role == "student" and patient.mode != "simulation":
@@ -419,6 +419,23 @@ async def update_status(
     await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
     await ensure_course_open(db, patient.course_id)
     await apply_status(db, patient, user, role, body.model_dump(exclude_unset=True), _ip(request))
+    await db.commit()
+    return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role)
+
+
+@router.post("/{patient_id}/encounters", response_model=PatientOut, response_model_exclude_none=True)
+async def open_encounter(
+    patient_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    request: Request,
+    role: Annotated[str, Query()],
+):
+    patient = await load_patient(db, patient_id)
+    rows = await memberships_for(db, user.id)
+    await ensure_visible(db, patient, user, role, rows, request_ip=_ip(request))
+    await ensure_course_open(db, patient.course_id)
+    await start_visit(db, patient, user, role, _ip(request))
     await db.commit()
     return patient_out(patient, owner_name=owner_name_for(patient, role), viewer_role=role)
 

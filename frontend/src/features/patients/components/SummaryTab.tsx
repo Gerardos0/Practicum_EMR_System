@@ -6,6 +6,7 @@ import { listAppointments } from "../../../api/scheduling";
 import { addAllergy, addLungSound, addVital, markLungSoundEnteredInError, markVitalEnteredInError, removeAllergy } from "../../../api/chart";
 import VitalsChart from "./VitalsChart";
 import PatientReportedCard from "./PatientReportedCard";
+import VisitRecord from "./VisitRecord";
 import { useSession } from "../../auth/useSession";
 import { can } from "../../../utils/permissions";
 import { canChartPatient, canEditSection } from "../../chart/access";
@@ -19,7 +20,7 @@ const ADVANCE_LABEL: Partial<Record<EncounterStatus, string>> = {
   "Checked in": "Check in",
   Roomed: "Room patient",
   "In progress": "Start visit",
-  "Checked out": "Check out",
+  "Checked out": "Discharge",
 };
 const VITAL_LABELS = ["BP", "Pulse", "Pain", "Temperature", "Respiratory rate", "SpO2", "Weight"];
 const LUNG_LOCATIONS: LungSoundLocation[] = ["RUL", "RML", "RLL", "LUL", "LLL"];
@@ -56,6 +57,9 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
   const idx = FLOW.indexOf(p.status.encounter);
   const next = idx >= 0 && idx < FLOW.length - 1 ? FLOW[idx + 1] : undefined;
   const needsCosign = next === "Checked out" && p.mode === "assessment" && !notes.some((n) => n.status === "cosigned");
+  const checkIn = (p.visits ?? []).find((visit) => visit.current && visit.checkedInByName)
+    ?? (p.visits ?? []).find((visit) => visit.checkedInByName);
+  const unsignedDraft = next === "Checked out" && notes.some((n) => n.status === "draft");
 
   const mine = notes.filter((n) => n.authorId === user.id);
   const openNote = mine.find((n) => n.status === "draft" || n.status === "returned");
@@ -66,7 +70,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
     <Button variant="contained" color="secondary" onClick={() => navigate(simAction.href)}>{simAction.label}</Button>
   ) : null) : !isAuthor ? null : openNote ? (
     <Button variant="contained" color="secondary" onClick={() => navigate(`/patients/${p.id}/notes/${openNote.id}`)}>
-      {openNote.status === "returned" ? "Revise returned note" : "Continue note"}
+      {openNote.status === "returned" ? (openNote.bodyLocked ? "Add an addendum" : "Revise returned note") : "Continue note"}
     </Button>
   ) : !submitted ? (
     <Button variant="contained" color="secondary" onClick={() => navigate(`/patients/${p.id}/notes/new`)}>Start note</Button>
@@ -89,9 +93,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           title: phase === "closed" ? "Visit note is closed" : "Ready for the visit note",
           body: phase === "closed"
             ? "A clarification is a new note. The signed visit note stays closed."
-            : p.viewerStation === "pharmacist"
-              ? "Write the visit note, and use Medications → Fill verification to verify or hold submitted fills."
-              : "The pharmacist or provider writes the note. The provider signs it closed. Pharmacists can also verify fills on the Medications tab.",
+            : "Write the visit note, then submit it. Your instructor signs it off.",
           action: noteButton,
         };
       }
@@ -102,7 +104,9 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
       return {
         severity: "error" as const,
         title: "Your instructor returned this note",
-        body: "Open it, address the feedback, then sign and resubmit.",
+        body: openNote.bodyLocked
+          ? "The signed note stays as written. Add an addendum, then it goes back for review."
+          : "Open it, address the feedback, then sign and resubmit.",
         action: noteButton,
       };
     }
@@ -118,7 +122,7 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
       return {
         severity: "success" as const,
         title: "Note submitted — waiting for co-signature",
-        body: "You can keep reviewing the chart. You'll edit again only if the note is returned.",
+        body: "The signed wording stays. If it is returned, correct it with an addendum.",
         action: null,
       };
     }
@@ -158,8 +162,17 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
           <Typography variant="body2">{nextStep.body}</Typography>
         </Alert>
       )}
+      {p.status.encounter === "Scheduled" && chartable && (
+        <Alert severity="info">Check-in starts this visit. Sign the note when you finish. After that, the original stays and a correction is an addendum. Notes from earlier visits stay locked.</Alert>
+      )}
+      {(p.status.encounter === "Checked in" || p.status.encounter === "Roomed" || p.status.encounter === "In progress") && chartable && (
+        <Alert severity="info">This visit is checked in. Document it and sign the note. A signed note is not edited. Add an addendum if something else needs to be recorded.</Alert>
+      )}
       {needsCosign && isAuthor && (
-        <Alert severity="info">You can check the patient out once your instructor co-signs your note.</Alert>
+        <Alert severity="info">Discharge waits until your instructor co-signs the note. The signed note stays as written.</Alert>
+      )}
+      {!needsCosign && unsignedDraft && isAuthor && (
+        <Alert severity="info">Sign the visit note before discharge. After it is signed, corrections are an addendum.</Alert>
       )}
 
       <Paper sx={card}>
@@ -169,9 +182,14 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
             <Typography variant="body2" color="text.secondary">
               {formatDate(p.encounter.date)} · visit {p.status.encounter.toLowerCase()} · {p.status.careSetting.toLowerCase()}
             </Typography>
+            {checkIn?.checkedInByName && (
+              <Typography variant="body2" color="text.secondary">
+                Checked in by {checkIn.checkedInByName}{checkIn.checkedInAt ? ` · ${formatDateTime(checkIn.checkedInAt)}` : ""}
+              </Typography>
+            )}
           </Box>
           {next && chartable && can(activeRole, "encounter:advance") && (
-            <Button variant="outlined" disabled={needsCosign} onClick={() => onAdvance(next)}>
+            <Button variant="outlined" disabled={needsCosign || unsignedDraft} onClick={() => onAdvance(next)}>
               {ADVANCE_LABEL[next]}
             </Button>
           )}
@@ -180,6 +198,8 @@ export default function SummaryTab({ patient: p, notes, onAdvance, onChange }: P
         <Typography variant="subtitle2">Chief complaint</Typography>
         <Typography variant="body2">{p.chiefComplaint || "Not documented"}</Typography>
       </Paper>
+
+      <VisitRecord patient={p} onChange={onChange} />
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
 

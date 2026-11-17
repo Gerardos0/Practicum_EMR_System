@@ -32,6 +32,7 @@ from app.models.clinical import (
     Referral,
     LungSound,
     Vital,
+    make_encounter,
 )
 from app.models.user import Discipline, Permission, Role, User
 from app.services.access import ROLE_PERMISSIONS
@@ -592,14 +593,14 @@ async def _demo_case_work(db, maya, andre, ana, clarissa, luis, gerardo, pharmac
     for master in (maya, andre):
         await db.refresh(
             master,
-            attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+            attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"],
         )
 
     maya_ana = await _ensure_chart(db, "TR-CASE-MAYA-AR", lambda: _clone_case(db, maya, "TR-CASE-MAYA-AR", ana))
     maya_clarissa = await _ensure_chart(db, "TR-CASE-MAYA-CD", lambda: _clone_case(db, maya, "TR-CASE-MAYA-CD", clarissa))
     andre_luis = await _ensure_chart(db, "TR-CASE-ANDRE-LO", lambda: _clone_case(db, andre, "TR-CASE-ANDRE-LO", luis))
     for copy in (maya_ana, maya_clarissa, andre_luis):
-        await db.refresh(copy, attribute_names=["encounter"])
+        await db.refresh(copy, attribute_names=["encounters"])
 
     ana_note = await _ensure_note(
         db, maya_ana, ana, pharmacy, gerardo,
@@ -704,7 +705,7 @@ async def _demo_case_work(db, maya, andre, ana, clarissa, luis, gerardo, pharmac
     )
 
 
-_CHART_TREE = ("allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter")
+_CHART_TREE = ("allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters")
 
 
 async def _chart_snapshot(db, patient: Patient) -> dict:
@@ -753,10 +754,16 @@ async def _clone_case(db, source: Patient, mrn: str, owner: User) -> Patient:
         hipaa_note=source.hipaa_note,
         snapshot=chart_snapshot(source),
         is_training=True,
-        encounter=Encounter(
-            type=source.encounter.type if source.encounter else "Office visit",
-            date=source.encounter.date if source.encounter else date(2026, 10, 20),
-        ),
+        encounters=[make_encounter(
+            visit_type=source.encounter.type if source.encounter else "Office visit",
+            when=source.encounter.date if source.encounter else date(2026, 10, 20),
+            status="In progress",
+            care_setting=source.care_setting,
+            chief_complaint=source.chief_complaint,
+            unit=source.unit,
+            room=source.room,
+            bed=source.bed,
+        )],
     )
     for item in source.allergies:
         chart.allergies.append(
@@ -1877,7 +1884,13 @@ def _patient(**kwargs) -> Patient:
         hipaa_signed_at=_BASELINE_VITAL if kwargs.get("hipaa", True) else None,
         hipaa_note="Simulated HIPAA acknowledgment on file." if kwargs.get("hipaa", True) else None,
         is_training=True,
-        encounter=Encounter(type=kwargs["encounter_type"], date=date(2026, 9, 22)),
+        encounters=[make_encounter(
+            visit_type=kwargs["encounter_type"],
+            when=date(2026, 9, 22),
+            status=kwargs["encounter_status"],
+            care_setting=kwargs["care"],
+            chief_complaint=kwargs["cc"],
+        )],
     )
 
 

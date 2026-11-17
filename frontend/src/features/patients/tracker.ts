@@ -4,20 +4,29 @@ import { formatDate } from "../../utils/format";
 
 const FINISHED = new Set(["Checked out", "Closed"]);
 
-/** Roomed or in a visit. A filled room also counts once the patient has left the schedule. */
+/** Visit status is Checked in. A room number alone does not count until the visit is roomed. */
+export function isCheckedIn(patient: Patient): boolean {
+  if (patient.mode === "case") return false;
+  return patient.status.encounter === "Checked in";
+}
+
+/** Roomed or in a visit. */
 export function isInRoom(patient: Patient): boolean {
   if (patient.mode === "case") return false;
   const encounter = patient.status.encounter;
-  if (FINISHED.has(encounter) || encounter === "Scheduled") return false;
-  if (encounter === "Roomed" || encounter === "In progress") return true;
-  return Boolean(patient.room?.trim());
+  return encounter === "Roomed" || encounter === "In progress";
 }
 
-/** Present in the clinic, and not yet assigned to a student or placed in a room. */
+/** Not checked in and not in a room yet. */
 export function isWaitingRoom(patient: Patient): boolean {
   if (patient.mode === "case") return false;
-  if (patient.ownerId) return false;
-  return !isInRoom(patient);
+  if (isCheckedIn(patient) || isInRoom(patient)) return false;
+  return !FINISHED.has(patient.status.encounter);
+}
+
+/** A flagged lab on the chart. */
+export function hasAbnormalResults(patient: Patient): boolean {
+  return patient.labs.some((lab) => Boolean(lab.flag));
 }
 
 export function isAssignedTo(patient: Patient, userId: string): boolean {
@@ -31,8 +40,13 @@ export function placeLabel(patient: Patient): string {
     patient.bed?.trim() ? `Bed ${patient.bed.trim()}` : "",
   ].filter(Boolean);
   if (parts.length) return parts.join(", ");
-  if (patient.status.encounter === "Roomed" || patient.status.encounter === "In progress") return patient.status.encounter;
-  return "—";
+  return "";
+}
+
+/** Current visit status, with the bed assignment when one is set. */
+export function visitLine(patient: Patient): string {
+  const place = placeLabel(patient);
+  return place ? `${patient.status.encounter} · ${place}` : patient.status.encounter;
 }
 
 export function matchesPatientQuery(row: PatientRow, query: string): boolean {

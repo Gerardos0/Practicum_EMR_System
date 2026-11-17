@@ -13,19 +13,21 @@ from app.models.clinical import (
     ChartSession,
     ClinicalNote,
     CourseMembership,
-    Encounter,
     LabResult,
+    LungSound,
     Medication,
     Patient,
     Problem,
     SimulationAssignment,
+    current_encounter,
+    make_encounter,
 )
 from app.models.user import Role, User
 from app.services.access import full_name, require
 from app.services.audit import log_event
 from app.services.charts import utcnow
 
-CLINICIAN_STATIONS = ("pharmacist", "provider")
+CLINICIAN_STATIONS = ("nurse",)
 
 
 async def station_for(db: AsyncSession, patient_id: uuid.UUID, user_id: uuid.UUID) -> str | None:
@@ -58,9 +60,7 @@ async def stations_on(db: AsyncSession, patient_id: uuid.UUID) -> set[str]:
 
 
 def signer_required(stations: set[str]) -> str:
-    if "provider" in stations:
-        return "provider"
-    return "pharmacist"
+    return "nurse"
 
 
 async def start_simulation(
@@ -78,19 +78,8 @@ async def start_simulation(
     require(role, "case:author", "Your role can't start a simulation.")
     if source.mode != "case" or source.course_id != course_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Start a simulation from a case in this course.")
-    if pharmacist_id is None and provider_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Assign a pharmacist or a provider.")
-    seats = {"nurse": nurse_id, "pharmacist": pharmacist_id, "provider": provider_id}
-    chosen: dict[uuid.UUID, str] = {}
-    for station, user_id in seats.items():
-        if user_id is None:
-            continue
-        if user_id in chosen:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Each station needs a different student.")
-        chosen[user_id] = station
-    for user_id in chosen:
-        if not await _student_in_course(db, user_id, course_id):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Assign students who are on this course roster.")
+    if not await _student_in_course(db, nurse_id, course_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Assign a student who is on this course roster.")
 
     locks = dict(source.section_locks or {})
     locks["vitals"] = False
@@ -139,10 +128,16 @@ async def start_simulation(
         bed=source.bed,
         photo=source.photo,
         photo_content_type=source.photo_content_type,
-        encounter=Encounter(
-            type=source.encounter.type if source.encounter else "Office visit",
-            date=date.today(),
-        ),
+        encounters=[make_encounter(
+            visit_type=source.encounter.type if source.encounter else "Office visit",
+            when=date.today(),
+            status="Checked in",
+            care_setting=source.care_setting,
+            chief_complaint=source.chief_complaint,
+            unit=source.unit,
+            room=source.room,
+            bed=source.bed,
+        )],
     )
     for item in source.allergies:
         clone.allergies.append(
@@ -173,8 +168,7 @@ async def start_simulation(
         )
     db.add(clone)
     await db.flush()
-    for user_id, station in chosen.items():
-        db.add(SimulationAssignment(patient_id=clone.id, user_id=user_id, station=station))
+    db.add(SimulationAssignment(patient_id=clone.id, user_id=nurse_id, station="nurse"))
     appointments = (await db.scalars(select(Appointment).where(Appointment.patient_id == source.id))).all()
     for item in appointments:
         db.add(Appointment(patient_id=clone.id, when=item.when, kind=item.kind, with_whom=item.with_whom))
@@ -191,7 +185,7 @@ async def start_simulation(
     await db.flush()
     await db.refresh(
         clone,
-        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"],
+        attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"],
     )
     return clone
 
@@ -230,10 +224,10 @@ async def prepare_note(db: AsyncSession, patient: Patient, author: User, role: s
         return "clarification"
     if patient.simulation_phase != "ready":
         raise HTTPException(status.HTTP_409_CONFLICT, "The chart is not ready. The nurse records vitals first.")
-    if station not in CLINICIAN_STATIONS:
+    if station != "nurse":
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "The nurse records vitals. The pharmacist or provider writes the visit note.",
+            "The nurse writes the visit note. The instructor signs it off.",
         )
     existing = await db.scalar(
         select(ClinicalNote.id).where(
@@ -264,13 +258,11 @@ async def sign_simulation(db: AsyncSession, note: ClinicalNote, author: User, pa
         return
     required = signer_required(await stations_on(db, patient.id))
     if station != required:
-        who = "provider" if required == "provider" else "pharmacist"
-        raise HTTPException(status.HTTP_403_FORBIDDEN, f"The {who} signs this visit note and closes it.")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "The nurse submits this visit note. The instructor signs it off.")
     if patient.simulation_phase != "ready":
-        raise HTTPException(status.HTTP_409_CONFLICT, "Sign the visit note after vitals are recorded.")
-    note.status = "signed"
+        raise HTTPException(status.HTTP_409_CONFLICT, "Submit the visit note after vitals are recorded.")
+    note.status = "pending_review"
     note.body_locked = True
-    patient.simulation_phase = "closed"
 
 
 async def presence_rows(db: AsyncSession, patient: Patient) -> list[dict]:

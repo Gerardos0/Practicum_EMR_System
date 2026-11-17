@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.clinical import Encounter, Patient
+from app.models.clinical import Encounter, Patient, make_encounter
 from app.models.user import User
 from app.services.audit import log_event
 from app.services.cases import _unique_case_mrn
@@ -137,11 +137,20 @@ async def import_cases(db: AsyncSession, *, payload: bytes, actor: User, course_
             room=values["room"] or None,
             bed=values["bed"] or None,
             is_training=True,
-            encounter=Encounter(type=values["encounter_type"] or "Office visit", date=datetime.now().date()),
+            encounters=[make_encounter(
+                visit_type=values["encounter_type"] or "Office visit",
+                when=datetime.now().date(),
+                status="Scheduled",
+                care_setting=setting,
+                chief_complaint=values["chief_complaint"],
+                unit=values["unit"] or None,
+                room=values["room"] or None,
+                bed=values["bed"] or None,
+            )],
         )
         db.add(patient)
         await db.flush()
-        await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounter"])
+        await db.refresh(patient, attribute_names=["allergies", "medications", "problems", "labs", "vitals", "lung_sounds", "encounters"])
         await _replace_children(db, patient, _children(values, index))
         created += 1
     await log_event(

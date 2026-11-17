@@ -150,3 +150,12 @@ export function addProblem(role: Role, patientId: string, body: Omit<Problem, "i
 export function updatePlacement(role: Role, patientId: string, body: { unit?: string; room?: string; bed?: string }): Promise<Patient> {
   return chart(role, patientId, "/placement", "PATCH", body);
 }
+
+export function updateHistory(
+  role: Role,
+  patientId: string,
+  section: "medical_history" | "surgical_history" | "chief_complaint",
+  value: string,
+): Promise<Patient> {
+  return chart(role, patientId, "/history", "PATCH", { section, value });
+}

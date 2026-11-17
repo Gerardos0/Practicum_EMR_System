@@ -4,7 +4,7 @@ import {
 } from "@mui/material";
 import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { login } from "../../api/auth";
 import { takeSignedOutNotice } from "../../api/client";
 import { homePathFor, uniqueRoles } from "../../utils/permissions";
@@ -181,9 +181,6 @@ export default function LoginPage() {
               )}
             </Stack>
           </Box>
-          <Typography variant="body2" sx={{ mt: 2.5 }}>
-            <Link component={RouterLink} to="/portal/signup">New patient? Create your account</Link>
-          </Typography>
         </Box>
       </Box>
     </Box>

@@ -4,6 +4,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 
+from app.core.security import create_access_token
 from app.models.audit import AuditEvent
 from app.models.clinical import Course, Patient, PatientIntake
 from app.models.user import User
@@ -11,6 +12,12 @@ from app.services.hidden import assert_no_hidden
 from app.services.retention import purge_expired
 from tests.test_portal import _portal_headers
 from tests.test_workflows import course_id, login, patient_by_mrn
+
+
+async def _demo_headers(db_session):
+    user = await db_session.scalar(select(User).where(User.email == "patient.demo@example.com"))
+    token = create_access_token(str(user.id), role="patient")
+    return {"Authorization": f"Bearer {token}"}, user
 
 
 def intake_payload(**updates):
@@ -85,8 +92,8 @@ async def _rosa_context(client):
 
 
 @pytest.mark.asyncio
-async def test_portal_intake_loads_chart_defaults_and_staff_sees_unsubmitted(client):
-    patient, _ = await login(client, "patient.demo@example.com")
+async def test_portal_intake_loads_chart_defaults_and_staff_sees_unsubmitted(client, db_session):
+    patient, _ = await _demo_headers(db_session)
     instructor, _, rosa = await _rosa_context(client)
 
     response = await client.get("/api/v1/portal/intake", headers=patient)
@@ -115,7 +122,7 @@ async def test_portal_intake_loads_chart_defaults_and_staff_sees_unsubmitted(cli
 
 @pytest.mark.asyncio
 async def test_portal_intake_saves_edits_and_upserts_one_row(client, db_session):
-    patient, _ = await login(client, "patient.demo@example.com")
+    patient, _ = await _demo_headers(db_session)
     instructor, _, rosa = await _rosa_context(client)
 
     first = await client.put("/api/v1/portal/intake", headers=patient, params={"role": "patient"}, json=intake_payload())
@@ -211,7 +218,7 @@ async def test_case_master_intake_is_not_editable(client, db_session):
 
 @pytest.mark.asyncio
 async def test_ended_and_archived_courses_disable_intake_edits(client, db_session):
-    patient, _ = await login(client, "patient.demo@example.com")
+    patient, _ = await _demo_headers(db_session)
     _, _, rosa = await _rosa_context(client)
     course = await db_session.scalar(select(Course).where(Course.id == uuid.UUID(rosa["courseId"])))
     assert course is not None
@@ -230,8 +237,8 @@ async def test_ended_and_archived_courses_disable_intake_edits(client, db_sessio
 
 
 @pytest.mark.asyncio
-async def test_intake_validation_trims_values_and_blank_clears_field(client):
-    patient, _ = await login(client, "patient.demo@example.com")
+async def test_intake_validation_trims_values_and_blank_clears_field(client, db_session):
+    patient, _ = await _demo_headers(db_session)
 
     oversized = await client.put(
         "/api/v1/portal/intake", headers=patient,
@@ -259,8 +266,8 @@ async def test_intake_validation_trims_values_and_blank_clears_field(client):
 
 
 @pytest.mark.asyncio
-async def test_staff_visibility_and_assessment_ownership(client):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+async def test_staff_visibility_and_assessment_ownership(client, db_session):
+    patient_headers, _ = await _demo_headers(db_session)
     instructor, course, rosa = await _rosa_context(client)
     saved = await client.put(
         "/api/v1/portal/intake", headers=patient_headers,
@@ -290,7 +297,7 @@ async def test_staff_visibility_and_assessment_ownership(client):
 
 @pytest.mark.asyncio
 async def test_intake_does_not_change_chart_and_survives_practice_reset(client, db_session):
-    patient, _ = await login(client, "patient.demo@example.com")
+    patient, _ = await _demo_headers(db_session)
     instructor, _, rosa = await _rosa_context(client)
     before = await client.get(
         f"/api/v1/patients/{rosa['id']}", headers=instructor, params={"role": "instructor"},
@@ -321,7 +328,7 @@ async def test_intake_does_not_change_chart_and_survives_practice_reset(client, 
 
 @pytest.mark.asyncio
 async def test_intake_update_audit_contains_field_names_not_values(client, db_session):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+    patient_headers, _ = await _demo_headers(db_session)
     _, _, rosa = await _rosa_context(client)
     response = await client.put(
         "/api/v1/portal/intake", headers=patient_headers,
@@ -368,7 +375,7 @@ async def test_retention_purge_removes_intake_rows_written_by_user(client, db_se
 
 @pytest.mark.asyncio
 async def test_v2_legacy_intake_row_defaults_new_fields_and_accepts_update(client, db_session):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+    patient_headers, _ = await _demo_headers(db_session)
     _, _, rosa = await _rosa_context(client)
     patient_user = await db_session.scalar(select(User).where(User.email == "patient.demo@example.com"))
     assert patient_user is not None
@@ -415,8 +422,8 @@ async def test_v2_legacy_intake_row_defaults_new_fields_and_accepts_update(clien
 
 
 @pytest.mark.asyncio
-async def test_v2_full_round_trip_and_staff_visibility(client):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+async def test_v2_full_round_trip_and_staff_visibility(client, db_session):
+    patient_headers, _ = await _demo_headers(db_session)
     instructor, _, rosa = await _rosa_context(client)
     payload = full_v2_payload()
 
@@ -452,7 +459,7 @@ async def test_v2_full_round_trip_and_staff_visibility(client):
 
 @pytest.mark.asyncio
 async def test_v2_returning_patient_edits_keep_other_list_items(client, db_session):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+    patient_headers, _ = await _demo_headers(db_session)
     _, _, rosa = await _rosa_context(client)
     payload = full_v2_payload(
         conditions=[{"name": "Asthma", "year": "2018"}, {"name": "Migraines", "year": "2021"}],
@@ -474,8 +481,8 @@ async def test_v2_returning_patient_edits_keep_other_list_items(client, db_sessi
 
 
 @pytest.mark.asyncio
-async def test_v2_validation_rejects_bad_fields_and_accepts_empty_dates(client):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+async def test_v2_validation_rejects_bad_fields_and_accepts_empty_dates(client, db_session):
+    patient_headers, _ = await _demo_headers(db_session)
     invalid_payloads = [
         full_v2_payload(state="Texas"),
         full_v2_payload(zipCode="7990"),
@@ -516,7 +523,7 @@ async def test_v2_validation_rejects_bad_fields_and_accepts_empty_dates(client):
 
 @pytest.mark.asyncio
 async def test_v2_audit_detail_contains_names_but_no_submitted_values(client, db_session):
-    patient_headers, _ = await login(client, "patient.demo@example.com")
+    patient_headers, _ = await _demo_headers(db_session)
     _, _, rosa = await _rosa_context(client)
     response = await client.put(
         "/api/v1/portal/intake", headers=patient_headers,

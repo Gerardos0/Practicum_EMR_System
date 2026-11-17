@@ -34,6 +34,7 @@ export default function ChartReference({ patient: p }: { patient: Patient }) {
     {
       title: "History", body: (
         <>
+          <Typography variant="body2"><b>Past medical:</b> {p.pastMedicalHistory}</Typography>
           <Typography variant="body2"><b>Family:</b> {p.familyHistory}</Typography>
           <Typography variant="body2"><b>Surgical:</b> {p.surgicalHistory}</Typography>
           <Typography variant="body2"><b>Social:</b> {p.socialHistory}</Typography>
