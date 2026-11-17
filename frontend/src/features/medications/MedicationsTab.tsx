@@ -12,7 +12,7 @@ import { getCourse } from "../../api/courses";
 import { lexicompInteractions, lexicompStatus, medicationDetails, searchMedications, type LexicompInteractions, type LexicompStatus } from "../../api/reference";
 import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
-import { canEditSection } from "../chart/access";
+import { canChartPatient, canEditSection } from "../chart/access";
 import { medicationSig } from "../../utils/sig";
 import { useAsync } from "../../utils/useAsync";
 import EmptyState from "../../components/EmptyState";
@@ -24,9 +24,10 @@ const blank = {
 };
 
 export default function MedicationsTab({ patient, onChange }: { patient: Patient; onChange: (patient: Patient) => void }) {
-  const { activeRole, courseId } = useSession();
+  const { user, activeRole, courseId } = useSession();
   const course = useAsync(() => (courseId ? getCourse(courseId) : Promise.resolve(undefined)), [courseId]);
-  const editable = canEditSection(activeRole, patient, "medications");
+  const editable = canEditSection(activeRole, patient, "medications", user.id);
+  const chartable = canChartPatient(activeRole, patient, user.id);
   const [form, setForm] = useState(blank);
   const [editingId, setEditingId] = useState<string>();
   const [names, setNames] = useState<string[]>([]);
@@ -228,7 +229,7 @@ export default function MedicationsTab({ patient, onChange }: { patient: Patient
         rows={active}
         empty="No active medications"
         editable={editable}
-        inpatient={patient.status.careSetting === "Inpatient" && activeRole === "student"}
+        inpatient={patient.status.careSetting === "Inpatient" && activeRole === "student" && chartable}
         pendingIds={pendingIds}
         canSubmitOrder={canSubmitOrder}
         onEdit={(row) => {

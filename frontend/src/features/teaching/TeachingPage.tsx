@@ -42,7 +42,7 @@ export default function TeachingPage() {
       </Typography>
       {message && <Alert severity="success" onClose={() => setMessage("")}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6">Rubric</Typography>
         <CourseRubricPanel guide={course.data?.gradingGuide} fileName={course.data?.rubricFileName} />
         {canUpload && (
@@ -63,7 +63,7 @@ export default function TeachingPage() {
           </>
         )}
       </Paper>
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1.5 }}>Grade export</Typography>
         <TextField label="Case key" value={caseKey} onChange={(e) => setCaseKey(e.target.value)} helperText="The case key from the case you assigned." sx={{ mr: 1, mb: 1 }} />
         <Button variant="contained" disabled={!caseKey.trim()} onClick={async () => {
@@ -72,7 +72,7 @@ export default function TeachingPage() {
           catch (e) { setError((e as Error).message); }
         }}>Download grades</Button>
       </Paper>
-      <Paper sx={{ p: 2.5 }}>
+      <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Typography component="h2" variant="h6" sx={{ mb: 1 }}>Student activity</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           One row per student. Minutes count while the chart is open and the student is active.

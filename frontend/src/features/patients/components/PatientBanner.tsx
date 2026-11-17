@@ -12,15 +12,15 @@ import { phaseChip } from "../simulation";
 
 interface Props {
   patient: Patient;
-  ownerName?: string;
   onEditStatus?: () => void;
   compact?: boolean;
 }
 
 const card = { borderRadius: 1, overflow: "hidden", border: "none", boxShadow: `inset 0 0 0 1px ${utep.lineSoft}` } as const;
 
-export default function PatientBanner({ patient: p, ownerName, onEditStatus, compact }: Props) {
+export default function PatientBanner({ patient: p, onEditStatus, compact }: Props) {
   const { activeRole } = useSession();
+  const ownerName = p.ownerName;
   const opened = useAsync(
     () => (p.mode === "simulation" ? listOpened(activeRole, p.id) : Promise.resolve([])),
     [activeRole, p.id, p.mode],
@@ -108,13 +108,12 @@ export default function PatientBanner({ patient: p, ownerName, onEditStatus, com
           <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
             <Chip size="small" label={statusLabel} sx={statusChip} />
             {p.codeStatus && (
-              <Chip
-                size="small"
-                label={p.codeStatus}
-                sx={codeAlert
-                  ? { bgcolor: utep.alertSoft, color: utep.alert, fontWeight: 700 }
-                  : { bgcolor: "action.hover", color: utep.ink2 }}
-              />
+              <Chip size="small" label={p.codeStatus} sx={codeAlert
+                ? { bgcolor: utep.alertSoft, color: utep.alert, fontWeight: 700 }
+                : { bgcolor: "action.hover", color: utep.ink2 }} />
+            )}
+            {p.mode === "case" && (
+              <Chip size="small" label="Case master" sx={{ bgcolor: utep.navy, color: "#fff" }} />
             )}
             {p.hipaaOnFile && (
               <Chip size="small" label="HIPAA on file" sx={{ bgcolor: "action.hover", color: utep.ink2 }} />

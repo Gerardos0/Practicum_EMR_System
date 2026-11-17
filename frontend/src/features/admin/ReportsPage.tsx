@@ -19,7 +19,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function CountSection({ title, values, labels = {} }: { title: string; values: Record<string, number>; labels?: Record<string, string> }) {
   return (
-    <Paper component="section" sx={{ p: 2.25 }}>
+    <Paper component="section" sx={{ p: 2.25, borderRadius: "16px" }}>
       <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>{title}</Typography>
       <Stack spacing={1}>
         {Object.entries(values).map(([key, value]) => (
@@ -90,7 +90,7 @@ export default function ReportsPage() {
               { label: "Patients", count: Object.values(report.data.patientsByMode).reduce((sum, count) => sum + count, 0) },
               { label: "Audit events", count: report.data.auditEventCount },
             ].map((stat) => (
-              <Paper key={stat.label} sx={{ p: 2.25, borderTop: "3px solid", borderColor: "secondary.main" }}>
+              <Paper key={stat.label} sx={{ p: 2.25, borderRadius: "16px", borderTop: "3px solid", borderColor: "secondary.main" }}>
                 <Typography variant="body2" color="text.secondary">{stat.label}</Typography>
                 <Typography component="p" variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>{stat.count}</Typography>
               </Paper>

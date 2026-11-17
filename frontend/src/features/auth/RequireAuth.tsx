@@ -6,9 +6,10 @@ import { useAuth } from "./useSession";
 interface Props {
   roles?: Role[];
   needsCourse?: boolean;
+  courseOptionalFor?: Role[];
 }
 
-export default function RequireAuth({ roles, needsCourse = true }: Props) {
+export default function RequireAuth({ roles, needsCourse = true, courseOptionalFor }: Props) {
   const { session } = useAuth();
   const location = useLocation();
 
@@ -16,7 +17,8 @@ export default function RequireAuth({ roles, needsCourse = true }: Props) {
   if (session.mustChangePassword && location.pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />;
   }
-  if (needsCourse && !session.courseId) return <Navigate to="/select-course" replace />;
+  const courseOptional = courseOptionalFor?.includes(session.activeRole) ?? false;
+  if (needsCourse && !session.courseId && !courseOptional) return <Navigate to="/select-course" replace />;
   if (roles && !roles.includes(session.activeRole)) {
     return <Navigate to={homePathFor(session.activeRole)} replace />;
   }

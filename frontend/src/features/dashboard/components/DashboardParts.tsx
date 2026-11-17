@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Box, Chip, Link, Typography } from "@mui/material";
+import { Box, Chip, Link, Paper, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import type { EncounterStatus } from "../../../types";
 import { utep } from "../../../theme/tokens";
@@ -68,22 +68,25 @@ interface PanelProps {
   subtitle?: string;
   action?: { label: string; to: string };
   accent?: boolean;
+  flush?: boolean;
   children: ReactNode;
 }
 
-export function Panel({ title, subtitle, action, accent, children }: PanelProps) {
+export function Panel({ title, subtitle, action, accent, flush, children }: PanelProps) {
   return (
-    <Box
-      component="section"
-      aria-label={title}
+    <Paper
+      component="section" aria-label={title}
       sx={{
-        py: 2,
-        ...(accent
-          ? { borderTop: `3px solid ${utep.orange}`, pt: 2.25 }
-          : { borderTop: `1px solid ${utep.lineSoft}` }),
+        borderRadius: "16px",
+        boxShadow: "none",
+        overflow: "hidden",
+        px: flush ? 0 : 2.75,
+        pt: flush ? 2.25 : 2.75,
+        pb: flush ? 0 : 2.75,
+        ...(accent && { borderTop: `5px solid ${utep.orange}` }),
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "baseline", gap: 2, mb: subtitle ? 0.5 : 1.25 }}>
+      <Box sx={{ display: "flex", alignItems: "baseline", gap: 2, mb: subtitle ? 0.5 : flush ? 1.25 : 1.5, px: flush ? 2.75 : 0 }}>
         <Typography component="h2" variant="h6" sx={{ flex: 1, color: utep.navy, fontSize: 18 }}>{title}</Typography>
         {action && (
           <Link component={RouterLink} to={action.to} underline="hover" sx={{ fontWeight: 600, fontSize: 14, color: utep.navy, whiteSpace: "nowrap" }}>
@@ -91,9 +94,13 @@ export function Panel({ title, subtitle, action, accent, children }: PanelProps)
           </Link>
         )}
       </Box>
-      {subtitle && <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{subtitle}</Typography>}
+      {subtitle && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, px: flush ? 2.75 : 0 }}>
+          {subtitle}
+        </Typography>
+      )}
       {children}
-    </Box>
+    </Paper>
   );
 }
 

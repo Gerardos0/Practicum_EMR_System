@@ -12,14 +12,15 @@ interface Props {
   patientId: string;
   reviewer?: boolean;
   emptyAction?: React.ReactNode;
+  emptyBody?: string;
 }
 
-export default function NotesList({ notes, patientId, reviewer, emptyAction }: Props) {
+export default function NotesList({ notes, patientId, reviewer, emptyAction, emptyBody }: Props) {
   const navigate = useNavigate();
   if (notes.length === 0) {
     return (
       <EmptyState title="No notes on this encounter yet" action={emptyAction}>
-        {reviewer ? "Notes appear here once the student starts documenting." : "Start a note to document this visit."}
+        {emptyBody ?? (reviewer ? "Notes appear here once the student starts documenting." : "Start a note to document this visit.")}
       </EmptyState>
     );
   }

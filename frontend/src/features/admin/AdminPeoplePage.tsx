@@ -60,7 +60,7 @@ export default function AdminPeoplePage() {
       </Paper>
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
         {courses.data.map((course) => (
-          <Card key={course.id} sx={{ minWidth: 180, borderWidth: course.id === courseId ? 2 : 1, borderColor: course.id === courseId ? "primary.main" : "divider" }}>
+          <Card key={course.id} sx={{ minWidth: 180, borderRadius: "16px", borderWidth: course.id === courseId ? 2 : 1, borderColor: course.id === courseId ? "primary.main" : "divider" }}>
             <CardActionArea onClick={() => setCourseId(course.id)}>
               <CardContent>
                 <Typography variant="subtitle2">{course.code}</Typography>

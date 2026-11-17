@@ -8,8 +8,8 @@ import EmptyState from "../../components/EmptyState";
 import { formatDate } from "../../utils/format";
 
 export default function LabsTab({ patient, onChange }: { patient: Patient; onChange: (patient: Patient) => void }) {
-  const { activeRole } = useSession();
-  const editable = canEditSection(activeRole, patient, "labs");
+  const { user, activeRole } = useSession();
+  const editable = canEditSection(activeRole, patient, "labs", user.id);
   const [form, setForm] = useState({ name: "", value: "", unit: "", referenceRange: "", collectedAt: "" });
   const [error, setError] = useState("");
 

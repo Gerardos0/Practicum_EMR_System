@@ -4,13 +4,15 @@ import type { Patient } from "../../types";
 import { createReferral, listAppointments, listReferrals } from "../../api/scheduling";
 import { useSession } from "../auth/useSession";
 import { can } from "../../utils/permissions";
+import { canChartPatient } from "../chart/access";
 import { disciplineLabel } from "../../utils/labels";
 import { formatDate, formatDateTime } from "../../utils/format";
 import { useAsync } from "../../utils/useAsync";
 import ReferralDialog from "./ReferralDialog";
 
 export default function SchedulingTab({ patient, section = "both" }: { patient: Patient; section?: "appointments" | "referrals" | "both" }) {
-  const { activeRole } = useSession();
+  const { user, activeRole } = useSession();
+  const chartable = canChartPatient(activeRole, patient, user.id);
   const [open, setOpen] = useState(false);
   const appts = useAsync(() => listAppointments(patient.id, activeRole), [patient.id, activeRole]);
   const refs = useAsync(() => listReferrals(patient.id, activeRole), [patient.id, activeRole]);
@@ -33,7 +35,7 @@ export default function SchedulingTab({ patient, section = "both" }: { patient: 
       {(section === "both" || section === "referrals") && <Paper sx={{ p: 2.5, borderRadius: "16px" }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
           <Typography component="h2" variant="h6" sx={{ flex: 1 }}>Referrals</Typography>
-          {can(activeRole, "referral:create") && <Button variant="outlined" onClick={() => setOpen(true)}>Create referral</Button>}
+          {can(activeRole, "referral:create") && chartable && <Button variant="outlined" onClick={() => setOpen(true)}>Create referral</Button>}
         </Box>
         {(refs.data ?? []).length === 0 && <Typography variant="body2" color="text.secondary">No referrals yet.</Typography>}
         <Stack spacing={1.5}>
