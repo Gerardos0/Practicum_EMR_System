@@ -10,7 +10,8 @@ import { useSession } from "../auth/useSession";
 import { usePageHeading } from "../../components/usePageHeading";
 import PageError from "../../components/PageError";
 import { actionLabel } from "./auditLabels";
-import CensusRow, { nameInitials } from "../../components/CensusRow";
+import CensusRow from "../../components/CensusRow";
+import { nameInitials } from "../../components/census";
 
 export default function AuditLogPage() {
   const { user, courseId: sessionCourseId, activeRole } = useSession();

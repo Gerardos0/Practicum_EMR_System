@@ -4,7 +4,8 @@ import { useSession } from "../../auth/useSession";
 import { useAsync } from "../../../utils/useAsync";
 import { formatDateTime } from "../../../utils/format";
 import PageError from "../../../components/PageError";
-import CensusRow, { nameInitials } from "../../../components/CensusRow";
+import CensusRow from "../../../components/CensusRow";
+import { nameInitials } from "../../../components/census";
 
 function recordLabel(entity: string) {
   if (entity.startsWith("patient/")) return "Chart";

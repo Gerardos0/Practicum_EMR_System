@@ -12,7 +12,8 @@ import EmptyState from "../../components/EmptyState";
 import PageError from "../../components/PageError";
 import { usePageHeading } from "../../components/usePageHeading";
 import CountTabs from "../../components/CountTabs";
-import CensusRow, { nameInitials } from "../../components/CensusRow";
+import CensusRow from "../../components/CensusRow";
+import { nameInitials } from "../../components/census";
 import { templateName } from "./noteTemplates";
 import type { NoteStatus } from "../../types";
 
