@@ -59,7 +59,7 @@ async def test_portal_returns_only_linked_chart_sorted_and_audits_success(client
 
 
 @pytest.mark.asyncio
-async def test_portal_isolates_linked_charts_and_unlinked_login_is_not_found(client, db_session):
+async def test_portal_isolates_linked_charts_and_unlinked_login_has_no_chart(client, db_session):
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     course = await course_id(client, instructor, "PHAR 5320")
     rosa = await patient_by_mrn(client, instructor, course, "instructor", "TR-20001")
@@ -75,13 +75,18 @@ async def test_portal_isolates_linked_charts_and_unlinked_login_is_not_found(cli
     assert elena_response.json()["patient"]["mrn"] == "TR-20003"
     assert "TR-20003" not in str(rosa_response.json())
     assert "TR-20001" not in str(elena_response.json())
-    assert (await client.get("/api/v1/portal", headers=unlinked_headers)).status_code == 404
-    assert await db_session.scalar(
+    unlinked = await client.get("/api/v1/portal", headers=unlinked_headers)
+    assert unlinked.status_code == 200
+    assert unlinked.json()["patient"] is None
+    event = await db_session.scalar(
         select(AuditEvent).where(
             AuditEvent.action == "portal.view",
             AuditEvent.actor_user_id == unlinked_user.id,
         )
-    ) is None
+    )
+    assert event is not None
+    assert event.entity_type == "user"
+    assert event.details["detail"] == "Portal viewed without a linked chart."
 
 
 @pytest.mark.asyncio

@@ -176,7 +176,7 @@ async def test_portal_intakes_are_isolated_between_linked_patients(client, db_se
 
 
 @pytest.mark.asyncio
-async def test_nonpatient_roles_and_unlinked_patient_are_denied(client, db_session):
+async def test_nonpatient_roles_are_denied_and_unlinked_patient_can_prechart(client, db_session):
     student, _ = await login(client, "daniel.reyes@miners.utep.edu")
     instructor, _ = await login(client, "gerardo.sillas@utep.edu")
     admin, _ = await login(client, "clarissa.dominguez@utep.edu")
@@ -186,8 +186,13 @@ async def test_nonpatient_roles_and_unlinked_patient_are_denied(client, db_sessi
         assert (await client.put("/api/v1/portal/intake", headers=headers, json=body)).status_code == 403
 
     unlinked, _ = await _portal_headers(client, db_session, None, "intake-unlinked")
-    assert (await client.get("/api/v1/portal/intake", headers=unlinked)).status_code == 404
-    assert (await client.put("/api/v1/portal/intake", headers=unlinked, json=body)).status_code == 404
+    opened = await client.get("/api/v1/portal/intake", headers=unlinked)
+    assert opened.status_code == 200
+    assert opened.json()["identity"]["mrn"] is None
+    assert opened.json()["editable"] is True
+    saved = await client.put("/api/v1/portal/intake", headers=unlinked, json=body)
+    assert saved.status_code == 200
+    assert saved.json()["editable"] is True
 
 
 @pytest.mark.asyncio

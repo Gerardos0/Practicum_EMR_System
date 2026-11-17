@@ -5,7 +5,7 @@ import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { patientSignupByEmail } from "../../api/portalAccounts";
-import { trainingStripe, utep } from "../../theme/tokens";
+import { brandAccentBar, utep } from "../../theme/tokens";
 import { useAuth } from "../auth/useSession";
 
 export default function PatientSignupPage() {
@@ -60,7 +60,7 @@ export default function PatientSignupPage() {
             Educational medical record
           </Typography>
         </Box>
-        <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
+        <Box aria-hidden sx={{ height: 6, background: brandAccentBar }} />
         <Box component="main" sx={{ flex: 1, display: "grid", placeItems: "center", px: 2, py: 5 }}>
           <Paper component="section" aria-labelledby="no-chart-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>
             <Typography id="no-chart-title" component="h1" variant="h5" sx={{ mb: 1 }}>No patient chart found</Typography>
@@ -85,7 +85,7 @@ export default function PatientSignupPage() {
           Educational medical record
         </Typography>
       </Box>
-      <Box aria-hidden sx={{ height: 6, background: trainingStripe }} />
+      <Box aria-hidden sx={{ height: 6, background: brandAccentBar }} />
       <Box component="main" sx={{ flex: 1, display: "grid", placeItems: "center", px: 2, py: 5 }}>
         <Paper component="section" aria-labelledby="patient-signup-title" sx={{ width: "100%", maxWidth: 420, p: { xs: 3, sm: 4 } }}>
           <Typography id="patient-signup-title" component="h1" variant="h5" sx={{ mb: 0.5 }}>Create your patient account</Typography>
