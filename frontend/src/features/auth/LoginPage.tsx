@@ -97,7 +97,7 @@ export default function LoginPage() {
           <Typography sx={{ fontSize: { xs: 16, md: 18 }, fontWeight: 500, maxWidth: "32ch", opacity: 0.92, mb: 2 }}>
             Educational medical record for pharmacy and clinical training.
           </Typography>
-          <Box sx={{ width: 72, height: 3, bgcolor: utep.orange, mb: 2 }} />
+          <Box sx={{ width: "min(100%, 32ch)", height: 3, bgcolor: utep.orange, mb: 2 }} />
           <Typography variant="body2" sx={{ opacity: 0.78, maxWidth: "40ch" }}>
             Simulated patients only — never real PHI.
           </Typography>
