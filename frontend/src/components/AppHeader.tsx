@@ -65,7 +65,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
         sx={{ bgcolor: utep.paper, color: utep.navy, borderBottom: `1px solid ${utep.lineSoft}` }}
       >
         <Box aria-hidden sx={{ height: 3, background: brandAccentBar }} />
-        <Toolbar sx={{ gap: 1.25, flexWrap: "wrap", py: 1.25, px: { xs: 2, md: 3 }, minHeight: { md: 64 } }}>
+        <Toolbar sx={{ gap: 1, flexWrap: "nowrap", py: 0.75, px: { xs: 1.5, md: 2 }, minHeight: 56 }}>
           <IconButton
             aria-label="Open navigation" onClick={onOpenNav}
             sx={{ display: { md: "none" }, color: utep.navy, minWidth: 44, minHeight: 44 }}
@@ -80,14 +80,15 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
             {prefs.navCollapsed ? <MenuRounded /> : <MenuOpenRounded />}
           </IconButton>
 
-          <Box sx={{ flex: "1 1 220px", minWidth: 0 }}>
+          <Box sx={{ flex: "1 1 0", minWidth: 0, maxWidth: 340 }}>
             <Typography
               component="h1"
+              noWrap
               sx={{
                 fontFamily: fontDisplay,
                 fontWeight: 700,
-                fontSize: heading ? 22 : 16,
-                lineHeight: 1.2,
+                fontSize: heading ? 20 : 16,
+                lineHeight: 1.15,
                 color: utep.navy,
                 letterSpacing: "-0.02em",
               }}
@@ -95,7 +96,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
               {heading?.title ?? courseLabel}
             </Typography>
             {heading && (
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: utep.ink2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <Typography noWrap sx={{ fontSize: 12.5, fontWeight: 600, color: utep.ink2 }}>
                 {courseLabel}
               </Typography>
             )}
@@ -105,13 +106,13 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
             <Box
               component="form" role="search" onSubmit={search}
               sx={{
-                flex: "0 1 280px", display: "flex", alignItems: "center", gap: 1, px: 1.5, height: 40,
+                flex: "1 1 140px", minWidth: 0, maxWidth: 260, display: "flex", alignItems: "center", gap: 0.75, px: 1.25, height: 36,
                 bgcolor: "rgba(14,34,80,0.04)", borderRadius: 1, color: "text.secondary",
                 boxShadow: `inset 0 0 0 1px ${utep.lineSoft}`,
               }}
             >
               <SearchRounded fontSize="small" aria-hidden />
-              <Typography component="label" htmlFor="patient-search" sx={{ fontSize: 13, fontWeight: 700, color: utep.navy }}>
+              <Typography component="label" htmlFor="patient-search" sx={{ fontSize: 13, fontWeight: 700, color: utep.navy, display: { xs: "none", lg: "block" } }}>
                 Search
               </Typography>
               <InputBase
@@ -142,7 +143,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
                 // Leave chart/review deep links so we don't show another course's patient.
                 navigate(homePathFor(activeRole));
               }}
-              sx={{ ...pickerSx, minWidth: 140 }}
+              sx={{ ...pickerSx, height: 36, maxWidth: 168, "& .MuiSelect-select": { overflow: "hidden", textOverflow: "ellipsis" } }}
             >
               {roleCourses.map((c) => <MenuItem key={c.id} value={c.id}>{c.code}, {c.term}</MenuItem>)}
             </Select>
@@ -156,7 +157,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
                 switchRole(role);
                 navigate(homePathFor(role));
               }}
-              sx={{ ...pickerSx, bgcolor: utep.navy, color: "#fff", "& .MuiSvgIcon-root": { color: "#fff" } }}
+              sx={{ ...pickerSx, height: 36, bgcolor: utep.navy, color: "#fff", "& .MuiSvgIcon-root": { color: "#fff" } }}
               renderValue={(v) => roleLabel[v as Role]}
             >
               {roles.map((role) => <MenuItem key={role} value={role}>{roleLabel[role]}</MenuItem>)}
@@ -194,7 +195,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
           </Menu>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box sx={{ textAlign: "right", lineHeight: 1.25, display: { xs: "none", sm: "block" } }}>
+            <Box sx={{ textAlign: "right", lineHeight: 1.2, display: { xs: "none", xl: "block" } }}>
               <Typography variant="body2" sx={{ fontWeight: 700 }}>{user.fullName}</Typography>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                 {roleLabel[activeRole]}{discipline ? `, ${disciplineLabel[discipline]}` : ""}
@@ -206,7 +207,7 @@ export default function AppHeader({ onOpenNav }: { onOpenNav: () => void }) {
             >
               {initials}
             </Box>
-            <Chip label="Training" size="small" variant="outlined" sx={{ display: { xs: "none", md: "flex" }, borderColor: utep.line }} />
+            <Chip label="Training" size="small" variant="outlined" sx={{ display: { xs: "none", xl: "flex" }, borderColor: utep.line }} />
           </Box>
         </Toolbar>
       </AppBar>

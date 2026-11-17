@@ -13,7 +13,7 @@ type Props = {
   subtitle?: string;
   invert?: boolean;
   /** Hero product title size (px or CSS length). */
-  titleSize?: { xs?: number | string; sm?: number | string; md?: number | string } | number | string;
+  titleSize?: { xs?: number | string; sm?: number | string; md?: number | string; lg?: number | string } | number | string;
 } & BoxProps;
 
 /**
@@ -55,7 +55,7 @@ export default function BrandLogo({
   }
 
   if (variant === "hero") {
-    const size = titleSize ?? { xs: 40, sm: 52, md: 64 };
+    const size = titleSize ?? { xs: 36, md: 48 };
     return (
       <Box sx={{ ...sx }} {...rest}>
         <Box
@@ -63,7 +63,7 @@ export default function BrandLogo({
           src={pick}
           alt=""
           aria-hidden
-          sx={{ width: { xs: 44, md: 56 }, height: "auto", display: "block", mb: 2.5 }}
+          sx={{ width: { xs: 40, md: 48 }, height: "auto", display: "block", mb: 1.5 }}
         />
         <Typography
           component="p"
@@ -74,7 +74,8 @@ export default function BrandLogo({
             lineHeight: 0.95,
             letterSpacing: "-0.04em",
             color: invert ? utep.navy : "#fff",
-            mb: 1.5,
+            mb: 1,
+            "@media (max-height: 720px)": { fontSize: 36 },
           }}
         >
           UTEP EMR

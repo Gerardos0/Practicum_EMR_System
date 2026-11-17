@@ -62,9 +62,10 @@ export default function LoginPage() {
   return (
     <Box
       sx={{
-        minHeight: "100dvh",
+        height: "100dvh",
+        overflow: "hidden",
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1.15fr) minmax(320px, 440px)" },
+        gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) minmax(300px, 400px)" },
         bgcolor: utep.navyDark,
       }}
     >
@@ -73,12 +74,11 @@ export default function LoginPage() {
         aria-hidden={false}
         sx={{
           position: "relative",
-          display: "flex",
+          display: { xs: "none", md: "flex" },
           flexDirection: "column",
-          justifyContent: "flex-end",
-          px: { xs: 3, sm: 5, md: 7 },
-          py: { xs: 4, md: 7 },
-          minHeight: { xs: 220, md: "100dvh" },
+          justifyContent: "center",
+          px: { md: 5, lg: 7 },
+          py: 4,
           backgroundImage: brandAtmosphere,
           color: "#fff",
           overflow: "hidden",
@@ -87,21 +87,21 @@ export default function LoginPage() {
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(180deg, transparent 35%, rgba(8,22,54,0.55) 100%)",
+              "linear-gradient(180deg, transparent 35%, rgba(8,22,54,0.45) 100%)",
             pointerEvents: "none",
           },
         }}
       >
-        <Box sx={{ position: "relative", zIndex: 1, maxWidth: 520 }}>
-          <BrandLogo variant="hero" sx={{ mb: 0 }} />
-          <Typography sx={{ fontSize: { xs: 16, md: 18 }, fontWeight: 500, maxWidth: "32ch", opacity: 0.92, mb: 2 }}>
+        <Box sx={{ position: "relative", zIndex: 1, maxWidth: 460 }}>
+          <BrandLogo variant="hero" titleSize={{ md: 44, lg: 52 }} sx={{ mb: 0 }} />
+          <Typography sx={{ fontSize: 16, fontWeight: 500, maxWidth: "32ch", opacity: 0.92, mb: 1.5 }}>
             Educational medical record for pharmacy and clinical training.
           </Typography>
-          <Box sx={{ width: "min(100%, 32ch)", height: 3, bgcolor: utep.orange, mb: 2 }} />
+          <Box sx={{ width: "min(100%, 28ch)", height: 3, bgcolor: utep.orange, mb: 1.5 }} />
           <Typography variant="body2" sx={{ opacity: 0.78, maxWidth: "40ch" }}>
             Simulated patients only — never real PHI.
           </Typography>
-          <Box sx={{ mt: { xs: 3, md: 5 }, maxWidth: 260, opacity: 0.92 }}>
+          <Box sx={{ mt: 3, maxWidth: 220, opacity: 0.92, "@media (max-height: 720px)": { display: "none" } }}>
             <BrandLogo variant="wordmark" />
           </Box>
         </Box>
@@ -114,15 +114,19 @@ export default function LoginPage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
+          overflow: "auto",
           px: { xs: 3, sm: 4 },
-          py: { xs: 4, md: 6 },
+          py: 3,
         }}
       >
         <Box component="section" aria-labelledby="login-title" sx={{ width: "100%", maxWidth: 360, mx: "auto" }}>
-          <Typography id="login-title" component="h1" variant="h5" sx={{ mb: 0.75 }}>
+          <Box sx={{ display: { md: "none" }, mb: 2 }}>
+            <BrandLogo variant="lockup" invert />
+          </Box>
+          <Typography id="login-title" component="h1" variant="h5" sx={{ mb: 0.5 }}>
             Sign in
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Use your authorized training account.
           </Typography>
 

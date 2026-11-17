@@ -52,10 +52,19 @@ export default function AdminHomePage() {
   const checkedIn = board.data?.checkedIn ?? [];
 
   return (
-    <Box sx={{ display: "grid", gap: 2.5 }}>
-      <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 1.5,
+        flex: { md: "1 1 auto" },
+        minHeight: { md: 0 },
+        overflow: { md: "hidden" },
+        gridTemplateRows: { md: "auto minmax(0, 1fr)" },
+      }}
+    >
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
         <Panel title="Classes" accent action={{ label: "Manage classes", to: "/admin/courses" }}>
-          <Typography sx={{ fontSize: 40, fontWeight: 800, color: utep.navy, lineHeight: 1 }}>
+          <Typography sx={{ fontSize: 32, fontWeight: 800, color: utep.navy, lineHeight: 1 }}>
             {courses.length}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -69,7 +78,7 @@ export default function AdminHomePage() {
         </Panel>
       </Box>
 
-      <Panel title="Checked in" flush={checkedIn.length > 0}>
+      <Panel fill title="Checked in" flush={checkedIn.length > 0}>
         {board.error ? (
           <Typography color="error">The checked-in list could not be loaded.</Typography>
         ) : checkedIn.length === 0 ? (
