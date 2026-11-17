@@ -94,6 +94,46 @@ export interface MedicationOrderRecord {
   isCompound?: boolean;
 }
 
+export interface ClinicalOrderRecord {
+  id: string;
+  patientId: string;
+  encounterId?: string | null;
+  kind: "lab" | "procedure";
+  name: string;
+  priority: "routine" | "stat";
+  specimen?: string | null;
+  instructions?: string | null;
+  status: "ordered" | "cancelled";
+  orderedByName: string;
+  orderedAt: string;
+  updatedAt?: string | null;
+}
+
+export interface ClinicalOrderInput {
+  kind: "lab" | "procedure";
+  name: string;
+  priority: "routine" | "stat";
+  specimen?: string;
+  instructions?: string;
+}
+
+export function listClinicalOrders(role: Role, patientId: string): Promise<ClinicalOrderRecord[]> {
+  return request<ClinicalOrderRecord[]>(`/patients/${patientId}/orders`, { query: { role } });
+}
+
+export function createClinicalOrder(role: Role, patientId: string, body: ClinicalOrderInput): Promise<ClinicalOrderRecord> {
+  return request<ClinicalOrderRecord>(`/patients/${patientId}/orders`, { method: "POST", query: { role }, json: body });
+}
+
+export function updateClinicalOrder(
+  role: Role,
+  patientId: string,
+  orderId: string,
+  body: Partial<ClinicalOrderInput> & { status?: "ordered" | "cancelled" },
+): Promise<ClinicalOrderRecord> {
+  return request<ClinicalOrderRecord>(`/patients/${patientId}/orders/${orderId}`, { method: "PATCH", query: { role }, json: body });
+}
+
 export function listMedicationOrders(role: Role, patientId: string): Promise<MedicationOrderRecord[]> {
   return request<MedicationOrderRecord[]>(`/patients/${patientId}/medication-orders`, { query: { role } });
 }

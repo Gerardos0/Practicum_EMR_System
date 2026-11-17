@@ -41,6 +41,7 @@ class CourseOut(APIModel):
     code: str
     title: str
     term: str
+    track: Literal["pharmacy", "nursing"] | None = None
     status: CourseStatus
     inactivity_days: int = 7
     instructor_ids: list[str]
@@ -667,6 +668,37 @@ class AdministerWrite(APIModel):
 class AdministrationReview(APIModel):
     decision: Literal["accepted", "needs_follow_up"]
     comment: str = ""
+
+
+class ClinicalOrderCreate(APIModel):
+    kind: Literal["lab", "procedure"]
+    name: str = Field(min_length=1, max_length=120)
+    priority: Literal["routine", "stat"] = "routine"
+    specimen: str | None = None
+    instructions: str | None = None
+
+
+class ClinicalOrderUpdate(APIModel):
+    name: str | None = Field(default=None, max_length=120)
+    priority: Literal["routine", "stat"] | None = None
+    specimen: str | None = None
+    instructions: str | None = None
+    status: Literal["ordered", "cancelled"] | None = None
+
+
+class ClinicalOrderOut(APIModel):
+    id: str
+    patient_id: str
+    encounter_id: str | None = None
+    kind: Literal["lab", "procedure"]
+    name: str
+    priority: Literal["routine", "stat"]
+    specimen: str | None = None
+    instructions: str | None = None
+    status: Literal["ordered", "cancelled"]
+    ordered_by_name: str
+    ordered_at: datetime
+    updated_at: datetime | None = None
 
 
 class MedicationOrderCreate(APIModel):

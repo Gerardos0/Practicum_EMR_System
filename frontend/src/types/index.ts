@@ -48,6 +48,7 @@ export interface Course {
   code: string;
   title: string;
   term: string;
+  track?: "pharmacy" | "nursing" | null;
   status: CourseStatus;
   inactivityDays?: number;
   instructorIds: string[];

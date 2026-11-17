@@ -13,11 +13,14 @@ import PageError from "../../components/PageError";
 import { usePageHeading } from "../../components/usePageHeading";
 import BackLink from "../../components/BackLink";
 import PatientBanner from "./components/PatientBanner";
+import PharmacyProfile from "./components/PharmacyProfile";
+import { usePharmacyCourse } from "./usePharmacyCourse";
 import StatusDialog from "./components/StatusDialog";
 import SummaryTab from "./components/SummaryTab";
 import NotesList from "../encounters/components/NotesList";
 import MedicationsTab from "../medications/MedicationsTab";
 import LabsTab from "../labs/LabsTab";
+import { EditOrders, EnterOrders } from "./components/PharmacyOrders";
 import SchedulingTab from "../scheduling/SchedulingTab";
 import { simulationNoteAction } from "./simulation";
 import ChartActivity from "./components/ChartActivity";
@@ -27,6 +30,8 @@ const TABS = [
   { id: "summary", label: "Overview" },
   { id: "visits", label: "Visits" },
   { id: "labs", label: "Labs" },
+  { id: "enter-orders", label: "Enter orders" },
+  { id: "edit-orders", label: "Edit orders" },
   { id: "medications", label: "Medications" },
   { id: "notes", label: "Notes" },
   { id: "appointments", label: "Appointments" },
@@ -40,8 +45,11 @@ export default function PatientChartPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { user, activeRole } = useSession();
-  const visibleTabs = TABS.filter((item) => item.id !== "activity" || activeRole === "admin");
-  const tab = (visibleTabs.find((item) => item.id === params.get("tab"))?.id ?? "summary") as TabId;
+  const pharmacy = usePharmacyCourse();
+  const orderTabs = pharmacy ? [] : ["enter-orders", "edit-orders"];
+  const requested = params.get("tab") === "orders" ? "enter-orders" : params.get("tab");
+  const visibleTabs = TABS.filter((item) => (item.id !== "activity" || activeRole === "admin") && !orderTabs.includes(item.id));
+  const tab = (visibleTabs.find((item) => item.id === requested)?.id ?? "summary") as TabId;
   const [statusOpen, setStatusOpen] = useState(false);
 
   const patient = useAsync(() => getPatient(activeRole, patientId), [patientId, activeRole]);
@@ -103,10 +111,18 @@ export default function PatientChartPage() {
         />
       </Box>
 
-      <PatientBanner
-        patient={p}
-        onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
-      />
+      {pharmacy ? (
+        <PharmacyProfile
+          patient={p}
+          onChange={patient.setData}
+          onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
+        />
+      ) : (
+        <PatientBanner
+          patient={p}
+          onEditStatus={can(activeRole, "patient:update_status") ? () => setStatusOpen(true) : undefined}
+        />
+      )}
 
       <Tabs
         value={tab}
@@ -162,6 +178,8 @@ export default function PatientChartPage() {
         )}
         {tab === "medications" && <MedicationsTab patient={p} onChange={patient.setData} />}
         {tab === "labs" && <LabsTab patient={p} onChange={patient.setData} />}
+        {tab === "enter-orders" && pharmacy && <EnterOrders patient={p} />}
+        {tab === "edit-orders" && pharmacy && <EditOrders patient={p} />}
         {tab === "appointments" && <SchedulingTab patient={p} section="appointments" />}
         {tab === "referrals" && <SchedulingTab patient={p} section="referrals" />}
         {tab === "activity" && activeRole === "admin" && <ChartActivity patientId={p.id} />}

@@ -188,11 +188,12 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
         program_admin.roles.append(roles["admin"])
     pharmacy = disciplines["pharmacy"]
     therapy = disciplines["physical_therapy"]
+    nursing = disciplines["nursing"]
     await _member(db, daniel, phar, roles["student"], pharmacy)
     await _member(db, clarissa, phar, roles["student"], pharmacy)
     await _member(db, ana, phar, roles["student"], pharmacy)
     await _member(db, sam, phar, roles["student"], pharmacy)
-    await _member(db, luis, pt, roles["student"], therapy)
+    await _member(db, luis, pt, roles["student"], nursing)
     await _member(db, gerardo, phar, roles["instructor"], None)
     await _member(db, gerardo, pt, roles["instructor"], None)
     await _member(db, joe, phar, roles["instructor"], None)
@@ -207,16 +208,22 @@ async def _seed_courses_and_people(db, roles, disciplines, password: str | None)
 
 
 async def _course(db, code: str, title: str, term: str, rubric: str, *, guardrail_profile: str = "practicum") -> Course:
+    from app.services.course_track import track_for_code
+
     course = await db.scalar(select(Course).where(Course.code == code, Course.term == term))
+    track = track_for_code(code)
     if course is None:
         course = Course(
             code=code, title=title, term=term, rubric_file_name=rubric, guardrail_profile=guardrail_profile,
-            grading_guide=_guide_for(rubric),
+            grading_guide=_guide_for(rubric), track=track,
         )
         db.add(course)
         await db.flush()
-    elif course.grading_guide is None:
-        course.grading_guide = _guide_for(rubric)
+    else:
+        if course.grading_guide is None:
+            course.grading_guide = _guide_for(rubric)
+        if course.track != track:
+            course.track = track
     return course
 
 
@@ -287,6 +294,8 @@ async def _member(db, user: User, course: Course, role: Role, discipline: Discip
                 discipline_id=discipline.id if discipline else None,
             )
         )
+    elif discipline is not None and found.discipline_id != discipline.id:
+        found.discipline_id = discipline.id
 
 
 async def _ensure_admin(db, admin_role: Role, email: str, password: str) -> None:
@@ -1896,6 +1905,8 @@ def _patient(**kwargs) -> Patient:
 
 async def _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, therapy, hashed) -> None:
     role = await db.scalar(select(Role).where(Role.code == "student"))
+    nursing = await db.scalar(select(Discipline).where(Discipline.code == "nursing"))
+    clinic = nursing or therapy
     roster = [
         ("peter.parker@miners.utep.edu", "Peter", "Parker", "800701001", "1001", phar, pharmacy),
         ("wanda.maximoff@miners.utep.edu", "Wanda", "Maximoff", "800701002", "1002", phar, pharmacy),
@@ -1903,11 +1914,11 @@ async def _mixed_names(db, phar, pt, daniel, luis, gerardo, joe, pharmacy, thera
         ("scott.lang@miners.utep.edu", "Scott", "Lang", "800701004", "1004", phar, pharmacy),
         ("maria.gonzalez@miners.utep.edu", "Maria", "Gonzalez", "800703001", "3301", phar, pharmacy),
         ("diego.ramirez@miners.utep.edu", "Diego", "Ramirez", "800703002", "3302", phar, pharmacy),
-        ("bucky.barnes@miners.utep.edu", "Bucky", "Barnes", "800702001", "2001", pt, therapy),
-        ("jessica.jones@miners.utep.edu", "Jessica", "Jones", "800702002", "2002", pt, therapy),
-        ("matt.murdock@miners.utep.edu", "Matt", "Murdock", "800702003", "2003", pt, therapy),
-        ("andres.morales@miners.utep.edu", "Andres", "Morales", "800704001", "4401", pt, therapy),
-        ("valeria.castillo@miners.utep.edu", "Valeria", "Castillo", "800704002", "4402", pt, therapy),
+        ("bucky.barnes@miners.utep.edu", "Bucky", "Barnes", "800702001", "2001", pt, clinic),
+        ("jessica.jones@miners.utep.edu", "Jessica", "Jones", "800702002", "2002", pt, clinic),
+        ("matt.murdock@miners.utep.edu", "Matt", "Murdock", "800702003", "2003", pt, clinic),
+        ("andres.morales@miners.utep.edu", "Andres", "Morales", "800704001", "4401", pt, clinic),
+        ("valeria.castillo@miners.utep.edu", "Valeria", "Castillo", "800704002", "4402", pt, clinic),
     ]
     users = {}
     for email, first, last, uid, phone, course, disc in roster:

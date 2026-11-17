@@ -21,11 +21,14 @@ def _age(dob: date) -> int:
 
 
 def course_out(course: Course, instructor_ids: list[str]) -> dict:
+    from app.services.course_track import course_track
+
     return {
         "id": str(course.id),
         "code": course.code,
         "title": course.title,
         "term": course.term,
+        "track": course_track(course),
         "status": course.status,
         "inactivity_days": course.inactivity_days,
         "instructor_ids": instructor_ids,
