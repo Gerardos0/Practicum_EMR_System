@@ -9,6 +9,8 @@ import SelectCoursePage from "./features/auth/SelectCoursePage";
 import AppShell from "./components/AppShell";
 import PatientListPage from "./features/patients/PatientListPage";
 import PatientChartPage from "./features/patients/PatientChartPage";
+import PatientPortalPage from "./features/portal/PatientPortalPage";
+import PatientSignupPage from "./features/portal/PatientSignupPage";
 import NoteEditorPage from "./features/encounters/NoteEditorPage";
 import ReviewQueuePage from "./features/encounters/ReviewQueuePage";
 import NoteReviewPage from "./features/encounters/NoteReviewPage";
@@ -31,6 +33,7 @@ function LoginRoute() {
   const { session } = useAuth();
   if (!session) return <LoginPage />;
   if (session.mustChangePassword) return <Navigate to="/change-password" replace />;
+  if (session.activeRole === "patient") return <Navigate to="/portal" replace />;
   if (session.activeRole !== "student" && session.activeRole !== "instructor" && session.activeRole !== "admin") {
     return <LoginPage />;
   }
@@ -46,7 +49,8 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginRoute />} />
-            <Route path="/portal/*" element={<Navigate to="/" replace />} />
+            <Route path="/portal/signup" element={<PatientSignupPage />} />
+            <Route path="/portal/login" element={<Navigate to="/" replace />} />
 
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route path="/change-password" element={<ChangePasswordPage />} />
@@ -56,6 +60,9 @@ export default function App() {
             <Route element={<RequireAuth needsCourse={false} />}>
               <Route element={<AppShell />}>
                 <Route path="/about" element={<AboutPage />} />
+                <Route element={<RequireAuth roles={["patient"]} needsCourse={false} />}>
+                  <Route path="/portal" element={<PatientPortalPage />} />
+                </Route>
                 <Route element={<RequireAuth roles={["admin"]} needsCourse={false} />}>
                   <Route path="/admin" element={<AdminHomePage />} />
                   <Route path="/admin/courses" element={<CourseAdminPage />} />

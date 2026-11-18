@@ -111,6 +111,17 @@ async def test_email_signup_links_chart_or_creates_login_without_chart(client, d
     assert portal.status_code == 200, portal.text
     assert portal.json()["patient"]["mrn"] == patient_out["mrn"]
 
+    signed_in = await client.post(
+        "/api/v1/auth/login",
+        data={"username": "rosa.chart@example.com", "password": "patient-pass-123"},
+    )
+    assert signed_in.status_code == 200, signed_in.text
+    signed_in_portal = await client.get(
+        "/api/v1/portal", headers={"Authorization": f"Bearer {signed_in.json()['access_token']}"}
+    )
+    assert signed_in_portal.status_code == 200, signed_in_portal.text
+    assert signed_in_portal.json()["patient"]["mrn"] == patient_out["mrn"]
+
     missing = await client.post(
         "/api/v1/auth/patient-signup-by-email",
         json={"email": "no.chart@example.com", "password": "patient-pass-123"},

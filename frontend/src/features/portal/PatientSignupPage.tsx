@@ -133,7 +133,7 @@ export default function PatientSignupPage() {
                   </Stack>
                 </Box>
                 <Typography variant="body2" sx={{ mt: 2.5 }}>
-                  Already have an account? <Link component={RouterLink} to="/portal/login">Sign in</Link>
+                  Already have an account? <Link component={RouterLink} to="/">Sign in</Link>
                 </Typography>
               </>
             )}

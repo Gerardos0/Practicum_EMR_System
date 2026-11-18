@@ -72,7 +72,7 @@ def _rate_limit_login(ip: str | None) -> None:
         bucket.append(now)
 
 
-ACCOUNT_ROLES = ("instructor", "student", "admin")
+ACCOUNT_ROLES = ("instructor", "student", "admin", "patient")
 
 
 async def _default_acting_role(db: DbSession, user: User) -> str | None:
