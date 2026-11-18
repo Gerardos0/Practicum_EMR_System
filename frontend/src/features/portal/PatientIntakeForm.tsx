@@ -107,7 +107,7 @@ export default function PatientIntakeForm({ intake, onSaved, previewMode = false
       onSaved(result);
       setDraft(result.data);
       setSaved(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("main")?.scrollTo({ top: 0, behavior: "smooth" });
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
